@@ -111,6 +111,10 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+export function getTermExamAnswers() {
+  return answers
+}
+
 export function useTermExamAnswers() {
   return React.useSyncExternalStore(
     subscribe,

@@ -34,6 +34,7 @@ import {
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { academicMediums, academicVersions } from "@/lib/institutes"
 import {
+  isActiveMark,
   isPassRegenerated,
   regeneratePassStatus,
   useTermExamMarks,
@@ -94,7 +95,7 @@ export function PassFailRegenerate() {
     .sort((a, b) => a.instituteId - b.instituteId || a.rank - b.rank)
 
   const markCount = new Map<number, number>()
-  for (const m of marks) markCount.set(m.termExamId, (markCount.get(m.termExamId) ?? 0) + 1)
+  for (const m of marks.filter(isActiveMark)) markCount.set(m.termExamId, (markCount.get(m.termExamId) ?? 0) + 1)
 
   function setParam(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams)

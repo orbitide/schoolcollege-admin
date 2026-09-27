@@ -8,6 +8,7 @@ import {
   examLetterGrades,
   examStudents,
   getTermExamMarks,
+  isActiveMark,
   regeneratePassStatus,
   takesSubject,
 } from "@/lib/term-exam-marks"
@@ -85,7 +86,7 @@ export function calculateMeritList(exam: TermExam, institute: Institute): MeritR
   const enrolled = examStudents(exam).filter(
     ({ enrolment: e }) => e.sectionId != null && e.classRoll.trim()
   )
-  const saved = getTermExamMarks().filter((m) => m.termExamId === exam.id)
+  const saved = getTermExamMarks().filter((m) => m.termExamId === exam.id && isActiveMark(m))
 
   const results = enrolled.map(({ student, enrolment: e }): MeritResult => {
     const taken = exam.subjects.filter((s) => takesSubject(e, s.subjectId))

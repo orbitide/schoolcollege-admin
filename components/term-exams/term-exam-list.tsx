@@ -7,7 +7,7 @@ import { CheckIcon, MinusIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { useStudentLookups } from "@/components/students/student-lookups"
-import { FilterField, examDate } from "@/components/term-exams/term-exam-fields"
+import { FilterField, examDate, stamp } from "@/components/term-exams/term-exam-fields"
 import { TermExamActions } from "@/components/term-exams/term-exam-actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -382,14 +382,4 @@ function Flag({ on, label }: { on: TermExam[(typeof flagColumns)[number]["key"]]
   ) : (
     <MinusIcon className="mx-auto size-4 text-muted-foreground/60" aria-label={`${label}: no`} />
   )
-}
-
-function stamp(iso: string) {
-  return new Date(iso).toLocaleString("en-GB", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
 }

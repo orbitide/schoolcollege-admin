@@ -20,7 +20,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -39,6 +39,15 @@ const data = {
       ],
     },
     {
+      title: "Teacher",
+      icon: <UserRoundIcon />,
+      tone: "sky",
+      items: [
+        { title: "Manage Teacher (Admin)", url: "/teachers" },
+        { title: "Section Teacher (Admin)", url: "/section-teachers" },
+      ],
+    },
+    {
       title: "Term Exam",
       icon: <ClipboardListIcon />,
       tone: "amber",
@@ -54,7 +63,14 @@ const data = {
       tone: "rose",
       items: [
         { title: "Marks Upload", url: "/term-exam-marks/upload" },
+        { title: "Edit Student Marks", url: "/term-exam-marks/edit" },
+        { title: "Subject Marks Edit", url: "/term-exam-marks/subject-edit" },
+        { title: "Student Marks Set Change", url: "/term-exam-marks/set-change" },
+        { title: "Marks Clear", url: "/term-exam-marks/clear" },
+        { title: "Grace Marks", url: "/term-exam-marks/grace-marks" },
+        { title: "Marks Recalculation", url: "/term-exam-marks/recalculation" },
         { title: "Pass Fail ReGenerate", url: "/term-exam-marks/pass-fail-regenerate" },
+        { title: "Student Exam", url: "/term-exam-marks/students" },
       ],
     },
     {

@@ -81,3 +81,14 @@ export function examDate(iso: string) {
     year: "numeric",
   })
 }
+
+// "05/01/2026, 10:00", the created / modified stamps of the admin lists.
+export function stamp(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
