@@ -5,6 +5,7 @@ import * as React from "react"
 import { removeInstituteRecords } from "@/lib/academic-store"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteStudents } from "@/lib/students"
+import { removeInstituteTermExams } from "@/lib/term-exams"
 import {
   seedInstitutes,
   type Institute,
@@ -70,4 +71,5 @@ export function deleteInstitute(id: number) {
   removeInstituteRecords(id)
   removeInstituteUsers(id)
   removeInstituteStudents(id)
+  removeInstituteTermExams(id)
 }

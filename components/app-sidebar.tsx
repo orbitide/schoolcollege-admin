@@ -18,7 +18,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -28,11 +28,14 @@ const data = {
       icon: <GraduationCapIcon />,
       items: [
         { title: "Manage Students", url: "/students" },
+        { title: "Student Import", url: "/students/import" },
         { title: "Student Transfer", url: "/students/transfer" },
+        { title: "Student Dynamic Report", url: "/students/report" },
         { title: "Manage Testimonial", url: "/students/testimonials" },
         { title: "Clear Student", url: "/students/clear" },
       ],
     },
+    { title: "Term Exam", url: "/term-exam", icon: <ClipboardListIcon /> },
     {
       title: "Basic Settings",
       icon: <SlidersHorizontalIcon />,

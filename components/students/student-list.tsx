@@ -117,6 +117,12 @@ export function StudentList() {
     setPage(0)
   }
 
+  // Each institute's current academic year id.
+  const currentYears = new Map(
+    institutes.map((i) => [i.id, yearStore.getList(i.id).find((y) => y.isCurrent)?.id])
+  )
+  const currentYearOf = (instituteId: number) => currentYears.get(instituteId)
+
   const listed = selected ? [selected] : institutes
   const instituteById = new Map(institutes.map((i) => [i.id, i]))
   const needle = query.trim().toLowerCase()
@@ -129,6 +135,9 @@ export function StudentList() {
         ? currentEnrolment(student)
         : student.enrolments.find((e) => String(e.yearId) === yearFilter)
     if (yearFilter !== CURRENT && yearFilter !== ALL && !enrolment) return []
+    // "Current year" lists only students enrolled in their institute's
+    // current year, not former students (as the legacy list does).
+    if (yearFilter === CURRENT && enrolment?.yearId !== currentYearOf(institute.id)) return []
     if (classFilter !== ALL && String(enrolment?.classId) !== classFilter)
       return []
     if (sectionFilter !== ALL && String(enrolment?.sectionId) !== sectionFilter)

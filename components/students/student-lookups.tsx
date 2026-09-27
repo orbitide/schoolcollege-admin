@@ -71,3 +71,13 @@ export function initials(name: string) {
     .map((part) => part[0]?.toUpperCase())
     .join("")
 }
+
+// Lookups for the dynamic report: names, plus subject codes by id.
+export function useReportLookups() {
+  const name = useStudentLookups()
+  const subjects = subjectStore.useAll()
+  return React.useMemo(() => {
+    const codes = new Map(subjects.map((s) => [s.id, s.code]))
+    return { name, subjectCode: (id: number) => codes.get(id) ?? "?" }
+  }, [name, subjects])
+}

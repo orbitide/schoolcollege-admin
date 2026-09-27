@@ -117,6 +117,20 @@ function mobile(n: number) {
   return `017${String(10000000 + n * 7919).slice(-8)}`
 }
 
+// A made-up but stable board result for seeded student `n`.
+function seedResult(exam: "JSC" | "SSC", passingYear: string, n: number): BoardResult {
+  const gpas = ["5.00", "4.94", "4.83", "4.67", "4.50", "4.28", "3.89", "5.00"]
+  return {
+    passingYear,
+    board: ["Dhaka", "Dhaka", "Cumilla", "Dhaka", "Rajshahi"][n % 5],
+    roll: String((exam === "SSC" ? 410000 : 210000) + Number(passingYear.slice(2)) * 1000 + n),
+    registrationNo: String((exam === "SSC" ? 2110000000 : 1910000000) + Number(passingYear.slice(2)) * 10000 + n),
+    gpa: gpas[n % gpas.length],
+    totalMarks: exam === "SSC" ? String(1020 + ((n * 37) % 180)) : String(700 + ((n * 23) % 150)),
+    eiin: "108888",
+  }
+}
+
 function seedStudent(index: number): Student {
   const classId = Math.floor(index / 6) + 1 // Class Six (1) … Class Ten (5)
   const inClass = index % 6
@@ -160,31 +174,38 @@ function seedStudent(index: number): Student {
     guardianRelation: "",
     guardianAddress: "",
     primaryCommunicationPerson: "Father",
+    // Class Ten sat JSC in 2024 and SSC in 2026; Class Nine sat JSC in
+    // 2025. These feed the testimonials.
     board:
       classId === 5
-        ? {
-            JSC: {
-              passingYear: "2024",
-              board: "Dhaka",
-              roll: String(210000 + index),
-              registrationNo: String(1910000000 + index),
-              gpa: ["5.00", "4.83", "4.50"][index % 3],
-              totalMarks: "",
-              eiin: "108888",
-            },
-            // Class Ten sat SSC in 2026; its results feed the testimonials.
-            SSC: {
-              passingYear: "2026",
-              board: "Dhaka",
-              roll: String(410000 + index),
-              registrationNo: String(2110000000 + index),
-              gpa: ["5.00", "4.94", "4.67", "4.28", "3.89", "5.00"][index % 6],
-              totalMarks: String(1020 + ((index * 37) % 180)),
-              eiin: "108888",
-            },
-          }
-        : {},
+        ? { JSC: seedResult("JSC", "2024", index), SSC: seedResult("SSC", "2026", index) }
+        : classId === 4
+          ? { JSC: seedResult("JSC", "2025", index) }
+          : {},
     enrolments: [
+      // Class Nine were in Class Eight in 2025 and were promoted.
+      ...(classId === 4
+        ? [
+            {
+              yearId: 1,
+              medium: "",
+              classId: 3,
+              sectionId: 4 + section + 1,
+              branchId: 1,
+              shiftId: section + 1,
+              version: "",
+              groupId: null,
+              sessionId: null,
+              houseId: (index % 4) + 1,
+              classRoll: String(800 + inClass + 1),
+              studentType: "Regular" as const,
+              bankId: "",
+              subjectIds: [],
+              optionalSubjectId: null,
+              transferred: true,
+            },
+          ]
+        : []),
       {
         yearId: 2,
         medium: "",
@@ -209,7 +230,57 @@ function seedStudent(index: number): Student {
   }
 }
 
-const seedStudents: Student[] = Array.from({ length: 30 }, (_, i) => seedStudent(i))
+// Last year's Class Ten: 12 former students who sat SSC in 2025 (and JSC in
+// 2023), for the testimonials of an earlier examinee year.
+function seedAlumnus(n: number): Student {
+  const girl = n % 2 === 0
+  const first = girl ? girls[(n + 7) % girls.length] : boys[(n + 7) % boys.length]
+  const surname = surnames[(n + 3) % surnames.length]
+  const section = n % 2 // Class Ten A or B
+  const address = `House ${60 + n}, Road ${2 + (n % 7)}, ${areas[(n + 2) % areas.length]}, Dhaka`
+  return {
+    ...seedStudent(24 + (n % 6)),
+    id: 31 + n,
+    studentIdentificationNo: 25001 + n,
+    name: `${first} ${surname}`,
+    gender: girl ? "Female" : "Male",
+    dateOfBirth: `2009-${String(1 + (n % 12)).padStart(2, "0")}-${String(3 + n).padStart(2, "0")}`,
+    primaryMobile: mobile(201 + n),
+    fatherName: `${fathers[(n + 3) % fathers.length]} ${surname}`,
+    fatherMobile: mobile(201 + n),
+    motherName: `${mothers[(n + 5) % mothers.length]} Begum`,
+    motherMobile: mobile(301 + n),
+    presentAddress: address,
+    permanentAddress: address,
+    board: { JSC: seedResult("JSC", "2023", 40 + n), SSC: seedResult("SSC", "2025", 40 + n) },
+    enrolments: [
+      {
+        yearId: 1,
+        medium: "",
+        classId: 5,
+        sectionId: 9 + section,
+        branchId: 1,
+        shiftId: section + 1,
+        version: "",
+        groupId: (n % 3) + 1,
+        sessionId: null,
+        houseId: (n % 4) + 1,
+        classRoll: String(1001 + n),
+        studentType: "Regular",
+        bankId: "",
+        subjectIds: [1, 2, 3, 4],
+        optionalSubjectId: null,
+      },
+    ],
+    status: "Active",
+    admittedAt: "2024-01-07",
+  }
+}
+
+const seedStudents: Student[] = [
+  ...Array.from({ length: 30 }, (_, i) => seedStudent(i)),
+  ...Array.from({ length: 12 }, (_, i) => seedAlumnus(i)),
+]
 
 // ---- Store ----
 
@@ -250,6 +321,21 @@ export function addStudent(input: StudentInput) {
 
 export function updateStudent(id: number, input: Partial<StudentInput>) {
   emit(students.map((s) => (s.id === id ? { ...s, ...input } : s)))
+}
+
+// Applies a Student Import in one go: new students are added, existing ones
+// updated (see lib/student-import.ts).
+export function importStudents(
+  creates: StudentInput[],
+  updates: { id: number; input: Partial<StudentInput> }[]
+) {
+  const changes = new Map(updates.map((u) => [u.id, u.input]))
+  let id = Math.max(0, ...students.map((s) => s.id))
+  const today = new Date().toISOString().slice(0, 10)
+  emit([
+    ...students.map((s) => (changes.has(s.id) ? { ...s, ...changes.get(s.id) } : s)),
+    ...creates.map((input) => ({ ...input, id: ++id, admittedAt: today })),
+  ])
 }
 
 // Full names of the public exams, as printed on testimonials.

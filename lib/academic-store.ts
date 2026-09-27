@@ -342,6 +342,8 @@ export const classStore = createRecordStore<AcademicClass>(
   ].map(([name, nameBn, rollStartFrom], index) => {
     const grouped = index >= 3
     const ssc = index === 4
+    // Class Eight sits JSC and issues testimonials for it, as Ten does for SSC.
+    const jsc = index === 2
     return {
       id: index + 1,
       instituteId: 1,
@@ -353,8 +355,8 @@ export const classStore = createRecordStore<AcademicClass>(
       hasSession: false,
       hasSubjectGroup: grouped,
       groupIds: grouped ? [1, 2, 3] : [],
-      publicExams: ssc ? ["SSC"] : [],
-      testimonialExams: ssc ? ["SSC"] : [],
+      publicExams: ssc ? ["SSC"] : jsc ? ["JSC"] : [],
+      testimonialExams: ssc ? ["SSC"] : jsc ? ["JSC"] : [],
       enableBoardAdmission: ssc,
       rank: index + 1,
       status: "Active" as const,
