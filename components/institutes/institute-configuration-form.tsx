@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { SelectField, Toggle } from "@/components/institutes/institute-form"
@@ -26,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   defaultConfiguration,
   roles,
+  type Institute,
   type InstituteConfiguration,
 } from "@/lib/institutes"
 import {
@@ -59,25 +59,17 @@ export function InstituteConfigurationForm({ id }: { id: number }) {
     )
   }
 
-  return (
-    <ConfigurationFormBody
-      key={id}
-      id={id}
-      name={institute.name}
-      initial={institute.configuration}
-    />
-  )
+  return <ConfigurationFormBody key={id} id={id} institute={institute} />
 }
 
 function ConfigurationFormBody({
   id,
-  name,
-  initial,
+  institute,
 }: {
   id: number
-  name: string
-  initial: Config
+  institute: Institute
 }) {
+  const { name, configuration: initial } = institute
   const router = useRouter()
   const [values, setValues] = React.useState<Config>({
     ...defaultConfiguration,
@@ -176,23 +168,12 @@ function ConfigurationFormBody({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      noValidate
-      className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6"
-    >
-      <Button asChild variant="ghost" size="sm" className="w-fit">
-        <Link href={backHref}>
-          <ArrowLeftIcon data-icon="inline-start" />
-          {name}
-        </Link>
-      </Button>
-
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h3 className="text-xl font-semibold tracking-tight">
             Configuration
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground">
             Results, reports, SMS and exam settings for {name}.
           </p>
@@ -267,12 +248,12 @@ function ConfigurationFormBody({
               <FieldLabel htmlFor="reportHeaderStyle">
                 Report header style
               </FieldLabel>
-              <Textarea rows={2} className="font-mono text-xs" {...text("reportHeaderStyle")} />
+              <Input className="font-mono text-xs" {...text("reportHeaderStyle")} />
               <FieldDescription>Inline CSS for the institute name.</FieldDescription>
             </Field>
             <Field className="sm:col-span-3">
               <FieldLabel htmlFor="reportNameStyle">Report name style</FieldLabel>
-              <Textarea rows={2} className="font-mono text-xs" {...text("reportNameStyle")} />
+              <Input className="font-mono text-xs" {...text("reportNameStyle")} />
               <FieldDescription>Inline CSS for the report title.</FieldDescription>
             </Field>
             <Field>
@@ -290,6 +271,10 @@ function ConfigurationFormBody({
               error={errors.printPageSize}
               input={number("printPageSize")}
             />
+            <div className="flex flex-col gap-2 sm:col-span-3">
+              <span className="text-sm font-medium">Preview</span>
+              <ReportHeaderPreview institute={institute} config={values} />
+            </div>
           </CardContent>
         </Card>
 
@@ -439,6 +424,66 @@ function ConfigurationFormBody({
         <Button type="submit">Save configuration</Button>
       </div>
     </form>
+  )
+}
+
+// Turn an inline CSS string ("color: red; font-size: 20px") into a React style
+// object. Unknown or invalid declarations are simply ignored by the browser.
+function parseInlineStyle(css: string): React.CSSProperties {
+  const style: Record<string, string> = {}
+  for (const declaration of css.split(";")) {
+    const index = declaration.indexOf(":")
+    if (index === -1) continue
+    const property = declaration.slice(0, index).trim().toLowerCase()
+    const value = declaration.slice(index + 1).trim()
+    if (!/^-?[a-z]+(-[a-z]+)*$/.test(property) || !value) continue
+    style[property.replace(/-([a-z])/g, (_, char: string) => char.toUpperCase())] =
+      value
+  }
+  return style
+}
+
+// Mock of the printed report header, updated live as the settings change.
+function ReportHeaderPreview({
+  institute,
+  config,
+}: {
+  institute: Institute
+  config: Config
+}) {
+  const logoWidth = config.reportLogoWidth.trim() || "70px"
+  const highlight = config.reportHighlightColor.trim()
+
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-white p-6 text-black">
+      <div className="flex min-w-md items-center gap-4">
+        <div style={{ width: logoWidth }} className="shrink-0">
+          {institute.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={institute.logoUrl} alt="" className="h-auto w-full" />
+          ) : (
+            <div className="flex aspect-square w-full items-center justify-center rounded-md border border-dashed border-neutral-300 text-[10px] text-neutral-400">
+              Logo
+            </div>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col items-center text-center">
+          <p style={parseInlineStyle(config.reportHeaderStyle)}>{institute.name}</p>
+          <p className="text-xs text-neutral-600">
+            {[institute.address, institute.city].filter(Boolean).join(", ") ||
+              "Institute address"}
+            {institute.eiin && ` · EIIN: ${institute.eiin}`}
+          </p>
+          <p style={parseInlineStyle(config.reportNameStyle)}>Progress Report</p>
+        </div>
+        {/* Balances the logo so the text stays centred, as on the printed report. */}
+        <div style={{ width: logoWidth }} className="shrink-0" />
+      </div>
+      <div
+        className="mt-4 h-1 rounded-full"
+        style={{ backgroundColor: highlight || "#e5e5e5" }}
+      />
+    </div>
   )
 }
 

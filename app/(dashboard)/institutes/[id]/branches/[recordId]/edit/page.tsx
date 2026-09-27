@@ -6,16 +6,16 @@ export const metadata: Metadata = {
   title: "Edit branch · SMS Admin",
 }
 
-export default async function EditBranchPage({
+export default async function EditBranchesPage({
   params,
-}: PageProps<"/institutes/[id]/branches/[branchId]/edit">) {
-  const { id, branchId } = await params
+}: PageProps<"/institutes/[id]/branches/[recordId]/edit">) {
+  const { id, recordId } = await params
 
   return (
     <RecordForm
       instituteId={Number(id)}
       kind="branches"
-      recordId={Number(branchId)}
+      recordId={Number(recordId)}
     />
   )
 }

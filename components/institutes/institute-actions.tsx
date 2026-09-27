@@ -4,9 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import {
   BanIcon,
-  Building2Icon,
   CircleCheckIcon,
-  ClockIcon,
   EllipsisVerticalIcon,
   EyeIcon,
   LogInIcon,
@@ -98,22 +96,6 @@ export function InstituteActions({
               Configuration
             </Link>
           </DropdownMenuItem>
-          {institute.enableBranch && (
-            <DropdownMenuItem asChild>
-              <Link href={`/institutes/${institute.id}/branches`}>
-                <Building2Icon />
-                Branches
-              </Link>
-            </DropdownMenuItem>
-          )}
-          {institute.enableShift && (
-            <DropdownMenuItem asChild>
-              <Link href={`/institutes/${institute.id}/shifts`}>
-                <ClockIcon />
-                Shifts
-              </Link>
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem
             onSelect={() =>
               toast.info(`Opening ${institute.subdomain}.sms.app as admin`)

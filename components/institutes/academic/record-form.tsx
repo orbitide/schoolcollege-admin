@@ -7,9 +7,16 @@ import { ArrowLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import {
-  academicKinds,
+  isKindEnabled,
+  kindConfig,
+  kindLabels,
+  visibleFields,
   type AcademicKind,
   type EditableRecord,
+  type Errors,
+  type FieldDef,
+  type FieldValue,
+  type FieldValues,
 } from "@/components/institutes/academic/kinds"
 import { NotFound } from "@/components/institutes/academic/record-list"
 import { SelectField } from "@/components/institutes/institute-form"
@@ -21,14 +28,37 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { recordStatuses, type RecordStatus } from "@/lib/institutes"
+import {
+  recordStatuses,
+  type Institute,
+  type RecordStatus,
+} from "@/lib/institutes"
 import { useInstitute } from "@/lib/institutes-store"
+import { cn } from "@/lib/utils"
 
-type Values = { name: string; code: string; address: string; status: RecordStatus }
-type Errors = Partial<Record<keyof Values, string>>
+// Radix Select can't use "" as a value, so optional selects map "" to this.
+const ALL = "__all"
+
+// Form state keeps inputs as strings (and checkboxes as booleans) until submit.
+type FormState = Record<string, string | boolean>
 
 export function RecordForm({
   instituteId,
@@ -39,152 +69,234 @@ export function RecordForm({
   kind: AcademicKind
   recordId?: number
 }) {
-  const config = academicKinds[kind]
+  const config = kindConfig(kind)
   const institute = useInstitute(instituteId)
   const record = config.store.useOne(recordId ?? -1)
 
   if (!institute) return <NotFound />
+  const { singular, plural } = kindLabels(kind, institute)
   if (
     recordId !== undefined &&
     (!record || record.instituteId !== instituteId)
   ) {
-    return <NotFound what={config.singular} />
+    return <NotFound what={singular} />
+  }
+
+  const listHref = `/institutes/${instituteId}/${config.segment}`
+  if (!isKindEnabled(kind, institute)) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-sm text-muted-foreground">
+          {plural} are turned off for this institute.
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link href={listHref}>Back to {plural.toLowerCase()}</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
     <RecordFormBody
       key={recordId ?? "new"}
-      instituteId={instituteId}
-      instituteName={institute.name}
+      institute={institute}
       kind={kind}
+      singular={singular}
+      plural={plural}
       record={record}
     />
   )
 }
 
+function initialValue(field: FieldDef, record?: EditableRecord) {
+  const value = record?.[field.key]
+  switch (field.type) {
+    case "checkbox":
+      return Boolean(value)
+    case "integer":
+    case "decimal":
+      return String(value ?? 0)
+    case "select":
+      return String(value ?? (field.required ? field.options?.[0] ?? "" : ""))
+    default:
+      return String(value ?? "")
+  }
+}
+
 function RecordFormBody({
-  instituteId,
-  instituteName,
+  institute,
   kind,
+  singular,
+  plural,
   record,
 }: {
-  instituteId: number
-  instituteName: string
+  institute: Institute
   kind: AcademicKind
+  singular: string
+  plural: string
   record?: EditableRecord
 }) {
-  const config = academicKinds[kind]
+  const config = kindConfig(kind)
   const router = useRouter()
-  const [values, setValues] = React.useState<Values>({
-    name: record?.name ?? "",
-    code: record?.code ?? "",
-    address: record?.address ?? "",
-    status: record?.status ?? "Active",
-  })
+  const siblings = config.store
+    .useList(institute.id)
+    .filter((sibling) => sibling.id !== record?.id)
+  const fields = visibleFields(kind, institute)
+  const [name, setName] = React.useState(record?.name ?? "")
+  const [status, setStatus] = React.useState<RecordStatus>(
+    record?.status ?? "Active"
+  )
+  const [values, setValues] = React.useState<FormState>(() =>
+    Object.fromEntries(config.fields.map((f) => [f.key, initialValue(f, record)]))
+  )
   const [errors, setErrors] = React.useState<Errors>({})
-  const listHref = `/institutes/${instituteId}/${config.segment}`
-  const singular = config.singular.toLowerCase()
+  const listHref = `/institutes/${institute.id}/${config.segment}`
+  const lower = singular.toLowerCase()
 
-  function text(key: "name" | "code" | "address") {
-    return {
-      id: key,
-      name: key,
-      value: values[key],
-      "aria-invalid": !!errors[key],
-      onChange: (
-        event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-      ) => setValues((current) => ({ ...current, [key]: event.target.value })),
+  function set(key: string, value: string | boolean) {
+    setValues((current) => ({ ...current, [key]: value }))
+  }
+
+  // Parse and check every field; returns typed values plus any errors.
+  function parse(): { parsed: FieldValues; next: Errors } {
+    const parsed: FieldValues = {}
+    const next: Errors = {}
+
+    for (const field of config.fields) {
+      const raw = values[field.key]
+      if (field.type === "checkbox") {
+        parsed[field.key] = Boolean(raw)
+        continue
+      }
+      const text = String(raw ?? "").trim()
+      const shown = fields.includes(field)
+      if (field.type === "integer" || field.type === "decimal") {
+        const number = Number(text)
+        parsed[field.key] = text === "" ? 0 : number
+        if (!shown) continue
+        if (text === "" && field.required) next[field.key] = `${field.label} is required.`
+        else if (Number.isNaN(number)) next[field.key] = "Enter a number."
+        else if (field.type === "integer" && !Number.isInteger(number)) {
+          next[field.key] = "Enter a whole number."
+        } else if (field.min !== undefined && number < field.min) {
+          next[field.key] = `Must be ${field.min} or more.`
+        } else if (field.max !== undefined && number > field.max) {
+          next[field.key] = `Must be ${field.max} or less.`
+        }
+        continue
+      }
+      parsed[field.key] = text
+      if (shown && field.required && !text) {
+        next[field.key] = `${field.label} is required.`
+      }
     }
+
+    const scope = Object.fromEntries(
+      (config.uniqueScope ?? []).map((key) => [key, parsed[key]])
+    )
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      next.name = "Name is required."
+    } else if (
+      config.store.isTaken(institute.id, "name", trimmedName, record?.id, scope)
+    ) {
+      next.name = `Another ${lower} already uses this name.`
+    }
+    for (const field of config.fields) {
+      if (
+        field.unique &&
+        !next[field.key] &&
+        config.store.isTaken(
+          institute.id,
+          field.key,
+          String(parsed[field.key]),
+          record?.id,
+          scope
+        )
+      ) {
+        next[field.key] = `Another ${lower} already uses this ${field.label.toLowerCase()}.`
+      }
+    }
+
+    if (Object.values(next).every((error) => !error) && config.validate) {
+      Object.assign(next, config.validate(parsed, { institute, siblings }))
+    }
+    return { parsed, next }
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const input = {
-      name: values.name.trim(),
-      status: values.status,
-      ...(config.hasCodeAndAddress && {
-        code: values.code.trim(),
-        address: values.address.trim(),
-      }),
-    }
-
-    const next: Errors = {}
-    if (!input.name) {
-      next.name = `${config.singular} name is required.`
-    } else if (config.store.isTaken(instituteId, "name", input.name, record?.id)) {
-      next.name = `Another ${singular} already uses this name.`
-    }
-    if (config.hasCodeAndAddress) {
-      if (!input.code) {
-        next.code = "Code is required."
-      } else if (config.store.isTaken(instituteId, "code", input.code, record?.id)) {
-        next.code = `Another ${singular} already uses this code.`
-      }
-    }
+    const { parsed, next } = parse()
     setErrors(next)
-    if (Object.keys(next).length > 0) return
+    if (Object.values(next).some(Boolean)) return
 
-    if (record) {
-      config.store.update(record.id, input)
-      toast.success(`${input.name} updated`)
-    } else {
-      config.store.add({ ...input, instituteId })
-      toast.success(`${input.name} added`)
+    const currentField = config.fields.find((field) => field.current)
+    const input: Partial<EditableRecord> = {
+      ...parsed,
+      name: name.trim(),
+      status,
+      // The current flag is only ever set through setCurrent below.
+      ...(currentField && { [currentField.key]: Boolean(record?.[currentField.key]) }),
     }
+
+    const id = record
+      ? (config.store.update(record.id, input), record.id)
+      : config.store.add({ ...input, instituteId: institute.id } as EditableRecord).id
+    if (currentField && parsed[currentField.key] && !record?.[currentField.key]) {
+      config.store.setCurrent(id)
+    }
+    toast.success(`${name.trim()} ${record ? "updated" : "added"}`)
     router.push(listHref)
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      noValidate
-      className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6"
-    >
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 md:gap-6">
       <Button asChild variant="ghost" size="sm" className="w-fit">
         <Link href={listHref}>
           <ArrowLeftIcon data-icon="inline-start" />
-          {config.plural}
+          {plural}
         </Link>
       </Button>
 
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {record ? `Edit ${singular}` : `Add ${singular}`}
-        </h2>
-        <p className="text-sm text-muted-foreground">{instituteName}</p>
-      </div>
+      <h3 className="text-xl font-semibold tracking-tight">
+        {record ? `Edit ${lower}` : `Add ${lower}`}
+      </h3>
 
-      <Card className="max-w-2xl">
+      <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle>{config.singular} details</CardTitle>
+          <CardTitle>{singular} details</CardTitle>
           <CardDescription>{config.description}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field data-invalid={!!errors.name}>
             <FieldLabel htmlFor="name">Name</FieldLabel>
-            <Input {...text("name")} />
+            <Input
+              id="name"
+              value={name}
+              aria-invalid={!!errors.name}
+              onChange={(event) => setName(event.target.value)}
+            />
             <FieldError>{errors.name}</FieldError>
           </Field>
-          {config.hasCodeAndAddress && (
-            <Field data-invalid={!!errors.code}>
-              <FieldLabel htmlFor="code">Code</FieldLabel>
-              <Input {...text("code")} />
-              <FieldError>{errors.code}</FieldError>
-            </Field>
-          )}
           <SelectField
             name="status"
             label="Status"
             options={recordStatuses}
-            value={values.status}
-            onChange={(status) => setValues((current) => ({ ...current, status }))}
+            value={status}
+            onChange={setStatus}
           />
-          {config.hasCodeAndAddress && (
-            <Field className="sm:col-span-2">
-              <FieldLabel htmlFor="address">Address</FieldLabel>
-              <Textarea rows={2} {...text("address")} />
-            </Field>
-          )}
+          {fields.map((field) => (
+            <RecordField
+              key={field.key}
+              field={field}
+              value={values[field.key]}
+              error={errors[field.key]}
+              institute={institute}
+              locked={field.current && Boolean(record?.[field.key])}
+              lower={lower}
+              onChange={(value) => set(field.key, value)}
+            />
+          ))}
         </CardContent>
       </Card>
 
@@ -192,8 +304,115 @@ function RecordFormBody({
         <Button asChild variant="outline">
           <Link href={listHref}>Cancel</Link>
         </Button>
-        <Button type="submit">{record ? "Save changes" : `Add ${singular}`}</Button>
+        <Button type="submit">{record ? "Save changes" : `Add ${lower}`}</Button>
       </div>
     </form>
+  )
+}
+
+function RecordField({
+  field,
+  value,
+  error,
+  institute,
+  locked,
+  lower,
+  onChange,
+}: {
+  field: FieldDef
+  value: string | boolean
+  error?: string
+  institute: Institute
+  locked?: boolean
+  lower: string
+  onChange: (value: string | boolean) => void
+}) {
+  const id = field.key
+  const wide = field.wide || field.type === "textarea" || field.type === "checkbox"
+  const hint = field.hint?.(value as FieldValue, institute)
+
+  if (field.type === "checkbox") {
+    const description = field.current
+      ? locked
+        ? `This is the current ${lower}. Set another one as current to change it.`
+        : `Replaces the institute's current ${lower}.`
+      : field.description
+    return (
+      <Field orientation="horizontal" className="sm:col-span-2">
+        <Checkbox
+          id={id}
+          checked={Boolean(value)}
+          disabled={locked}
+          onCheckedChange={(checked) => onChange(checked === true)}
+        />
+        <FieldContent>
+          <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+          {description && <FieldDescription>{description}</FieldDescription>}
+        </FieldContent>
+      </Field>
+    )
+  }
+
+  let control: React.ReactNode
+  if (field.type === "select") {
+    const options = field.options ?? []
+    control = (
+      <Select
+        value={value === "" ? ALL : String(value)}
+        onValueChange={(next) => onChange(next === ALL ? "" : next)}
+      >
+        <SelectTrigger id={id} className="w-full" aria-invalid={!!error}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {!field.required && (
+              <SelectItem value={ALL}>{field.allLabel ?? "None"}</SelectItem>
+            )}
+            {options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    )
+  } else if (field.type === "textarea") {
+    control = (
+      <Textarea
+        id={id}
+        rows={3}
+        value={String(value)}
+        aria-invalid={!!error}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    )
+  } else {
+    const numeric = field.type === "integer" || field.type === "decimal"
+    control = (
+      <Input
+        id={id}
+        type={numeric ? "number" : field.type === "date" ? "date" : "text"}
+        step={field.type === "decimal" ? "0.01" : numeric ? "1" : undefined}
+        min={field.min}
+        max={field.max}
+        placeholder={field.placeholder}
+        value={String(value)}
+        aria-invalid={!!error}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    )
+  }
+
+  return (
+    <Field data-invalid={!!error} className={cn(wide && "sm:col-span-2")}>
+      <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
+      {control}
+      {(hint || field.description) && (
+        <FieldDescription>{hint ?? field.description}</FieldDescription>
+      )}
+      <FieldError>{error}</FieldError>
+    </Field>
   )
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { branchStore, shiftStore } from "@/lib/academic-store"
+import { removeInstituteRecords } from "@/lib/academic-store"
 import {
   seedInstitutes,
   type Institute,
@@ -65,6 +65,5 @@ export function setInstituteStatus(id: number, status: InstituteStatus) {
 
 export function deleteInstitute(id: number) {
   emit(institutes.filter((i) => i.id !== id))
-  branchStore.removeForInstitute(id)
-  shiftStore.removeForInstitute(id)
+  removeInstituteRecords(id)
 }

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import {
   billingCycles,
   defaultConfiguration,
@@ -246,19 +247,31 @@ function InstituteFormBody({
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6"
+      className={cn(
+        "flex flex-col gap-4 md:gap-6",
+        // Editing renders inside the institute layout, which adds its own padding and header.
+        !isEdit && "px-4 py-4 md:py-6 lg:px-6"
+      )}
     >
-      <Button asChild variant="ghost" size="sm" className="w-fit">
-        <Link href={backHref}>
-          <ArrowLeftIcon data-icon="inline-start" />
-          {isEdit ? initial?.name : "Institutes"}
-        </Link>
-      </Button>
+      {!isEdit && (
+        <Button asChild variant="ghost" size="sm" className="w-fit">
+          <Link href={backHref}>
+            <ArrowLeftIcon data-icon="inline-start" />
+            Institutes
+          </Link>
+        </Button>
+      )}
 
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {isEdit ? "Edit institute" : "Add institute"}
-        </h2>
+        {isEdit ? (
+          <h3 className="text-xl font-semibold tracking-tight">
+            Edit institute
+          </h3>
+        ) : (
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Add institute
+          </h2>
+        )}
         <p className="text-sm text-muted-foreground">
           {isEdit
             ? "Update the institute's profile, academic settings and subscription."

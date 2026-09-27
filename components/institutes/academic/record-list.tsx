@@ -4,8 +4,8 @@ import * as React from "react"
 import Link from "next/link"
 import {
   ArrowDownIcon,
-  ArrowLeftIcon,
   ArrowUpIcon,
+  CalendarCheckIcon,
   CircleCheckIcon,
   CircleMinusIcon,
   EllipsisVerticalIcon,
@@ -16,7 +16,10 @@ import {
 import { toast } from "sonner"
 
 import {
-  academicKinds,
+  isKindEnabled,
+  visibleColumns,
+  kindConfig,
+  kindLabels,
   type AcademicKind,
   type EditableRecord,
 } from "@/components/institutes/academic/kinds"
@@ -31,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -55,6 +59,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useInstitute } from "@/lib/institutes-store"
+import { cn } from "@/lib/utils"
 
 export function RecordList({
   instituteId,
@@ -63,21 +68,30 @@ export function RecordList({
   instituteId: number
   kind: AcademicKind
 }) {
-  const config = academicKinds[kind]
+  const config = kindConfig(kind)
   const institute = useInstitute(instituteId)
   const records = config.store.useList(instituteId)
   const [deleting, setDeleting] = React.useState<EditableRecord | null>(null)
 
   if (!institute) return <NotFound />
 
-  const enabled = Boolean(institute[config.toggle])
+  const enabled = isKindEnabled(kind, institute)
+  const { singular, plural } = kindLabels(kind, institute)
   const base = `/institutes/${instituteId}/${config.segment}`
-  const singular = config.singular.toLowerCase()
+  const columns = visibleColumns(kind, institute)
+  const ranked = config.ranked !== false
+  const hasCurrent = config.fields.some((field) => field.current)
+  const columnCount = columns.length + (ranked ? 4 : 3)
 
   function toggleStatus(record: EditableRecord) {
     const next = record.status === "Active" ? "Inactive" : "Active"
     config.store.setStatus(record.id, next)
     toast.success(`${record.name} ${next === "Active" ? "activated" : "inactivated"}`)
+  }
+
+  function makeCurrent(record: EditableRecord) {
+    config.store.setCurrent(record.id)
+    toast.success(`${record.name} is now the current ${singular.toLowerCase()}`)
   }
 
   function remove() {
@@ -88,26 +102,17 @@ export function RecordList({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
-      <Button asChild variant="ghost" size="sm" className="w-fit">
-        <Link href={`/institutes/${instituteId}`}>
-          <ArrowLeftIcon data-icon="inline-start" />
-          {institute.name}
-        </Link>
-      </Button>
-
+    <div className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {config.plural}
-          </h2>
+          <h3 className="text-xl font-semibold tracking-tight">{plural}</h3>
           <p className="text-sm text-muted-foreground">{config.description}</p>
         </div>
         {enabled && (
           <Button asChild>
             <Link href={`${base}/new`}>
               <PlusIcon data-icon="inline-start" />
-              Add {singular}
+              Add {singular.toLowerCase()}
             </Link>
           </Button>
         )}
@@ -116,10 +121,10 @@ export function RecordList({
       {!enabled && (
         <Card>
           <CardHeader>
-            <CardTitle>{config.plural} are turned off</CardTitle>
+            <CardTitle>{plural} are turned off</CardTitle>
             <CardDescription>
-              Turn on {config.plural.toLowerCase()} in the institute&apos;s
-              academic settings to manage them here.
+              Turn on {plural.toLowerCase()} in the institute&apos;s academic
+              settings to manage them here.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -138,14 +143,16 @@ export function RecordList({
           <Table>
             <TableHeader className="bg-muted">
               <TableRow>
-                <TableHead className="w-28">Rank</TableHead>
+                {ranked && <TableHead className="w-28">Rank</TableHead>}
                 <TableHead>Name</TableHead>
-                {config.hasCodeAndAddress && (
-                  <>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Address</TableHead>
-                  </>
-                )}
+                {columns.map((column) => (
+                  <TableHead
+                    key={column.label}
+                    className={cn(column.align === "right" && "text-right")}
+                  >
+                    {column.label}
+                  </TableHead>
+                ))}
                 <TableHead>Status</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -154,6 +161,7 @@ export function RecordList({
               {records.length ? (
                 records.map((record, index) => (
                   <TableRow key={record.id}>
+                    {ranked && (
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="w-6 tabular-nums text-muted-foreground">
@@ -181,15 +189,25 @@ export function RecordList({
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{record.name}</TableCell>
-                    {config.hasCodeAndAddress && (
-                      <>
-                        <TableCell>{record.code || "—"}</TableCell>
-                        <TableCell className="max-w-64 truncate text-muted-foreground">
-                          {record.address || "—"}
-                        </TableCell>
-                      </>
                     )}
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {record.name}
+                        {hasCurrent && Boolean(record.isCurrent) && (
+                          <Badge>Current</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column.label}
+                        className={cn(
+                          column.align === "right" && "text-right tabular-nums"
+                        )}
+                      >
+                        {column.render(record)}
+                      </TableCell>
+                    ))}
                     <TableCell>
                       <StatusBadge status={record.status} />
                     </TableCell>
@@ -205,13 +223,19 @@ export function RecordList({
                             <span className="sr-only">Open menu</span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem asChild>
                             <Link href={`${base}/${record.id}/edit`}>
                               <PencilIcon />
                               Edit
                             </Link>
                           </DropdownMenuItem>
+                          {hasCurrent && !record.isCurrent && (
+                            <DropdownMenuItem onSelect={() => makeCurrent(record)}>
+                              <CalendarCheckIcon />
+                              Set as current
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onSelect={() => toggleStatus(record)}>
                             {record.status === "Active" ? (
                               <CircleMinusIcon />
@@ -236,10 +260,10 @@ export function RecordList({
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={config.hasCodeAndAddress ? 6 : 4}
+                    colSpan={columnCount}
                     className="h-24 text-center text-muted-foreground"
                   >
-                    No {config.plural.toLowerCase()} yet.
+                    No {plural.toLowerCase()} yet.
                   </TableCell>
                 </TableRow>
               )}
@@ -256,8 +280,8 @@ export function RecordList({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the {singular} from {institute.name}. This cannot be
-              undone.
+              This removes the {singular.toLowerCase()} from {institute.name}.
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

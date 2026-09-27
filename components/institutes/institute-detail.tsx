@@ -1,21 +1,19 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import {
-  ArrowLeftIcon,
   CalendarIcon,
   GlobeIcon,
   MailIcon,
   MapPinIcon,
-  PencilIcon,
   PhoneIcon,
-  SlidersHorizontalIcon,
   UserIcon,
 } from "lucide-react"
 
-import { InstituteActions } from "@/components/institutes/institute-actions"
-import { StatusBadge } from "@/components/institutes/status-badge"
+import {
+  formatDateRange,
+  kindLabels,
+} from "@/components/institutes/academic/kinds"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -34,9 +32,19 @@ import {
   formatDate,
   planLimits,
   planPrices,
+  type HolidayEvent,
   type Institute,
 } from "@/lib/institutes"
-import { branchStore, shiftStore } from "@/lib/academic-store"
+import {
+  branchStore,
+  categoryStore,
+  holidayStore,
+  houseStore,
+  letterGradeStore,
+  resultRemarkStore,
+  shiftStore,
+  yearStore,
+} from "@/lib/academic-store"
 import { useInstitute } from "@/lib/institutes-store"
 
 // Dummy activity feed until audit logs come from the API.
@@ -51,10 +59,15 @@ function activityFor(institute: Institute) {
 }
 
 export function InstituteDetail({ id }: { id: number }) {
-  const router = useRouter()
   const institute = useInstitute(id)
   const branches = branchStore.useList(id)
   const shifts = shiftStore.useList(id)
+  const houses = houseStore.useList(id)
+  const categories = categoryStore.useList(id)
+  const currentYear = yearStore.useList(id).find((year) => year.isCurrent)
+  const grades = letterGradeStore.useList(id)
+  const remarks = resultRemarkStore.useList(id)
+  const nextHoliday = nextOccurrence(holidayStore.useList(id))
 
   if (!institute) {
     return (
@@ -71,6 +84,8 @@ export function InstituteDetail({ id }: { id: number }) {
   }
 
   const config = institute.configuration
+  const houseLabels = kindLabels("houses", institute)
+  const categoryLabels = kindLabels("categories", institute)
   const limits = planLimits[institute.plan]
   const monthly = planPrices[institute.plan]
   const billed =
@@ -79,58 +94,7 @@ export function InstituteDetail({ id }: { id: number }) {
       : `$${monthly} / month`
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
-      <Button asChild variant="ghost" size="sm" className="w-fit">
-        <Link href="/institutes">
-          <ArrowLeftIcon data-icon="inline-start" />
-          Institutes
-        </Link>
-      </Button>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {institute.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={institute.logoUrl}
-              alt={`${institute.name} logo`}
-              className="size-14 shrink-0 rounded-md border object-contain"
-            />
-          )}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-semibold tracking-tight">
-                {institute.name}
-              </h2>
-              <StatusBadge status={institute.status} />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {institute.shortName} · EIIN {institute.eiin} · {institute.type}{" "}
-              · {institute.city} · {institute.subdomain}.sms.app
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/institutes/${institute.id}/edit`}>
-              <PencilIcon data-icon="inline-start" />
-              Edit
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/institutes/${institute.id}/configuration`}>
-              <SlidersHorizontalIcon data-icon="inline-start" />
-              Configuration
-            </Link>
-          </Button>
-          <InstituteActions
-            institute={institute}
-            showView={false}
-            onDeleted={() => router.push("/institutes")}
-          />
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4 md:gap-6">
       <div className="grid gap-4 @4xl/main:grid-cols-3">
         <Card className="@4xl/main:col-span-2">
           <CardHeader>
@@ -225,6 +189,40 @@ export function InstituteDetail({ id }: { id: number }) {
             <CardDescription>Calendar and enabled structures</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-x-8 gap-y-3 text-sm @xl/main:grid-cols-2">
+            <Row label="Current academic year">
+              <Link
+                href={`/institutes/${institute.id}/years`}
+                className="underline-offset-4 hover:underline"
+              >
+                {currentYear ? currentYear.name : "Not set"}
+              </Link>
+            </Row>
+            <Row label="Letter grades">
+              <ManageLink
+                href={`/institutes/${institute.id}/grades`}
+                count={grades.length}
+                noun="grade"
+                plural="grades"
+              />
+            </Row>
+            <Row label="Result remarks">
+              <ManageLink
+                href={`/institutes/${institute.id}/remarks`}
+                count={remarks.length}
+                noun="remark"
+                plural="remarks"
+              />
+            </Row>
+            <Row label="Next holiday">
+              <Link
+                href={`/institutes/${institute.id}/holidays`}
+                className="underline-offset-4 hover:underline"
+              >
+                {nextHoliday
+                  ? `${nextHoliday.name} · ${formatDateRange(nextHoliday.startDate, nextHoliday.endDate)}`
+                  : "None scheduled"}
+              </Link>
+            </Row>
             <Row label="Start day of week">{institute.startDayOfWeek}</Row>
             <Row label="Weekend">
               {institute.weekend.length ? institute.weekend.join(", ") : "—"}
@@ -263,12 +261,27 @@ export function InstituteDetail({ id }: { id: number }) {
               {yesNo(institute.enableSectionGender)}
             </Row>
             <Row label="Student house">
-              {withLabel(institute.enableStudentHouse, institute.studentHouseLabel)}
+              {institute.enableStudentHouse ? (
+                <ManageLink
+                  href={`/institutes/${institute.id}/houses`}
+                  count={houses.length}
+                  noun={houseLabels.singular.toLowerCase()}
+                  plural={houseLabels.plural.toLowerCase()}
+                />
+              ) : (
+                "No"
+              )}
             </Row>
             <Row label="Student category">
-              {withLabel(
-                institute.enableStudentCategory,
-                institute.studentCategoryLabel
+              {institute.enableStudentCategory ? (
+                <ManageLink
+                  href={`/institutes/${institute.id}/categories`}
+                  count={categories.length}
+                  noun={categoryLabels.singular.toLowerCase()}
+                  plural={categoryLabels.plural.toLowerCase()}
+                />
+              ) : (
+                "No"
               )}
             </Row>
             <Row label="Show class roll">
@@ -328,6 +341,28 @@ export function InstituteDetail({ id }: { id: number }) {
       </div>
     </div>
   )
+}
+
+// The next active holiday from today. Yearly ones are moved to their next date.
+function nextOccurrence(holidays: HolidayEvent[]) {
+  const today = new Date().toISOString().slice(0, 10)
+  const year = Number(today.slice(0, 4))
+  const upcoming = holidays
+    .filter((holiday) => holiday.status === "Active")
+    .map((holiday) => {
+      if (holiday.repetition !== "Yearly" || holiday.endDate >= today) return holiday
+      const shift = (date: string, to: number) => `${to}${date.slice(4)}`
+      const target = shift(holiday.endDate, year) >= today ? year : year + 1
+      const span = Number(holiday.endDate.slice(0, 4)) - Number(holiday.startDate.slice(0, 4))
+      return {
+        ...holiday,
+        startDate: shift(holiday.startDate, target - span),
+        endDate: shift(holiday.endDate, target),
+      }
+    })
+    .filter((holiday) => holiday.endDate >= today)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+  return upcoming[0]
 }
 
 function ManageLink({

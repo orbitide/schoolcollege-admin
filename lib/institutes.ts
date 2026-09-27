@@ -91,10 +91,56 @@ export type AcademicRecord = {
 }
 
 export type Shift = AcademicRecord
+export type AcademicSession = AcademicRecord
+export type StudentCategory = AcademicRecord
 
 export type Branch = AcademicRecord & {
   code: string
   address: string
+}
+
+export type AcademicYear = AcademicRecord & {
+  code: string
+  isCurrent: boolean
+}
+
+// Capacity 0 means unlimited.
+export type StudentHouse = AcademicRecord & {
+  capacity: number
+}
+
+export const holidayTypes = ["Event", "Management", "Gazetted"] as const
+export const repetitions = ["Once", "Yearly"] as const
+
+// `medium` is "" when a record applies to all mediums.
+export type LetterGrade = AcademicRecord & {
+  medium: string
+  minMarks: number
+  maxMarks: number
+  gradePoint: number
+  maxGradePoint: number
+}
+
+export type ResultRemark = AcademicRecord & {
+  medium: string
+  minGpa: number
+  maxGpa: number
+  minMarks: number
+  maxMarks: number
+  basedOnGrading: boolean
+  isGolden: boolean
+  minFailCount: number
+  maxFailCount: number
+}
+
+// Dates are ISO "YYYY-MM-DD" strings.
+export type HolidayEvent = AcademicRecord & {
+  medium: string
+  startDate: string
+  endDate: string
+  type: (typeof holidayTypes)[number]
+  repetition: (typeof repetitions)[number]
+  description: string
 }
 
 // Per-institute configuration for results, reports, SMS and exams.
@@ -196,9 +242,15 @@ export const defaultSettings: InstituteSettings = {
   classRollLabel: "",
 }
 
-// A couple of seed institutes use branches and shifts so those screens have data.
+// A couple of seed institutes use the optional structures so those screens have data.
 const seedSettings: Record<number, Partial<InstituteSettings>> = {
-  1: { enableBranch: true, enableShift: true },
+  1: {
+    enableBranch: true,
+    enableShift: true,
+    enableStudentHouse: true,
+    studentHouseLabel: "House",
+    enableStudentCategory: true,
+  },
   2: { enableShift: true },
 }
 

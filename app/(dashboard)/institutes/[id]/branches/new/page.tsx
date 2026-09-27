@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Add branch · SMS Admin",
 }
 
-export default async function NewBranchPage({
+export default async function NewBranchesPage({
   params,
 }: PageProps<"/institutes/[id]/branches/new">) {
   const { id } = await params
