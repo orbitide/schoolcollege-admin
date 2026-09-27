@@ -3,6 +3,8 @@
 import * as React from "react"
 
 import type {
+  AcademicClass,
+  AcademicGroup,
   AcademicRecord,
   AcademicSession,
   AcademicYear,
@@ -11,9 +13,11 @@ import type {
   LetterGrade,
   RecordStatus,
   ResultRemark,
+  Section,
   Shift,
   StudentCategory,
   StudentHouse,
+  Subject,
 } from "@/lib/institutes"
 
 // In-memory dummy stores for per-institute ranked records (branches, shifts, …).
@@ -62,6 +66,10 @@ function createRecordStore<T extends AcademicRecord>(
         () => forInstitute(all, instituteId),
         [all, instituteId]
       )
+    },
+    // Snapshot outside React, e.g. for checks run from event handlers.
+    getList(instituteId: number) {
+      return forInstitute(records, instituteId)
     },
     useOne(id: number) {
       return useAll().find((record) => record.id === id)
@@ -303,10 +311,92 @@ export const holidayStore = createRecordStore<HolidayEvent>(
   { sortKey: "startDate" }
 )
 
+export const groupStore = createRecordStore<AcademicGroup>(
+  [
+    ["Science", "SCI", "বিজ্ঞান"],
+    ["Business Studies", "BUS", "ব্যবসায় শিক্ষা"],
+    ["Humanities", "HUM", "মানবিক"],
+  ].map(([name, code, nameBn], index) => ({
+    id: index + 1,
+    instituteId: 1,
+    name,
+    code,
+    nameBn,
+    rank: index + 1,
+    status: "Active" as const,
+  }))
+)
+
+export const classStore = createRecordStore<AcademicClass>(
+  [
+    ["Class Six", "ষষ্ঠ শ্রেণি", ""],
+    ["Class Seven", "সপ্তম শ্রেণি", ""],
+    ["Class Eight", "অষ্টম শ্রেণি", ""],
+    ["Class Nine", "নবম শ্রেণি", ""],
+    ["Class Ten", "দশম শ্রেণি", "SSC"],
+  ].map(([name, nameBn, publicExam], index) => ({
+    id: index + 1,
+    instituteId: 1,
+    name,
+    nameBn,
+    branchId: 1,
+    medium: "",
+    version: "",
+    publicExam,
+    rank: index + 1,
+    status: "Active" as const,
+  }))
+)
+
+// Sections A and B of every seeded class, in the morning and day shifts.
+export const sectionStore = createRecordStore<Section>(
+  [1, 2, 3, 4, 5].flatMap((classId) =>
+    ["A", "B"].map((name, index) => {
+      const n = (classId - 1) * 2 + index
+      return {
+        id: n + 1,
+        instituteId: 1,
+        classId,
+        name,
+        shiftId: index + 1,
+        capacity: 50,
+        gender: "Any" as const,
+        rank: n + 1,
+        status: "Active" as const,
+      }
+    })
+  )
+)
+
+export const subjectStore = createRecordStore<Subject>(
+  (
+    [
+      ["Bangla", "বাংলা", "BAN", 100, 33],
+      ["English", "ইংরেজি", "ENG", 100, 33],
+      ["General Mathematics", "সাধারণ গণিত", "MATH", 100, 33],
+      ["Information & Communication Technology", "তথ্য ও যোগাযোগ প্রযুক্তি", "ICT", 50, 17],
+    ] as const
+  ).map(([name, nameBn, code, fullMarks, passMarks], index) => ({
+    id: index + 1,
+    instituteId: 1,
+    name,
+    nameBn,
+    code,
+    fullMarks,
+    passMarks,
+    rank: index + 1,
+    status: "Active" as const,
+  }))
+)
+
 export function removeInstituteRecords(instituteId: number) {
   for (const store of [
     branchStore,
     shiftStore,
+    groupStore,
+    classStore,
+    sectionStore,
+    subjectStore,
     yearStore,
     sessionStore,
     houseStore,

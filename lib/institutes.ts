@@ -33,6 +33,7 @@ export type InstituteSettings = {
   weekend: WeekDay[]
   enableBranch: boolean
   enableShift: boolean
+  enableGroup: boolean
   enableMedium: boolean
   enableVersion: boolean
   enableSectionGender: boolean
@@ -107,6 +108,40 @@ export type AcademicYear = AcademicRecord & {
 // Capacity 0 means unlimited.
 export type StudentHouse = AcademicRecord & {
   capacity: number
+}
+
+// Streams such as Science that a class can be split into.
+export type AcademicGroup = AcademicRecord & {
+  code: string
+  nameBn: string
+}
+
+export const publicExams = ["JSC", "SSC", "HSC", "O Level", "A Level"] as const
+export const sectionGenders = ["Any", "Male", "Female"] as const
+
+// `branchId` is null and `medium`, `version`, `publicExam` are "" when unused.
+export type AcademicClass = AcademicRecord & {
+  nameBn: string
+  branchId: number | null
+  medium: string
+  version: string
+  publicExam: string
+}
+
+// Capacity 0 means unlimited; `shiftId` is null when shifts are off.
+export type Section = AcademicRecord & {
+  classId: number
+  shiftId: number | null
+  capacity: number
+  gender: (typeof sectionGenders)[number]
+}
+
+// Catalog defaults; pass marks are between 0 and full marks.
+export type Subject = AcademicRecord & {
+  nameBn: string
+  code: string
+  fullMarks: number
+  passMarks: number
 }
 
 export const holidayTypes = ["Event", "Management", "Gazetted"] as const
@@ -228,6 +263,7 @@ export const defaultSettings: InstituteSettings = {
   weekend: ["Friday"],
   enableBranch: false,
   enableShift: false,
+  enableGroup: false,
   enableMedium: false,
   enableVersion: false,
   enableSectionGender: false,
@@ -247,6 +283,7 @@ const seedSettings: Record<number, Partial<InstituteSettings>> = {
   1: {
     enableBranch: true,
     enableShift: true,
+    enableGroup: true,
     enableStudentHouse: true,
     studentHouseLabel: "House",
     enableStudentCategory: true,

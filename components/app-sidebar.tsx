@@ -3,7 +3,7 @@
 import * as React from "react"
 
 import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
+import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -16,7 +16,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, SchoolIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon } from "lucide-react"
+import { LayoutDashboardIcon, SchoolIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -26,11 +26,15 @@ const data = {
   },
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
-    { title: "Institutes", url: "/institutes", icon: <SchoolIcon /> },
+    {
+      title: "Basic Settings",
+      icon: <SlidersHorizontalIcon />,
+      items: [{ title: "Institutes", url: "/institutes", icon: <SchoolIcon /> }],
+    },
     { title: "Plans", url: "/plans", icon: <PackageIcon /> },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon /> },
     { title: "Users", url: "/users", icon: <UsersIcon /> },
-  ],
+  ] satisfies NavMainItem[],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
     { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },

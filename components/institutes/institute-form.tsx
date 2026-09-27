@@ -427,6 +427,13 @@ function InstituteFormBody({
           <CardContent className="grid gap-x-6 gap-y-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
             <Toggle name="enableBranch" label="Branch" values={values} set={set} />
             <Toggle name="enableShift" label="Shift" values={values} set={set} />
+            <Toggle
+              name="enableGroup"
+              label="Group"
+              description="Streams such as Science, Business Studies and Humanities."
+              values={values}
+              set={set}
+            />
             <Toggle name="enableMedium" label="Medium" values={values} set={set} />
             <Toggle name="enableVersion" label="Version" values={values} set={set} />
             <Toggle

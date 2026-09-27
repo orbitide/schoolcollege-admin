@@ -4,6 +4,8 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { Collapsible } from "radix-ui"
+
 import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
@@ -11,19 +13,25 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { CirclePlusIcon, MailIcon } from "lucide-react"
+import { ChevronRightIcon, CirclePlusIcon, MailIcon } from "lucide-react"
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string
-    url: string
-    icon?: React.ReactNode
-  }[]
-}) {
+export type NavItem = {
+  title: string
+  url: string
+  icon?: React.ReactNode
+}
+
+// A top-level entry is either a link or a collapsible menu of links.
+export type NavMainItem = NavItem | (Omit<NavItem, "url"> & { items: NavItem[] })
+
+export function NavMain({ items }: { items: NavMainItem[] }) {
   const pathname = usePathname()
+  const isActive = (url: string) =>
+    pathname === url || pathname.startsWith(`${url}/`)
 
   return (
     <SidebarGroup>
@@ -52,20 +60,53 @@ export function NavMain({
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton
+          {items.map((item) =>
+            "items" in item ? (
+              <Collapsible.Root
+                key={item.title}
                 asChild
-                tooltip={item.title}
-                isActive={pathname.startsWith(item.url)}
+                defaultOpen={item.items.some((sub) => isActive(sub.url))}
+                className="group/collapsible"
               >
-                <Link href={item.url}>
-                  {item.icon}
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+                <SidebarMenuItem>
+                  <Collapsible.Trigger asChild>
+                    <SidebarMenuButton tooltip={item.title}>
+                      {item.icon}
+                      <span>{item.title}</span>
+                      <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </Collapsible.Trigger>
+                  <Collapsible.Content>
+                    <SidebarMenuSub>
+                      {item.items.map((sub) => (
+                        <SidebarMenuSubItem key={sub.title}>
+                          <SidebarMenuSubButton asChild isActive={isActive(sub.url)}>
+                            <Link href={sub.url}>
+                              {sub.icon}
+                              <span>{sub.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </Collapsible.Content>
+                </SidebarMenuItem>
+              </Collapsible.Root>
+            ) : (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.title}
+                  isActive={isActive(item.url)}
+                >
+                  <Link href={item.url}>
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          )}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import type { RecordStore } from "@/lib/academic-store"
 import {
   recordStatuses,
   type Institute,
@@ -123,6 +124,12 @@ function initialValue(field: FieldDef, record?: EditableRecord) {
   }
 }
 
+function blankValue(field: FieldDef): FieldValue {
+  if (field.type === "record") return null
+  if (field.type === "integer" || field.type === "decimal") return 0
+  return ""
+}
+
 function RecordFormBody({
   institute,
   kind,
@@ -168,12 +175,22 @@ function RecordFormBody({
         parsed[field.key] = Boolean(raw)
         continue
       }
+      // Fields the institute has turned off keep whatever the record had.
+      if (!fields.includes(field)) {
+        parsed[field.key] = record
+          ? ((record[field.key] ?? null) as FieldValue)
+          : (field.fallback ?? blankValue(field))
+        continue
+      }
       const text = String(raw ?? "").trim()
-      const shown = fields.includes(field)
+      if (field.type === "record") {
+        parsed[field.key] = text === "" ? null : Number(text)
+        if (text === "" && field.required) next[field.key] = `${field.label} is required.`
+        continue
+      }
       if (field.type === "integer" || field.type === "decimal") {
         const number = Number(text)
         parsed[field.key] = text === "" ? 0 : number
-        if (!shown) continue
         if (text === "" && field.required) next[field.key] = `${field.label} is required.`
         else if (Number.isNaN(number)) next[field.key] = "Enter a number."
         else if (field.type === "integer" && !Number.isInteger(number)) {
@@ -186,7 +203,7 @@ function RecordFormBody({
         continue
       }
       parsed[field.key] = text
-      if (shown && field.required && !text) {
+      if (field.required && !text) {
         next[field.key] = `${field.label} is required.`
       }
     }
@@ -354,7 +371,19 @@ function RecordField({
   }
 
   let control: React.ReactNode
-  if (field.type === "select") {
+  if (field.type === "record" && field.source) {
+    control = (
+      <RecordSelect
+        id={id}
+        field={field}
+        source={field.source}
+        instituteId={institute.id}
+        value={String(value)}
+        invalid={!!error}
+        onChange={onChange}
+      />
+    )
+  } else if (field.type === "select") {
     const options = field.options ?? []
     control = (
       <Select
@@ -414,5 +443,61 @@ function RecordField({
       )}
       <FieldError>{error}</FieldError>
     </Field>
+  )
+}
+
+// Picks another record of the institute (e.g. a section's class) by id.
+// Inactive records are left out unless this record already points at one.
+function RecordSelect({
+  id,
+  field,
+  source,
+  instituteId,
+  value,
+  invalid,
+  onChange,
+}: {
+  id: string
+  field: FieldDef
+  source: RecordStore<EditableRecord>
+  instituteId: number
+  value: string
+  invalid: boolean
+  onChange: (value: string) => void
+}) {
+  const options = source
+    .useList(instituteId)
+    .filter((record) => record.status === "Active" || String(record.id) === value)
+
+  if (!options.length) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No active {field.label.toLowerCase()} records yet. Add one first.
+      </p>
+    )
+  }
+
+  return (
+    <Select
+      value={value === "" ? (field.required ? "" : ALL) : value}
+      onValueChange={(next) => onChange(next === ALL ? "" : next)}
+    >
+      <SelectTrigger id={id} className="w-full" aria-invalid={invalid}>
+        <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {!field.required && (
+            <SelectItem value={ALL}>{field.allLabel ?? "None"}</SelectItem>
+          )}
+          {options.map((record) => (
+            <SelectItem key={record.id} value={String(record.id)}>
+              {record.name}
+              {record.status !== "Active" && " (inactive)"}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   )
 }

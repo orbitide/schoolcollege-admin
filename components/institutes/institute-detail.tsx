@@ -38,11 +38,15 @@ import {
 import {
   branchStore,
   categoryStore,
+  classStore,
+  groupStore,
   holidayStore,
   houseStore,
   letterGradeStore,
   resultRemarkStore,
+  sectionStore,
   shiftStore,
+  subjectStore,
   yearStore,
 } from "@/lib/academic-store"
 import { useInstitute } from "@/lib/institutes-store"
@@ -62,6 +66,10 @@ export function InstituteDetail({ id }: { id: number }) {
   const institute = useInstitute(id)
   const branches = branchStore.useList(id)
   const shifts = shiftStore.useList(id)
+  const groups = groupStore.useList(id)
+  const classes = classStore.useList(id)
+  const sections = sectionStore.useList(id)
+  const subjects = subjectStore.useList(id)
   const houses = houseStore.useList(id)
   const categories = categoryStore.useList(id)
   const currentYear = yearStore.useList(id).find((year) => year.isCurrent)
@@ -197,6 +205,30 @@ export function InstituteDetail({ id }: { id: number }) {
                 {currentYear ? currentYear.name : "Not set"}
               </Link>
             </Row>
+            <Row label="Classes">
+              <ManageLink
+                href={`/institutes/${institute.id}/classes`}
+                count={classes.length}
+                noun="class"
+                plural="classes"
+              />
+            </Row>
+            <Row label="Sections">
+              <ManageLink
+                href={`/institutes/${institute.id}/sections`}
+                count={sections.length}
+                noun="section"
+                plural="sections"
+              />
+            </Row>
+            <Row label="Subjects">
+              <ManageLink
+                href={`/institutes/${institute.id}/subjects`}
+                count={subjects.length}
+                noun="subject"
+                plural="subjects"
+              />
+            </Row>
             <Row label="Letter grades">
               <ManageLink
                 href={`/institutes/${institute.id}/grades`}
@@ -246,6 +278,18 @@ export function InstituteDetail({ id }: { id: number }) {
                   count={shifts.length}
                   noun="shift"
                   plural="shifts"
+                />
+              ) : (
+                "No"
+              )}
+            </Row>
+            <Row label="Group">
+              {institute.enableGroup ? (
+                <ManageLink
+                  href={`/institutes/${institute.id}/groups`}
+                  count={groups.length}
+                  noun="group"
+                  plural="groups"
                 />
               ) : (
                 "No"

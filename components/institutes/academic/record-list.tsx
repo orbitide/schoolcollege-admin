@@ -94,6 +94,18 @@ export function RecordList({
     toast.success(`${record.name} is now the current ${singular.toLowerCase()}`)
   }
 
+  // Records other records still point at can't be deleted yet.
+  function requestDelete(record: EditableRecord) {
+    const reason = config.inUse?.(record)
+    if (reason) {
+      toast.error(`${record.name} can't be deleted`, {
+        description: `${reason} Move or delete those first, or inactivate it instead.`,
+      })
+      return
+    }
+    setDeleting(record)
+  }
+
   function remove() {
     if (!deleting) return
     config.store.remove(deleting.id)
@@ -247,7 +259,7 @@ export function RecordList({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
-                            onSelect={() => setDeleting(record)}
+                            onSelect={() => requestDelete(record)}
                           >
                             <Trash2Icon />
                             Delete

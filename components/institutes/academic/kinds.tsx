@@ -4,19 +4,26 @@ import { Badge } from "@/components/ui/badge"
 import {
   branchStore,
   categoryStore,
+  classStore,
+  groupStore,
   holidayStore,
   houseStore,
   letterGradeStore,
   resultRemarkStore,
+  sectionStore,
   sessionStore,
   shiftStore,
+  subjectStore,
   yearStore,
   type RecordStore,
 } from "@/lib/academic-store"
 import {
   academicMediums,
+  academicVersions,
   holidayTypes,
+  publicExams,
   repetitions,
+  sectionGenders,
   type AcademicRecord,
   type Institute,
   type InstituteSettings,
@@ -25,15 +32,28 @@ import {
 // Any per-institute record; extra fields are described by the kind's `fields`.
 export type EditableRecord = AcademicRecord & Record<string, unknown>
 
-export type FieldValue = string | number | boolean
+// `null` is an unset record reference (e.g. a class with no branch).
+export type FieldValue = string | number | boolean | null
 export type FieldValues = Record<string, FieldValue>
 export type Errors = Record<string, string | undefined>
 
 export type FieldDef = {
   key: string
   label: string
-  type: "text" | "textarea" | "integer" | "decimal" | "date" | "select" | "checkbox"
+  type:
+    | "text"
+    | "textarea"
+    | "integer"
+    | "decimal"
+    | "date"
+    | "select"
+    | "checkbox"
+    | "record"
   options?: readonly string[]
+  // Value a new record gets while the field is hidden (defaults to blank).
+  fallback?: FieldValue
+  // For a record field: the store whose record ids it picks from.
+  source?: RecordStore<EditableRecord>
   // For an optional select: label of the "" option, e.g. "All mediums".
   allLabel?: string
   required?: boolean
@@ -75,6 +95,8 @@ export type KindConfig = {
     values: FieldValues,
     context: { institute: Institute; siblings: EditableRecord[] }
   ) => Errors
+  // Why a record can't be deleted yet, e.g. a class that still has sections.
+  inUse?: (record: EditableRecord) => string | undefined
   store: RecordStore<EditableRecord>
 }
 
@@ -107,6 +129,35 @@ const mediumColumn: ColumnDef = {
   label: "Medium",
   showWhen: mediumEnabled,
   render: (record) => String(record.medium || "All mediums"),
+}
+
+// Name of a referenced record; `fallback` when unset or since deleted.
+function RecordName({
+  store,
+  id,
+  fallback = "—",
+}: {
+  store: RecordStore<EditableRecord>
+  id: unknown
+  fallback?: string
+}) {
+  const record = store.useOne(id == null ? -1 : Number(id))
+  return record ? record.name : fallback
+}
+
+// "Used by 2 sections." when other records still point at this one.
+function usedBy(
+  store: RecordStore<EditableRecord>,
+  key: string,
+  record: EditableRecord,
+  noun: string,
+  plural: string
+) {
+  const count = store
+    .getList(record.instituteId)
+    .filter((other) => other[key] === record.id).length
+  if (!count) return undefined
+  return `Used by ${count} ${count === 1 ? noun : plural}.`
 }
 
 const jsWeekdays = [
@@ -187,6 +238,8 @@ export const academicKinds = {
         ),
       },
     ],
+    inUse: (record) =>
+      usedBy(asEditable(classStore), "branchId", record, "class", "classes"),
     store: asEditable(branchStore),
   },
   shifts: {
@@ -197,7 +250,184 @@ export const academicKinds = {
     toggle: "enableShift",
     fields: [],
     columns: [],
+    inUse: (record) =>
+      usedBy(asEditable(sectionStore), "shiftId", record, "section", "sections"),
     store: asEditable(shiftStore),
+  },
+  groups: {
+    segment: "groups",
+    singular: "Group",
+    plural: "Groups",
+    description: "Streams such as Science or Humanities that a class can be split into.",
+    toggle: "enableGroup",
+    fields: [
+      { key: "code", label: "Code", type: "text", required: true, unique: true },
+      { key: "nameBn", label: "Name (Bangla)", type: "text" },
+    ],
+    columns: [
+      { label: "Code", render: (r) => String(r.code || "—") },
+      { label: "Name (Bangla)", render: (r) => String(r.nameBn || "—") },
+    ],
+    store: asEditable(groupStore),
+  },
+  classes: {
+    segment: "classes",
+    singular: "Class",
+    plural: "Classes",
+    description: "Levels the institute teaches, such as Class Six, in teaching order.",
+    uniqueScope: ["branchId", "medium", "version"],
+    fields: [
+      { key: "nameBn", label: "Name (Bangla)", type: "text", required: true },
+      {
+        key: "branchId",
+        label: "Branch",
+        type: "record",
+        required: true,
+        source: asEditable(branchStore),
+        showWhen: (institute) => institute.enableBranch,
+      },
+      {
+        key: "medium",
+        label: "Medium",
+        type: "select",
+        options: academicMediums,
+        required: true,
+        showWhen: mediumEnabled,
+      },
+      {
+        key: "version",
+        label: "Version",
+        type: "select",
+        options: academicVersions,
+        required: true,
+        showWhen: (institute) => institute.enableVersion,
+      },
+      {
+        key: "publicExam",
+        label: "Public exam",
+        type: "select",
+        options: publicExams,
+        allLabel: "None",
+        description: "The board exam students of this class sit, if any.",
+      },
+    ],
+    columns: [
+      { label: "Name (Bangla)", render: (r) => String(r.nameBn || "—") },
+      {
+        label: "Branch",
+        showWhen: (institute) => institute.enableBranch,
+        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+      },
+      {
+        label: "Medium",
+        showWhen: mediumEnabled,
+        render: (r) => String(r.medium || "—"),
+      },
+      {
+        label: "Version",
+        showWhen: (institute) => institute.enableVersion,
+        render: (r) => String(r.version || "—"),
+      },
+      {
+        label: "Public exam",
+        render: (r) =>
+          r.publicExam ? <Badge variant="outline">{String(r.publicExam)}</Badge> : "—",
+      },
+    ],
+    inUse: (record) =>
+      usedBy(asEditable(sectionStore), "classId", record, "section", "sections"),
+    store: asEditable(classStore),
+  },
+  sections: {
+    segment: "sections",
+    singular: "Section",
+    plural: "Sections",
+    description: "Divisions of a class, such as Section A, that students are placed in.",
+    uniqueScope: ["classId", "shiftId"],
+    fields: [
+      {
+        key: "classId",
+        label: "Class",
+        type: "record",
+        required: true,
+        source: asEditable(classStore),
+      },
+      {
+        key: "shiftId",
+        label: "Shift",
+        type: "record",
+        required: true,
+        source: asEditable(shiftStore),
+        showWhen: (institute) => institute.enableShift,
+      },
+      {
+        key: "capacity",
+        label: "Capacity",
+        type: "integer",
+        min: 0,
+        description: "Seats in this section. Use 0 for no limit.",
+      },
+      {
+        key: "gender",
+        label: "Gender",
+        type: "select",
+        options: sectionGenders,
+        required: true,
+        fallback: "Any",
+        showWhen: (institute) => institute.enableSectionGender,
+      },
+    ],
+    columns: [
+      {
+        label: "Class",
+        render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} />,
+      },
+      {
+        label: "Shift",
+        showWhen: (institute) => institute.enableShift,
+        render: (r) => <RecordName store={asEditable(shiftStore)} id={r.shiftId} />,
+      },
+      {
+        label: "Gender",
+        showWhen: (institute) => institute.enableSectionGender,
+        render: (r) => String(r.gender || "Any"),
+      },
+      {
+        label: "Capacity",
+        align: "right",
+        render: (r) => (num(r.capacity) ? num(r.capacity).toLocaleString() : "Unlimited"),
+      },
+    ],
+    store: asEditable(sectionStore),
+  },
+  subjects: {
+    segment: "subjects",
+    singular: "Subject",
+    plural: "Subjects",
+    description: "The subject catalog, with the default full and pass marks for each.",
+    fields: [
+      { key: "code", label: "Code", type: "text", required: true, unique: true },
+      { key: "nameBn", label: "Name (Bangla)", type: "text", required: true },
+      { key: "fullMarks", label: "Full marks", type: "integer", required: true, min: 1 },
+      { key: "passMarks", label: "Pass marks", type: "integer", required: true, min: 0 },
+    ],
+    columns: [
+      { label: "Code", render: (r) => String(r.code || "—") },
+      { label: "Name (Bangla)", render: (r) => String(r.nameBn || "—") },
+      {
+        label: "Pass / Full",
+        align: "right",
+        render: (r) => `${num(r.passMarks)} / ${num(r.fullMarks)}`,
+      },
+    ],
+    validate: (values) => {
+      const errors: Errors = {}
+      if (num(values.passMarks) > num(values.fullMarks)) {
+        errors.passMarks = "Pass marks can not exceed full marks."
+      }
+      return errors
+    },
+    store: asEditable(subjectStore),
   },
   years: {
     segment: "years",
@@ -426,6 +656,10 @@ export const academicKindOrder: AcademicKind[] = [
   "shifts",
   "years",
   "sessions",
+  "groups",
+  "classes",
+  "sections",
+  "subjects",
   "houses",
   "categories",
   "grades",
