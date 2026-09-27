@@ -2,6 +2,8 @@
 
 import * as React from "react"
 
+import { letterGradeStore } from "@/lib/academic-store"
+import type { Institute, LetterGrade } from "@/lib/institutes"
 import { getStudents, type Enrolment, type Student } from "@/lib/students"
 import { getTermExams, type TermExam, type TermExamSubject } from "@/lib/term-exams"
 
@@ -30,6 +32,13 @@ export type TermExamStudentMark = {
   mcqAnswer: string
   examinerCode: string
   totalMarks: number
+  // Set by Pass Fail ReGenerate; an upload clears isPassCalculated.
+  isPassCalculated: boolean
+  isPass: boolean
+  gpa: number
+  // The GPA counted in results; the optional subject's is reduced.
+  finalGpa: number
+  letterGrade: string
   createdBy: string
   createdAt: string
   modifiedBy: string
@@ -55,6 +64,8 @@ export type MarkUpload = Pick<TermExamStudentMark, "termExamId" | "studentId" | 
       | "examinerCode"
     >
   >
+
+const notCalculated = { isPassCalculated: false, isPass: false, gpa: 0, finalGpa: 0, letterGrade: "" }
 
 // Legacy GetTotalTermExamStudentSubjectMarks.
 export function markTotal(m: Pick<TermExamStudentMark, "theoryMarks" | "cqMarks" | "mcqMarks" | "practicalMarks" | "attendanceMarks" | "assignmentMarks">) {
@@ -148,6 +159,7 @@ function seedMarks(): TermExamStudentMark[] {
           mcqAnswer: "",
           examinerCode: "",
           totalMarks: markTotal(parts),
+          ...notCalculated,
           createdBy: seedUser,
           createdAt: `${exam.examEnd}T12:00:00.000Z`,
           modifiedBy: seedUser,
@@ -217,12 +229,13 @@ export function saveTermExamMarks(rows: MarkUpload[], user: string) {
       mcqAnswer: "",
       examinerCode: "",
       totalMarks: 0,
+      ...notCalculated,
       createdBy: user,
       createdAt: stamp,
       modifiedBy: user,
       modifiedAt: stamp,
     }
-    const next = { ...base, ...defined, modifiedBy: user, modifiedAt: stamp }
+    const next = { ...base, ...defined, ...notCalculated, modifiedBy: user, modifiedAt: stamp }
     next.totalMarks = markTotal(next)
     if (old) changed.set(old.id, next)
     else added.push(next)
@@ -241,3 +254,76 @@ export const markParts = [
   { key: "mcqMarks", label: "MCQ marks", full: (s: TermExamSubject) => s.mcqMarks },
   { key: "practicalMarks", label: "Practical marks", full: (s: TermExamSubject) => s.practicalMarks },
 ] as const
+
+// ---- Pass status ----
+
+// Legacy IsPassTermExam: every marked part and the total reach their pass marks.
+export function markIsPass(
+  s: TermExamSubject,
+  m: Pick<TermExamStudentMark, "theoryMarks" | "cqMarks" | "mcqMarks" | "practicalMarks" | "totalMarks">
+) {
+  return (
+    (!s.theoryMarks || (m.theoryMarks ?? 0) >= s.theoryPassMarks) &&
+    (!s.cqMarks || (m.cqMarks ?? 0) >= s.cqPassMarks) &&
+    (!s.mcqMarks || (m.mcqMarks ?? 0) >= s.mcqPassMarks) &&
+    (!s.practicalMarks || (m.practicalMarks ?? 0) >= s.practicalPassMarks) &&
+    m.totalMarks >= s.totalPassMarks
+  )
+}
+
+// Legacy GetStudentTermExamMarksLetterGrade: the grade whose marks range
+// holds the percentage; a fail gets the lowest grade.
+export function markGrade(grades: LetterGrade[], percent: number, pass: boolean) {
+  const lowest = [...grades].sort((a, b) => a.gradePoint - b.gradePoint)[0]
+  if (!pass) return lowest
+  return grades.find((g) => percent >= g.minMarks && percent <= g.maxMarks) ?? lowest
+}
+
+export function examLetterGrades(exam: TermExam) {
+  return letterGradeStore
+    .getList(exam.instituteId)
+    .filter((g) => g.status === "Active" && (!g.medium || !exam.medium || g.medium === exam.medium))
+}
+
+// Legacy IsPassReGenerate: the exam has marks and all of them are calculated.
+export function isPassRegenerated(examId: number, all: TermExamStudentMark[] = getTermExamMarks()) {
+  const own = all.filter((m) => m.termExamId === examId)
+  return own.length > 0 && own.every((m) => m.isPassCalculated)
+}
+
+// Legacy RegeneratePassStatus (CalculatePassFailWithGrade): recheck each of
+// the exam's marks for pass/fail, grade and GPA. Returns how many marks were
+// calculated, or throws the legacy message when there are none.
+export function regeneratePassStatus(exam: TermExam, institute: Institute) {
+  const current = getTermExamMarks()
+  const own = current.filter((m) => m.termExamId === exam.id)
+  if (!own.length) throw new Error("No student marks uploaded")
+  if (!exam.subjects.length) throw new Error("Exam subject(s) not found")
+
+  const grades = examLetterGrades(exam)
+  const subtraction = institute.configuration.optionalGpaSubtraction
+  const subjects = new Map(exam.subjects.map((s) => [s.subjectId, s]))
+  let count = 0
+  marks = current.map((m) => {
+    if (m.termExamId !== exam.id) return m
+    const s = subjects.get(m.subjectId)
+    if (!s) return m
+    const pass = markIsPass(s, m)
+    const grade =
+      exam.calculateGpa && grades.length
+        ? markGrade(grades, s.totalMarks ? (m.totalMarks * 100) / s.totalMarks : 0, pass)
+        : undefined
+    const gpa = grade?.gradePoint ?? 0
+    count++
+    return {
+      ...m,
+      isPassCalculated: true,
+      isPass: pass,
+      gpa,
+      finalGpa: m.isOptional ? Math.max(0, gpa - subtraction) : gpa,
+      letterGrade: grade?.name ?? "",
+    }
+  })
+  listeners.forEach((listener) => listener())
+  return count
+}

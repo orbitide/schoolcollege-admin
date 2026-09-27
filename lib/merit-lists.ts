@@ -2,14 +2,16 @@
 
 import * as React from "react"
 
+import { classStore, resultRemarkStore } from "@/lib/academic-store"
+import type { Institute } from "@/lib/institutes"
 import {
-  classStore,
-  letterGradeStore,
-  resultRemarkStore,
-} from "@/lib/academic-store"
-import type { Institute, LetterGrade } from "@/lib/institutes"
-import { examStudents, getTermExamMarks, takesSubject } from "@/lib/term-exam-marks"
-import type { TermExam, TermExamSubject } from "@/lib/term-exams"
+  examLetterGrades,
+  examStudents,
+  getTermExamMarks,
+  regeneratePassStatus,
+  takesSubject,
+} from "@/lib/term-exam-marks"
+import type { TermExam } from "@/lib/term-exams"
 
 // Legacy SchoolCollege ResultCalculation/MeritListReGenerate: recheck each
 // mark's pass status (TermExamStudentMarksService.RegeneratePassStatus),
@@ -59,23 +61,6 @@ export type MeritList = {
 
 // ---- Calculation ----
 
-// Legacy IsPassTermExam: every marked part and the total reach their pass marks.
-function isPass(s: TermExamSubject, m: { theory: number; cq: number; mcq: number; practical: number; total: number }) {
-  return (
-    (!s.theoryMarks || m.theory >= s.theoryPassMarks) &&
-    (!s.cqMarks || m.cq >= s.cqPassMarks) &&
-    (!s.mcqMarks || m.mcq >= s.mcqPassMarks) &&
-    (!s.practicalMarks || m.practical >= s.practicalPassMarks) &&
-    m.total >= s.totalPassMarks
-  )
-}
-
-function gradeFor(grades: LetterGrade[], percent: number, pass: boolean) {
-  const sorted = [...grades].sort((a, b) => a.gradePoint - b.gradePoint)
-  if (!pass) return sorted[0]
-  return grades.find((g) => percent >= g.minMarks && percent <= g.maxMarks) ?? sorted[0]
-}
-
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 // Legacy merit order: no retakes first, then GPA, golden, total marks, roll.
@@ -86,15 +71,14 @@ function meritOrder(calculateGpa: boolean) {
     a.roll.localeCompare(b.roll, undefined, { numeric: true })
 }
 
+// Works on the marks' saved pass status and grades, so run
+// regeneratePassStatus first (generateMeritList does).
 export function calculateMeritList(exam: TermExam, institute: Institute): MeritResult[] {
-  const grades = letterGradeStore
-    .getList(exam.instituteId)
-    .filter((g) => g.status === "Active" && (!g.medium || !exam.medium || g.medium === exam.medium))
+  const grades = examLetterGrades(exam)
   const remarks = resultRemarkStore
     .getList(exam.instituteId)
     .filter((r) => r.status === "Active" && (!r.medium || !exam.medium || r.medium === exam.medium))
   const maxGrade = [...grades].sort((a, b) => b.maxGradePoint - a.maxGradePoint)[0]
-  const subtraction = institute.configuration.optionalGpaSubtraction
 
   // The exam's students with their saved marks (none means absent).
   // Students without a section or roll are left out, as the legacy does.
@@ -105,33 +89,22 @@ export function calculateMeritList(exam: TermExam, institute: Institute): MeritR
 
   const results = enrolled.map(({ student, enrolment: e }): MeritResult => {
     const taken = exam.subjects.filter((s) => takesSubject(e, s.subjectId))
-    const bySubject = new Map(taken.map((s) => [s.subjectId, s]))
-    const own = saved.filter((m) => m.studentId === student.id && bySubject.has(m.subjectId))
-    const marks: StudentSubjectMark[] = own.map((mark) => {
-      const m = {
-        subjectId: mark.subjectId,
-        theory: mark.theoryMarks ?? 0,
-        cq: mark.cqMarks ?? 0,
-        mcq: mark.mcqMarks ?? 0,
-        practical: mark.practicalMarks ?? 0,
-        total: mark.totalMarks,
-      }
-      const s = bySubject.get(m.subjectId)!
-      const pass = isPass(s, m)
-      const isOptional = mark.isOptional
-      const grade = exam.calculateGpa && grades.length
-        ? gradeFor(grades, s.totalMarks ? (m.total * 100) / s.totalMarks : 0, pass)
-        : undefined
-      const gpa = grade?.gradePoint ?? 0
-      return {
-        ...m,
-        isOptional,
-        isPass: pass,
-        gpa,
-        finalGpa: isOptional ? Math.max(0, gpa - subtraction) : gpa,
-        letterGrade: grade?.name ?? "",
-      }
-    })
+    const takenIds = new Set(taken.map((s) => s.subjectId))
+    const marks: StudentSubjectMark[] = saved
+      .filter((m) => m.studentId === student.id && takenIds.has(m.subjectId))
+      .map((m) => ({
+        subjectId: m.subjectId,
+        theory: m.theoryMarks ?? 0,
+        cq: m.cqMarks ?? 0,
+        mcq: m.mcqMarks ?? 0,
+        practical: m.practicalMarks ?? 0,
+        total: m.totalMarks,
+        isOptional: m.isOptional,
+        isPass: m.isPass,
+        gpa: m.gpa,
+        finalGpa: m.finalGpa,
+        letterGrade: m.letterGrade,
+      }))
     const compulsory = marks.filter((m) => !m.isOptional)
     const optional = marks.filter((m) => m.isOptional)
     const compulsoryCount = taken.filter((s) => s.subjectId !== e.optionalSubjectId).length
@@ -228,6 +201,7 @@ export function useMeritLists() {
 // message when the exam can't be regenerated.
 export function generateMeritList(exam: TermExam, institute: Institute, user: string) {
   if (!exam.editEnable) throw new Error(`${exam.name} is not edit enable`)
+  regeneratePassStatus(exam, institute)
   const results = calculateMeritList(exam, institute)
   lists = [
     ...lists.filter((l) => l.termExamId !== exam.id),

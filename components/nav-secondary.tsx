@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { Highlight, matchesQuery } from "@/components/nav-search"
+import { Highlight, rankByQuery } from "@/components/nav-search"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -23,7 +23,7 @@ export function NavSecondary({
   }[]
   query?: string
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
-  const visible = items.filter((item) => matchesQuery(item.title, query))
+  const visible = rankByQuery(items, (item) => item.title, query)
 
   if (visible.length === 0) return null
 

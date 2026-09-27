@@ -52,7 +52,10 @@ const data = {
       title: "Term Exam Marks",
       icon: <FileSpreadsheetIcon />,
       tone: "rose",
-      items: [{ title: "Marks Upload", url: "/term-exam-marks/upload" }],
+      items: [
+        { title: "Marks Upload", url: "/term-exam-marks/upload" },
+        { title: "Pass Fail ReGenerate", url: "/term-exam-marks/pass-fail-regenerate" },
+      ],
     },
     {
       title: "Basic Settings",

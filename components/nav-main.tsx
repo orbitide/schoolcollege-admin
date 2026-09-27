@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 
 import { Collapsible } from "radix-ui"
 
-import { Highlight, matchesQuery } from "@/components/nav-search"
+import { Highlight, matchScore, rankByQuery } from "@/components/nav-search"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -89,17 +89,24 @@ export function ActiveBar() {
   )
 }
 
-// The entries left after a menu search: a link stays when its title matches;
-// a menu stays with all its links when its own title matches, otherwise with
-// just the matching links.
+// The entries left after a menu search, best match first: a link stays when
+// its title matches; a menu keeps just its matching links, or all of them
+// when only its own title matches. A menu ranks by its best match.
 export function filterNavItems(items: NavMainItem[], query: string) {
   if (!query.trim()) return items
-  return items.flatMap<NavMainItem>((item) => {
-    if (matchesQuery(item.title, query)) return [item]
-    if (!("items" in item)) return []
-    const subs = item.items.filter((sub) => matchesQuery(sub.title, query))
-    return subs.length ? [{ ...item, items: subs }] : []
-  })
+  return items
+    .flatMap<{ item: NavMainItem; index: number; score: number }>((item, index) => {
+      const own = matchScore(item.title, query)
+      if (!("items" in item)) return own > -Infinity ? [{ item, index, score: own }] : []
+      const subs = rankByQuery(item.items, (sub) => sub.title, query)
+      if (subs.length) {
+        const score = Math.max(own, ...subs.map((sub) => matchScore(sub.title, query)))
+        return [{ item: { ...item, items: subs }, index, score }]
+      }
+      return own > -Infinity ? [{ item, index, score: own }] : []
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.item)
 }
 
 // The one collapsible menu that is open (by title, "" when all are closed),

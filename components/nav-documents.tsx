@@ -9,7 +9,7 @@ import {
   navButtonClass,
   type NavTone,
 } from "@/components/nav-main"
-import { Highlight, matchesQuery } from "@/components/nav-search"
+import { Highlight, rankByQuery } from "@/components/nav-search"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +42,7 @@ export function NavDocuments({
 }) {
   const { isMobile } = useSidebar()
   const pathname = usePathname()
-  const visible = items.filter((item) => matchesQuery(item.name, query))
+  const visible = rankByQuery(items, (item) => item.name, query)
 
   if (visible.length === 0) return null
 
