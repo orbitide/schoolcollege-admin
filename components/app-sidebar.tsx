@@ -20,7 +20,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, SearchXIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -45,7 +45,14 @@ const data = {
       items: [
         { title: "Manage Term Exam", url: "/term-exam" },
         { title: "Correct Answer", url: "/term-exam/correct-answers" },
+        { title: "Generate Merit List", url: "/term-exam/merit-list" },
       ],
+    },
+    {
+      title: "Term Exam Marks",
+      icon: <FileSpreadsheetIcon />,
+      tone: "rose",
+      items: [{ title: "Marks Upload", url: "/term-exam-marks/upload" }],
     },
     {
       title: "Basic Settings",

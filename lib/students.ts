@@ -297,6 +297,10 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+export function getStudents() {
+  return students
+}
+
 export function useStudents() {
   return React.useSyncExternalStore(
     subscribe,

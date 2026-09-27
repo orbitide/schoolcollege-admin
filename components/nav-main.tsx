@@ -102,28 +102,30 @@ export function filterNavItems(items: NavMainItem[], query: string) {
   })
 }
 
-// Which collapsible menus the user opened or closed, kept in localStorage so
-// the sidebar looks the same after a refresh. Keyed by menu title.
-const MENU_STORAGE_KEY = "sms-admin:sidebar-menus"
-let savedMenus: Record<string, boolean> | undefined
+// The one collapsible menu that is open (by title, "" when all are closed),
+// kept in localStorage so the sidebar looks the same after a refresh.
+// undefined until the user opens or closes a menu.
+const MENU_STORAGE_KEY = "sms-admin:sidebar-open-menu"
+let savedMenu: string | undefined | null = null
 const menuListeners = new Set<() => void>()
 
-function readSavedMenus() {
-  if (savedMenus === undefined) {
+function readSavedMenu() {
+  if (savedMenu === null) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(MENU_STORAGE_KEY) ?? "{}")
-      savedMenus = parsed && typeof parsed === "object" ? parsed : {}
+      const parsed = JSON.parse(localStorage.getItem(MENU_STORAGE_KEY) ?? "null")
+      savedMenu = typeof parsed === "string" ? parsed : undefined
     } catch {
-      savedMenus = {}
+      savedMenu = undefined
     }
   }
-  return savedMenus!
+  return savedMenu
 }
 
-function saveMenuOpen(title: string, open: boolean) {
-  savedMenus = { ...readSavedMenus(), [title]: open }
+function saveOpenMenu(title: string) {
+  if (readSavedMenu() === title) return
+  savedMenu = title
   try {
-    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(savedMenus))
+    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(title))
   } catch {
     // Storage can be unavailable (private mode); the choice then lasts
     // until the page reloads.
@@ -135,7 +137,7 @@ function subscribeMenus(listener: () => void) {
   // Keep other tabs in step too.
   const onStorage = (event: StorageEvent) => {
     if (event.key !== MENU_STORAGE_KEY) return
-    savedMenus = undefined
+    savedMenu = null
     listener()
   }
   menuListeners.add(listener)
@@ -146,10 +148,10 @@ function subscribeMenus(listener: () => void) {
   }
 }
 
-// null on the server and during hydration, so the first render matches the
-// server's HTML; the saved state applies right after.
-function useSavedMenus() {
-  return React.useSyncExternalStore(subscribeMenus, readSavedMenus, () => null)
+// undefined on the server and during hydration, so the first render matches
+// the server's HTML; the saved state applies right after.
+function useSavedMenu() {
+  return React.useSyncExternalStore(subscribeMenus, readSavedMenu, () => undefined)
 }
 
 export function NavMain({
@@ -160,7 +162,7 @@ export function NavMain({
   query?: string
 }) {
   const pathname = usePathname()
-  const savedOpen = useSavedMenus()
+  const savedOpen = useSavedMenu()
   const searching = query.trim() !== ""
   const visible = filterNavItems(items, query)
   // The most specific matching link, so /students/new marks "Add Student"
@@ -171,6 +173,20 @@ export function NavMain({
       .sort((a, b) => b.url.length - a.url.length)[0]
   const isActive = (url: string) =>
     pathname === url || pathname.startsWith(`${url}/`)
+  // The menu holding the current page, if any.
+  const currentMenu = items.find(
+    (item) => "items" in item && item.items.some((sub) => isActive(sub.url))
+  )?.title
+
+  // Only one menu is open at a time. Arriving on a page from another menu
+  // (e.g. through a link in the page) switches to that menu.
+  // Not on first load, so a menu closed before a refresh stays closed.
+  const lastMenu = React.useRef(currentMenu)
+  React.useEffect(() => {
+    if (currentMenu && currentMenu !== lastMenu.current) saveOpenMenu(currentMenu)
+    lastMenu.current = currentMenu
+  }, [currentMenu])
+  const openMenu = savedOpen ?? currentMenu
 
   if (visible.length === 0) return null
 
@@ -186,15 +202,11 @@ export function NavMain({
               <Collapsible.Root
                 key={item.title}
                 asChild
-                // While searching, every matching menu is open. Otherwise the
-                // user's last choice wins; until they make one, a menu is
-                // open when it holds the current page.
-                open={
-                  searching ||
-                  (savedOpen?.[item.title] ?? item.items.some((sub) => isActive(sub.url)))
-                }
+                // While searching, every matching menu is open. Otherwise only
+                // one is: opening a menu closes the one that was open.
+                open={searching || openMenu === item.title}
                 onOpenChange={(open) => {
-                  if (!searching) saveMenuOpen(item.title, open)
+                  if (!searching) saveOpenMenu(open ? item.title : "")
                 }}
                 className="group/collapsible"
               >
@@ -213,11 +225,13 @@ export function NavMain({
                       <span className="ml-auto rounded-full bg-sidebar-accent px-1.5 py-px text-[10px] font-semibold text-sidebar-foreground/60 tabular-nums">
                         {item.items.length}
                       </span>
-                      <ChevronRightIcon className="text-sidebar-foreground/50 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      <ChevronRightIcon className="text-sidebar-foreground/50 transition-transform duration-250 ease-in-out group-data-[state=open]/collapsible:rotate-90 motion-reduce:transition-none" />
                     </SidebarMenuButton>
                   </Collapsible.Trigger>
-                  <Collapsible.Content>
-                    <SidebarMenuSub className="mt-1 mr-0 ml-5.5 gap-0.5 pl-3">
+                  {/* Slides open and shut (Radix measures the height), with
+                      the links fading alongside. */}
+                  <Collapsible.Content className="overflow-hidden duration-250 ease-in-out data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+                    <SidebarMenuSub className="mt-1 mr-0 ml-5.5 gap-0.5 pl-3 transition-opacity duration-250 ease-in-out group-data-[state=closed]/collapsible:opacity-0 motion-reduce:transition-none">
                       {item.items.map((sub) => (
                         <SidebarMenuSubItem key={sub.title}>
                           <SidebarMenuSubButton
