@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   closestCenter,
   DndContext,
@@ -40,10 +41,9 @@ import {
 } from "@tanstack/react-table"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
-import { z } from "zod"
 
 import { useIsMobile } from "@/hooks/use-mobile"
-import { InstituteFormDialog } from "@/components/institutes/institute-form-dialog"
+import { InstituteActions } from "@/components/institutes/institute-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -67,11 +67,8 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -96,7 +93,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { GripVerticalIcon, CircleCheckIcon, BanIcon, LoaderIcon, EllipsisVerticalIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
+import { managers, type Institute } from "@/lib/institutes"
+import { updateInstitute, useInstitutes } from "@/lib/institutes-store"
+import { GripVerticalIcon, CircleCheckIcon, BanIcon, LoaderIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
 
 // New in v9: declare the features this table uses — anything you don't
 // register is tree-shaken out of the bundle.
@@ -111,25 +110,7 @@ const features = tableFeatures({
   sortedRowModel: createSortedRowModel(),
 })
 
-const columnHelper = createColumnHelper<
-  typeof features,
-  z.infer<typeof schema>
->()
-
-export const schema = z.object({
-  id: z.number(),
-  name: z.string(),
-  subdomain: z.string(),
-  plan: z.string(),
-  status: z.string(),
-  students: z.number(),
-  teachers: z.number(),
-  manager: z.string(),
-})
-
-const planOptions = ["Basic", "Standard", "Premium"]
-const statusOptions = ["Active", "Trial", "Suspended"]
-const managerOptions = ["Rafiq Hasan", "Nusrat Jahan", "Tanvir Ahmed"]
+const columnHelper = createColumnHelper<typeof features, Institute>()
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
@@ -255,9 +236,13 @@ const columns = columnHelper.columns([
             Account Manager
           </Label>
           <Select
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              updateInstitute(row.original.id, {
+                ...row.original,
+                manager: value,
+              })
               toast.success(`${value} assigned to ${row.original.name}`)
-            }
+            }}
           >
             <SelectTrigger
               className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
@@ -268,7 +253,7 @@ const columns = columnHelper.columns([
             </SelectTrigger>
             <SelectContent align="end">
               <SelectGroup>
-                {managerOptions.map((manager) => (
+                {managers.map((manager) => (
                   <SelectItem key={manager} value={manager}>
                     {manager}
                   </SelectItem>
@@ -282,36 +267,11 @@ const columns = columnHelper.columns([
   }),
   columnHelper.display({
     id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="flex size-8 text-muted-foreground data-[state=open]:bg-muted"
-            size="icon"
-          >
-            <EllipsisVerticalIcon
-            />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>View details</DropdownMenuItem>
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Login as admin</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Suspend</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row }) => <InstituteActions institute={row.original} />,
   }),
 ])
 
-function DraggableRow({
-  row,
-}: {
-  row: Row<typeof features, z.infer<typeof schema>>
-}) {
+function DraggableRow({ row }: { row: Row<typeof features, Institute> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
@@ -336,14 +296,17 @@ function DraggableRow({
   )
 }
 
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
-  const [data, setData] = React.useState(() => initialData)
+export function DataTable() {
+  const institutes = useInstitutes()
+  // Drag order is local to this view; ids not in it yet (new institutes) go first.
+  const [order, setOrder] = React.useState<number[]>([])
+  const data = React.useMemo(() => {
+    const rank = new Map(order.map((id, index) => [id, index]))
+    return [...institutes].sort(
+      (a, b) => (rank.get(a.id) ?? -1) - (rank.get(b.id) ?? -1)
+    )
+  }, [institutes, order])
   const [view, setView] = React.useState("all")
-  const [addOpen, setAddOpen] = React.useState(false)
   const viewData = React.useMemo(
     () =>
       view === "all"
@@ -401,11 +364,10 @@ export function DataTable({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = data.findIndex((institute) => institute.id === active.id)
-        const newIndex = data.findIndex((institute) => institute.id === over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
+      const ids = data.map((institute) => institute.id)
+      setOrder(
+        arrayMove(ids, ids.indexOf(Number(active.id)), ids.indexOf(Number(over.id)))
+      )
     }
   }
 
@@ -479,10 +441,11 @@ export function DataTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-            <PlusIcon
-            />
-            <span className="hidden lg:inline">Add Institute</span>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/institutes/new">
+              <PlusIcon />
+              <span className="hidden lg:inline">Add Institute</span>
+            </Link>
           </Button>
         </div>
       </div>
@@ -620,7 +583,6 @@ export function DataTable({
           </div>
         </div>
       </TabsContent>
-      <InstituteFormDialog open={addOpen} onOpenChange={setAddOpen} />
     </Tabs>
   )
 }
@@ -645,7 +607,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function TableCellViewer({ item }: { item: Institute }) {
   const isMobile = useIsMobile()
 
   return (
@@ -719,91 +681,49 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               <Separator />
             </>
           )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="name">Institute name</Label>
-              <Input id="name" defaultValue={item.name} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="subdomain">Subdomain</Label>
-                <Input id="subdomain" defaultValue={item.subdomain} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="plan">Plan</Label>
-                <Select defaultValue={item.plan}>
-                  <SelectTrigger id="plan" className="w-full">
-                    <SelectValue placeholder="Select plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {planOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="students">Students</Label>
-                <Input id="students" defaultValue={item.students} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="teachers">Teachers</Label>
-                <Input id="teachers" defaultValue={item.teachers} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="manager">Account manager</Label>
-                <Select defaultValue={item.manager}>
-                  <SelectTrigger id="manager" className="w-full">
-                    <SelectValue placeholder="Select account manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {managerOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </form>
+          <div className="flex flex-col gap-3">
+            <DrawerRow label="Short name">{item.shortName || "—"}</DrawerRow>
+            <DrawerRow label="EIIN">{item.eiin || "—"}</DrawerRow>
+            <DrawerRow label="Type">{item.type}</DrawerRow>
+            <DrawerRow label="Principal">{item.principal || "—"}</DrawerRow>
+            <DrawerRow label="Email">{item.email}</DrawerRow>
+            <DrawerRow label="Phone">{item.phone || "—"}</DrawerRow>
+            <DrawerRow label="Plan">
+              {item.plan} · {item.billingCycle}
+            </DrawerRow>
+            <DrawerRow label="Status">{item.status}</DrawerRow>
+            <DrawerRow label="Account manager">{item.manager}</DrawerRow>
+          </div>
         </div>
         <DrawerFooter>
-          <Button onClick={() => toast.success(`${item.name} saved`)}>
-            Save changes
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button asChild>
+              <Link href={`/institutes/${item.id}`}>View details</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/institutes/${item.id}/edit`}>Edit</Link>
+            </Button>
+          </div>
           <DrawerClose asChild>
-            <Button variant="outline">Close</Button>
+            <Button variant="ghost">Close</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  )
+}
+
+function DrawerRow({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="truncate font-medium">{children}</span>
+    </div>
   )
 }

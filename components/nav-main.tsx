@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { InstituteFormDialog } from "@/components/institutes/institute-form-dialog"
 import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
@@ -25,7 +24,6 @@ export function NavMain({
   }[]
 }) {
   const pathname = usePathname()
-  const [addOpen, setAddOpen] = React.useState(false)
 
   return (
     <SidebarGroup>
@@ -33,13 +31,14 @@ export function NavMain({
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
+              asChild
               tooltip="Add Institute"
-              onClick={() => setAddOpen(true)}
               className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
-              <CirclePlusIcon
-              />
-              <span>Add Institute</span>
+              <Link href="/institutes/new">
+                <CirclePlusIcon />
+                <span>Add Institute</span>
+              </Link>
             </SidebarMenuButton>
             <Button
               size="icon"
@@ -69,7 +68,6 @@ export function NavMain({
           ))}
         </SidebarMenu>
       </SidebarGroupContent>
-      <InstituteFormDialog open={addOpen} onOpenChange={setAddOpen} />
     </SidebarGroup>
   )
 }

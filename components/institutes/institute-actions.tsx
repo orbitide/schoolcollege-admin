@@ -4,16 +4,18 @@ import * as React from "react"
 import Link from "next/link"
 import {
   BanIcon,
+  Building2Icon,
   CircleCheckIcon,
+  ClockIcon,
   EllipsisVerticalIcon,
   EyeIcon,
   LogInIcon,
   PencilIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { InstituteFormDialog } from "@/components/institutes/institute-form-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +37,7 @@ import {
 import type { Institute } from "@/lib/institutes"
 import { deleteInstitute, setInstituteStatus } from "@/lib/institutes-store"
 
-type Dialog = "edit" | "status" | "delete" | null
+type Dialog = "status" | "delete" | null
 
 export function InstituteActions({
   institute,
@@ -84,10 +86,34 @@ export function InstituteActions({
               </Link>
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onSelect={() => setDialog("edit")}>
-            <PencilIcon />
-            Edit
+          <DropdownMenuItem asChild>
+            <Link href={`/institutes/${institute.id}/edit`}>
+              <PencilIcon />
+              Edit
+            </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={`/institutes/${institute.id}/configuration`}>
+              <SlidersHorizontalIcon />
+              Configuration
+            </Link>
+          </DropdownMenuItem>
+          {institute.enableBranch && (
+            <DropdownMenuItem asChild>
+              <Link href={`/institutes/${institute.id}/branches`}>
+                <Building2Icon />
+                Branches
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {institute.enableShift && (
+            <DropdownMenuItem asChild>
+              <Link href={`/institutes/${institute.id}/shifts`}>
+                <ClockIcon />
+                Shifts
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onSelect={() =>
               toast.info(`Opening ${institute.subdomain}.sms.app as admin`)
@@ -110,12 +136,6 @@ export function InstituteActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <InstituteFormDialog
-        institute={institute}
-        open={dialog === "edit"}
-        onOpenChange={(open) => setDialog(open ? "edit" : null)}
-      />
 
       <AlertDialog
         open={dialog === "status" || dialog === "delete"}

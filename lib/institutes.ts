@@ -11,15 +11,47 @@ export const plans = ["Basic", "Standard", "Premium"] as const
 export const statuses = ["Active", "Trial", "Suspended"] as const
 export const billingCycles = ["Monthly", "Yearly"] as const
 export const managers = ["Rafiq Hasan", "Nusrat Jahan", "Tanvir Ahmed"] as const
+export const weekDays = [
+  "Saturday",
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+] as const
 
 export type InstituteType = (typeof instituteTypes)[number]
 export type Plan = (typeof plans)[number]
 export type InstituteStatus = (typeof statuses)[number]
 export type BillingCycle = (typeof billingCycles)[number]
+export type WeekDay = (typeof weekDays)[number]
 
-export type Institute = {
+// Academic structure the institute uses.
+export type InstituteSettings = {
+  startDayOfWeek: WeekDay
+  weekend: WeekDay[]
+  enableBranch: boolean
+  enableShift: boolean
+  enableMedium: boolean
+  enableVersion: boolean
+  enableSectionGender: boolean
+  enableStudentHouse: boolean
+  studentHouseLabel: string
+  enableStudentCategory: boolean
+  studentCategoryLabel: string
+  enableAutoIncrementStudentId: boolean
+  autoIncrementStudentIdStartFrom: number | null
+  studentIdLabel: string
+  showClassRoll: boolean
+  classRollLabel: string
+}
+
+export type Institute = InstituteSettings & {
   id: number
   name: string
+  shortName: string
+  eiin: string
   type: InstituteType
   subdomain: string
   plan: Plan
@@ -30,10 +62,103 @@ export type Institute = {
   manager: string
   principal: string
   email: string
+  otherEmails: string
   phone: string
   city: string
   address: string
+  logoUrl: string
+  principalSignatureUrl: string
+  configuration: InstituteConfiguration
   joinedAt: string
+}
+
+export const roles = ["Teacher", "Class Teacher", "Head Teacher"] as const
+
+// Fixed options picked on academic classes when the institute enables them.
+export const academicMediums = ["Bangla Medium", "English Medium"] as const
+export const academicVersions = ["Bangla Version", "English Version"] as const
+
+export const recordStatuses = ["Active", "Inactive"] as const
+export type RecordStatus = (typeof recordStatuses)[number]
+
+// Ranked, per-institute records such as branches and shifts.
+export type AcademicRecord = {
+  id: number
+  instituteId: number
+  name: string
+  rank: number
+  status: RecordStatus
+}
+
+export type Shift = AcademicRecord
+
+export type Branch = AcademicRecord & {
+  code: string
+  address: string
+}
+
+// Per-institute configuration for results, reports, SMS and exams.
+export type InstituteConfiguration = {
+  optionalGpaSubtraction: number
+  maximumGpa: number
+  reportHeaderStyle: string
+  reportNameStyle: string
+  reportLogoWidth: string
+  reportHighlightColor: string
+  printPageSize: number
+  admitCardColor1: string
+  admitCardColor2: string
+  admitCardFooterText: string
+  smsUrl: string
+  smsApiKey: string
+  smsRate: number
+  smsMask: string
+  smsBatchSize: number
+  smsBatchLoadSize: number
+  smsMaxTry: number
+  termExamWiseTransfer: boolean
+  minImageSize: number
+  maxImageSize: number
+  examShowAttendance: boolean
+  examShowAssignment: boolean
+  examShowDependent: boolean
+  dayFrom: number
+  dayTo: number
+  teacherRole: string
+  isUserRegistration: boolean
+}
+
+export const defaultConfiguration: InstituteConfiguration = {
+  optionalGpaSubtraction: 2,
+  maximumGpa: 5,
+  reportHeaderStyle:
+    "margin-top: 0px; margin-bottom: 4px; color:darkblue; font-size:24px; font-weight:bold;",
+  reportNameStyle:
+    "color:darkred; margin-top: 5px; margin-bottom: 0px; font-size:22px; font-weight:bold;",
+  reportLogoWidth: "70px",
+  reportHighlightColor: "",
+  printPageSize: 0,
+  admitCardColor1: "",
+  admitCardColor2: "",
+  admitCardFooterText:
+    "<u>Directions:</u><br />\n1. The examinee must bring the admit card in the examination hall.<br />\n2. The examinee must sign the attendance sheet for each subject in the examination hall otherwise(s)he will be treated as absent in the respective subject(s).",
+  smsUrl: "https://api2.onnorokomsms.com/HttpSendSms.ashx",
+  smsApiKey: "",
+  smsRate: 0.4,
+  smsMask: "",
+  smsBatchSize: 100,
+  smsBatchLoadSize: 4000,
+  smsMaxTry: 1,
+  termExamWiseTransfer: false,
+  minImageSize: 0,
+  maxImageSize: 100,
+  examShowAttendance: true,
+  examShowAssignment: true,
+  examShowDependent: false,
+  dayFrom: 26,
+  dayTo: 25,
+  teacherRole: "Teacher",
+  isUserRegistration: false,
 }
 
 export type InstituteInput = Omit<Institute, "id" | "joinedAt">
@@ -52,7 +177,92 @@ export const planLimits: Record<Plan, { students: number; teachers: number }> =
     Premium: { students: 10000, teachers: 500 },
   }
 
-export const seedInstitutes = seed as Institute[]
+export const defaultSettings: InstituteSettings = {
+  startDayOfWeek: "Saturday",
+  weekend: ["Friday"],
+  enableBranch: false,
+  enableShift: false,
+  enableMedium: false,
+  enableVersion: false,
+  enableSectionGender: false,
+  enableStudentHouse: false,
+  studentHouseLabel: "",
+  enableStudentCategory: false,
+  studentCategoryLabel: "",
+  enableAutoIncrementStudentId: false,
+  autoIncrementStudentIdStartFrom: null,
+  studentIdLabel: "",
+  showClassRoll: false,
+  classRollLabel: "",
+}
+
+// A couple of seed institutes use branches and shifts so those screens have data.
+const seedSettings: Record<number, Partial<InstituteSettings>> = {
+  1: { enableBranch: true, enableShift: true },
+  2: { enableShift: true },
+}
+
+// Seed rows only carry the SaaS fields; fill in the rest with defaults.
+export const seedInstitutes: Institute[] = seed.map((row) => ({
+  ...defaultSettings,
+  ...seedSettings[row.id],
+  shortName: row.subdomain.toUpperCase(),
+  eiin: String(100000 + row.id * 1111),
+  otherEmails: "",
+  logoUrl: "",
+  principalSignatureUrl: "",
+  configuration: defaultConfiguration,
+  ...(row as Omit<
+    Institute,
+    | keyof InstituteSettings
+    | "shortName"
+    | "eiin"
+    | "otherEmails"
+    | "logoUrl"
+    | "principalSignatureUrl"
+    | "configuration"
+  >),
+}))
+
+// Monthly revenue for one institute; yearly billing gets two months free.
+export function monthlyRevenue(institute: Institute) {
+  const price = planPrices[institute.plan]
+  return institute.billingCycle === "Yearly" ? (price * 10) / 12 : price
+}
+
+const csvColumns: [string, (i: Institute) => string | number][] = [
+  ["Name", (i) => i.name],
+  ["Short name", (i) => i.shortName],
+  ["EIIN", (i) => i.eiin],
+  ["Type", (i) => i.type],
+  ["Subdomain", (i) => i.subdomain],
+  ["Plan", (i) => i.plan],
+  ["Status", (i) => i.status],
+  ["Students", (i) => i.students],
+  ["Teachers", (i) => i.teachers],
+  ["Email", (i) => i.email],
+  ["Phone", (i) => i.phone],
+  ["City", (i) => i.city],
+  ["Joined", (i) => i.joinedAt],
+]
+
+export function exportInstitutesCsv(rows: Institute[]) {
+  const cell = (value: string | number) =>
+    `"${String(value).replaceAll('"', '""')}"`
+  const lines = [
+    csvColumns.map(([label]) => cell(label)).join(","),
+    ...rows.map((row) => csvColumns.map(([, pick]) => cell(pick(row))).join(",")),
+  ]
+  const blob = new Blob([lines.join("\r\n")], {
+    type: "text/csv;charset=utf-8",
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `institutes-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 export function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {

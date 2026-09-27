@@ -2,9 +2,11 @@
 
 import * as React from "react"
 
+import { branchStore, shiftStore } from "@/lib/academic-store"
 import {
   seedInstitutes,
   type Institute,
+  type InstituteConfiguration,
   type InstituteInput,
   type InstituteStatus,
 } from "@/lib/institutes"
@@ -50,10 +52,19 @@ export function updateInstitute(id: number, input: InstituteInput) {
   emit(institutes.map((i) => (i.id === id ? { ...i, ...input } : i)))
 }
 
+export function updateInstituteConfiguration(
+  id: number,
+  configuration: InstituteConfiguration
+) {
+  emit(institutes.map((i) => (i.id === id ? { ...i, configuration } : i)))
+}
+
 export function setInstituteStatus(id: number, status: InstituteStatus) {
   emit(institutes.map((i) => (i.id === id ? { ...i, status } : i)))
 }
 
 export function deleteInstitute(id: number) {
   emit(institutes.filter((i) => i.id !== id))
+  branchStore.removeForInstitute(id)
+  shiftStore.removeForInstitute(id)
 }

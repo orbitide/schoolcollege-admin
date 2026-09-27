@@ -10,24 +10,22 @@ import {
   ChevronRightIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
+  BanIcon,
+  CircleCheckIcon,
   DownloadIcon,
+  HourglassIcon,
   PlusIcon,
+  SchoolIcon,
   SearchIcon,
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { InstituteActions } from "@/components/institutes/institute-actions"
-import { InstituteFormDialog } from "@/components/institutes/institute-form-dialog"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -46,11 +44,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  exportInstitutesCsv,
   formatDate,
   instituteTypes,
+  monthlyRevenue,
   plans,
   statuses,
   type Institute,
+  type InstituteStatus,
 } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
@@ -73,7 +74,6 @@ export function InstitutesView() {
   })
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(10)
-  const [addOpen, setAddOpen] = React.useState(false)
 
   const filtered = React.useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -83,9 +83,15 @@ export function InstitutesView() {
         (plan === ALL || i.plan === plan) &&
         (type === ALL || i.type === type) &&
         (!query ||
-          [i.name, i.subdomain, i.city, i.principal, i.email].some((value) =>
-            value.toLowerCase().includes(query)
-          ))
+          [
+            i.name,
+            i.shortName,
+            i.eiin,
+            i.subdomain,
+            i.city,
+            i.principal,
+            i.email,
+          ].some((value) => value.toLowerCase().includes(query)))
     )
     const factor = sort.direction === "asc" ? 1 : -1
     return rows.sort((a, b) => {
@@ -131,12 +137,7 @@ export function InstitutesView() {
     )
   }
 
-  const counts = {
-    total: institutes.length,
-    active: institutes.filter((i) => i.status === "Active").length,
-    trial: institutes.filter((i) => i.status === "Trial").length,
-    suspended: institutes.filter((i) => i.status === "Suspended").length,
-  }
+  const stats = getStats(institutes)
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
@@ -150,30 +151,77 @@ export function InstitutesView() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => toast.info(`Exporting ${filtered.length} institutes`)}
+            disabled={filtered.length === 0}
+            onClick={() => {
+              exportInstitutesCsv(filtered)
+              toast.success(`Exported ${filtered.length} institutes`)
+            }}
           >
             <DownloadIcon data-icon="inline-start" />
             Export
           </Button>
-          <Button onClick={() => setAddOpen(true)}>
-            <PlusIcon data-icon="inline-start" />
-            Add Institute
+          <Button asChild>
+            <Link href="/institutes/new">
+              <PlusIcon data-icon="inline-start" />
+              Add Institute
+            </Link>
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 @3xl/main:grid-cols-4">
-        <StatCard label="Total institutes" value={counts.total} />
-        <StatCard label="Active" value={counts.active} />
-        <StatCard label="On trial" value={counts.trial} />
-        <StatCard label="Suspended" value={counts.suspended} />
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        <StatCard
+          label="Total institutes"
+          value={stats.total}
+          icon={<SchoolIcon />}
+          tone="blue"
+          detail={`${stats.students.toLocaleString()} students · ${stats.teachers.toLocaleString()} teachers`}
+          selected={status === ALL}
+          onClick={() => withReset(setStatus)(ALL)}
+        >
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="bg-emerald-500" style={{ width: `${stats.share("Active")}%` }} />
+            <div className="bg-amber-500" style={{ width: `${stats.share("Trial")}%` }} />
+            <div className="bg-red-500" style={{ width: `${stats.share("Suspended")}%` }} />
+          </div>
+        </StatCard>
+        <StatCard
+          label="Active"
+          value={stats.count("Active")}
+          icon={<CircleCheckIcon />}
+          tone="emerald"
+          detail={`$${stats.revenue("Active").toLocaleString()} monthly recurring revenue`}
+          percent={stats.share("Active")}
+          selected={status === "Active"}
+          onClick={() => withReset(setStatus)("Active")}
+        />
+        <StatCard
+          label="On trial"
+          value={stats.count("Trial")}
+          icon={<HourglassIcon />}
+          tone="amber"
+          detail={`$${stats.revenue("Trial").toLocaleString()} potential MRR if converted`}
+          percent={stats.share("Trial")}
+          selected={status === "Trial"}
+          onClick={() => withReset(setStatus)("Trial")}
+        />
+        <StatCard
+          label="Suspended"
+          value={stats.count("Suspended")}
+          icon={<BanIcon />}
+          tone="red"
+          detail={`${stats.studentsIn("Suspended").toLocaleString()} students without access`}
+          percent={stats.share("Suspended")}
+          selected={status === "Suspended"}
+          onClick={() => withReset(setStatus)("Suspended")}
+        />
       </div>
 
       <div className="flex flex-col gap-2 @3xl/main:flex-row @3xl/main:items-center">
         <div className="relative @3xl/main:w-72">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search name, subdomain, city…"
+            placeholder="Search name, EIIN, subdomain, city…"
             value={search}
             onChange={(e) => withReset(setSearch)(e.target.value)}
             className="pl-8"
@@ -220,6 +268,7 @@ export function InstitutesView() {
                 </SortButton>
               </TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>EIIN</TableHead>
               <TableHead>City</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
@@ -244,7 +293,7 @@ export function InstitutesView() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center">
                   No institutes match your filters.
                 </TableCell>
               </TableRow>
@@ -320,8 +369,6 @@ export function InstitutesView() {
           </div>
         </div>
       </div>
-
-      <InstituteFormDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   )
 }
@@ -330,17 +377,23 @@ function InstituteRow({ institute }: { institute: Institute }) {
   return (
     <TableRow>
       <TableCell>
-        <Link
-          href={`/institutes/${institute.id}`}
-          className="font-medium hover:underline"
-        >
-          {institute.name}
-        </Link>
-        <div className="text-xs text-muted-foreground">
-          {institute.subdomain}.sms.app
+        <div className="flex items-center gap-3">
+          <InstituteLogo institute={institute} />
+          <div className="min-w-0">
+            <Link
+              href={`/institutes/${institute.id}`}
+              className="font-medium hover:underline"
+            >
+              {institute.name}
+            </Link>
+            <div className="text-xs text-muted-foreground">
+              {institute.shortName} · {institute.subdomain}.sms.app
+            </div>
+          </div>
         </div>
       </TableCell>
       <TableCell>{institute.type}</TableCell>
+      <TableCell className="tabular-nums">{institute.eiin}</TableCell>
       <TableCell>{institute.city}</TableCell>
       <TableCell>
         <Badge variant="outline" className="px-1.5 text-muted-foreground">
@@ -366,16 +419,140 @@ function InstituteRow({ institute }: { institute: Institute }) {
   )
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function InstituteLogo({ institute }: { institute: Institute }) {
+  if (institute.logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={institute.logoUrl}
+        alt=""
+        className="size-8 shrink-0 rounded-md border object-contain"
+      />
+    )
+  }
+
   return (
-    <Card size="sm" className="shadow-xs">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl font-semibold tabular-nums">
-          {value}
-        </CardTitle>
-      </CardHeader>
-    </Card>
+    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
+      {(institute.shortName || institute.name).slice(0, 2).toUpperCase()}
+    </div>
+  )
+}
+
+function getStats(institutes: Institute[]) {
+  const total = institutes.length
+  const withStatus = (status: InstituteStatus) =>
+    institutes.filter((i) => i.status === status)
+  const sum = (rows: Institute[], pick: (i: Institute) => number) =>
+    rows.reduce((acc, i) => acc + pick(i), 0)
+
+  return {
+    total,
+    students: sum(institutes, (i) => i.students),
+    teachers: sum(institutes, (i) => i.teachers),
+    count: (status: InstituteStatus) => withStatus(status).length,
+    share: (status: InstituteStatus) =>
+      total ? Math.round((withStatus(status).length / total) * 100) : 0,
+    revenue: (status: InstituteStatus) =>
+      Math.round(sum(withStatus(status), monthlyRevenue)),
+    studentsIn: (status: InstituteStatus) =>
+      sum(withStatus(status), (i) => i.students),
+  }
+}
+
+const tones = {
+  blue: {
+    icon: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    bar: "bg-blue-500",
+    ring: "ring-blue-500/60",
+  },
+  emerald: {
+    icon: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    bar: "bg-emerald-500",
+    ring: "ring-emerald-500/60",
+  },
+  amber: {
+    icon: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    bar: "bg-amber-500",
+    ring: "ring-amber-500/60",
+  },
+  red: {
+    icon: "bg-red-500/10 text-red-600 dark:text-red-400",
+    bar: "bg-red-500",
+    ring: "ring-red-500/60",
+  },
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  tone,
+  detail,
+  percent,
+  selected,
+  onClick,
+  children,
+}: {
+  label: string
+  value: number
+  icon: React.ReactNode
+  tone: keyof typeof tones
+  detail: string
+  percent?: number
+  selected: boolean
+  onClick: () => void
+  children?: React.ReactNode
+}) {
+  const colors = tones[tone]
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className="rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <Card
+        className={cn(
+          "h-full bg-gradient-to-t from-primary/5 to-card shadow-xs transition-shadow hover:shadow-md dark:bg-card",
+          selected && cn("ring-2", colors.ring)
+        )}
+      >
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-muted-foreground">{label}</span>
+              <span className="text-3xl font-semibold tabular-nums">
+                {value}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "flex size-10 items-center justify-center rounded-lg [&_svg]:size-5",
+                colors.icon
+              )}
+            >
+              {icon}
+            </div>
+          </div>
+          {children ??
+            (percent !== undefined && (
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn("h-full rounded-full", colors.bar)}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                  {percent}%
+                </span>
+              </div>
+            ))}
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </CardContent>
+      </Card>
+    </button>
   )
 }
 
