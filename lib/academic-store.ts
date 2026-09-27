@@ -9,6 +9,8 @@ import type {
   AcademicSession,
   AcademicYear,
   Branch,
+  ClassYearSubject,
+  ClassYearSubjectDetail,
   HolidayEvent,
   LetterGrade,
   RecordStatus,
@@ -23,7 +25,7 @@ import type {
 // In-memory dummy stores for per-institute ranked records (branches, shifts, …).
 // Replace with API calls once the backend endpoints exist.
 // Records are listed by rank unless a `sortKey` is given (e.g. a start date).
-function createRecordStore<T extends AcademicRecord>(
+export function createRecordStore<T extends AcademicRecord>(
   seed: T[],
   { sortKey }: { sortKey?: keyof T } = {}
 ) {
@@ -60,6 +62,8 @@ function createRecordStore<T extends AcademicRecord>(
   }
 
   return {
+    // Every institute's records, for the all-institutes admin lists.
+    useAll,
     useList(instituteId: number) {
       const all = useAll()
       return React.useMemo(
@@ -327,25 +331,35 @@ export const groupStore = createRecordStore<AcademicGroup>(
   }))
 )
 
+// Each class promotes from the one before it; Nine and Ten split into groups.
 export const classStore = createRecordStore<AcademicClass>(
   [
-    ["Class Six", "ষষ্ঠ শ্রেণি", ""],
-    ["Class Seven", "সপ্তম শ্রেণি", ""],
-    ["Class Eight", "অষ্টম শ্রেণি", ""],
-    ["Class Nine", "নবম শ্রেণি", ""],
-    ["Class Ten", "দশম শ্রেণি", "SSC"],
-  ].map(([name, nameBn, publicExam], index) => ({
-    id: index + 1,
-    instituteId: 1,
-    name,
-    nameBn,
-    branchId: 1,
-    medium: "",
-    version: "",
-    publicExam,
-    rank: index + 1,
-    status: "Active" as const,
-  }))
+    ["Class Six", "ষষ্ঠ শ্রেণি", "601"],
+    ["Class Seven", "সপ্তম শ্রেণি", "701"],
+    ["Class Eight", "অষ্টম শ্রেণি", "801"],
+    ["Class Nine", "নবম শ্রেণি", "901"],
+    ["Class Ten", "দশম শ্রেণি", "1001"],
+  ].map(([name, nameBn, rollStartFrom], index) => {
+    const grouped = index >= 3
+    const ssc = index === 4
+    return {
+      id: index + 1,
+      instituteId: 1,
+      name,
+      nameBn,
+      medium: "",
+      rollStartFrom,
+      previousClassId: index ? index : null,
+      hasSession: false,
+      hasSubjectGroup: grouped,
+      groupIds: grouped ? [1, 2, 3] : [],
+      publicExams: ssc ? ["SSC"] : [],
+      testimonialExams: ssc ? ["SSC"] : [],
+      enableBoardAdmission: ssc,
+      rank: index + 1,
+      status: "Active" as const,
+    }
+  })
 )
 
 // Sections A and B of every seeded class, in the morning and day shifts.
@@ -358,7 +372,10 @@ export const sectionStore = createRecordStore<Section>(
         instituteId: 1,
         classId,
         name,
+        branchId: 1,
         shiftId: index + 1,
+        version: "",
+        groupId: null,
         capacity: 50,
         gender: "Any" as const,
         rank: n + 1,
@@ -389,8 +406,64 @@ export const subjectStore = createRecordStore<Subject>(
   }))
 )
 
+// Marks split for a seeded subject: [theory, cq, mcq, practical] as
+// [marks, pass] pairs; unused parts are 0.
+function seedDetail(
+  subjectId: number,
+  [theory, cq, mcq, practical]: [number, number][]
+): ClassYearSubjectDetail {
+  const parts = [theory, cq, mcq, practical]
+  return {
+    subjectId,
+    subjectType: "Compulsory",
+    groupId: null,
+    theoryMarks: theory[0],
+    theoryPassMarks: theory[1],
+    cqMarks: cq[0],
+    cqPassMarks: cq[1],
+    mcqMarks: mcq[0],
+    mcqPassMarks: mcq[1],
+    mcqMarksPerQuestion: mcq[0] ? 1 : 0,
+    negativeMcqMarks: 0,
+    practicalMarks: practical[0],
+    practicalPassMarks: practical[1],
+    classTestMarks: 0,
+    classTestPassMarks: 0,
+    totalMarks: parts.reduce((sum, [marks]) => sum + marks, 0),
+    totalPassMarks: parts.reduce((sum, [, pass]) => sum + pass, 0),
+    isAcceptPartial: false,
+  }
+}
+
+const none: [number, number] = [0, 0]
+
+// Class Nine and Ten of institute 1 take the four catalog subjects in 2026.
+export const classYearSubjectStore = createRecordStore<ClassYearSubject>(
+  [
+    [4, "Class Nine"],
+    [5, "Class Ten"],
+  ].map(([classId, className], index) => ({
+    id: index + 1,
+    instituteId: 1,
+    name: `${className} · 2026`,
+    medium: "",
+    classId: Number(classId),
+    yearId: 2,
+    perStudentSubjectCount: 4,
+    details: [
+      seedDetail(1, [none, [70, 23], [30, 10], none]),
+      seedDetail(2, [[100, 33], none, none, none]),
+      seedDetail(3, [none, [70, 23], [30, 10], none]),
+      seedDetail(4, [[25, 8], none, none, [25, 8]]),
+    ],
+    rank: index + 1,
+    status: "Active" as const,
+  }))
+)
+
 export function removeInstituteRecords(instituteId: number) {
   for (const store of [
+    classYearSubjectStore,
     branchStore,
     shiftStore,
     groupStore,

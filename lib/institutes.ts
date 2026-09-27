@@ -119,19 +119,30 @@ export type AcademicGroup = AcademicRecord & {
 export const publicExams = ["JSC", "SSC", "HSC", "O Level", "A Level"] as const
 export const sectionGenders = ["Any", "Male", "Female"] as const
 
-// `branchId` is null and `medium`, `version`, `publicExam` are "" when unused.
+// A level the institute teaches, as in the legacy SchoolCollege AcademicClass.
+// `medium` is "" when mediums are off. Testimonial exams are a subset of
+// `publicExams`; `groupIds` only apply when `hasSubjectGroup` is on.
 export type AcademicClass = AcademicRecord & {
   nameBn: string
-  branchId: number | null
   medium: string
-  version: string
-  publicExam: string
+  rollStartFrom: string
+  previousClassId: number | null
+  hasSession: boolean
+  hasSubjectGroup: boolean
+  groupIds: number[]
+  publicExams: string[]
+  testimonialExams: string[]
+  enableBoardAdmission: boolean
 }
 
-// Capacity 0 means unlimited; `shiftId` is null when shifts are off.
+// Capacity 0 means unlimited. Ids are null and `version` is "" when that
+// structure is turned off for the institute.
 export type Section = AcademicRecord & {
   classId: number
+  branchId: number | null
   shiftId: number | null
+  version: string
+  groupId: number | null
   capacity: number
   gender: (typeof sectionGenders)[number]
 }
@@ -142,6 +153,47 @@ export type Subject = AcademicRecord & {
   code: string
   fullMarks: number
   passMarks: number
+}
+
+export const subjectTypes = [
+  "Compulsory",
+  "Elective",
+  "Elective/Optional",
+  "Optional",
+] as const
+
+// One subject a class takes in a year, and how it is marked (legacy
+// ClassYearSubjectDetail). Totals are the sums of the parts.
+export type ClassYearSubjectDetail = {
+  subjectId: number
+  subjectType: (typeof subjectTypes)[number]
+  // null when the subject is common to every group of the class.
+  groupId: number | null
+  theoryMarks: number
+  theoryPassMarks: number
+  cqMarks: number
+  cqPassMarks: number
+  mcqMarks: number
+  mcqPassMarks: number
+  mcqMarksPerQuestion: number
+  negativeMcqMarks: number
+  practicalMarks: number
+  practicalPassMarks: number
+  classTestMarks: number
+  classTestPassMarks: number
+  totalMarks: number
+  totalPassMarks: number
+  isAcceptPartial: boolean
+}
+
+// The subjects a class takes in an academic year (legacy ClassYearSubject).
+// `name` is a display label such as "Class Nine · 2026".
+export type ClassYearSubject = AcademicRecord & {
+  medium: string
+  classId: number
+  yearId: number
+  perStudentSubjectCount: number
+  details: ClassYearSubjectDetail[]
 }
 
 export const holidayTypes = ["Event", "Management", "Gazetted"] as const
@@ -287,6 +339,11 @@ const seedSettings: Record<number, Partial<InstituteSettings>> = {
     enableStudentHouse: true,
     studentHouseLabel: "House",
     enableStudentCategory: true,
+    enableAutoIncrementStudentId: true,
+    autoIncrementStudentIdStartFrom: 26001,
+    studentIdLabel: "Student ID",
+    showClassRoll: true,
+    classRollLabel: "Class Roll",
   },
   2: { enableShift: true },
 }

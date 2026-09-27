@@ -50,6 +50,7 @@ import {
   yearStore,
 } from "@/lib/academic-store"
 import { useInstitute } from "@/lib/institutes-store"
+import { useStudents } from "@/lib/students"
 
 // Dummy activity feed until audit logs come from the API.
 function activityFor(institute: Institute) {
@@ -70,6 +71,7 @@ export function InstituteDetail({ id }: { id: number }) {
   const classes = classStore.useList(id)
   const sections = sectionStore.useList(id)
   const subjects = subjectStore.useList(id)
+  const students = useStudents().filter((student) => student.instituteId === id)
   const houses = houseStore.useList(id)
   const categories = categoryStore.useList(id)
   const currentYear = yearStore.useList(id).find((year) => year.isCurrent)
@@ -197,6 +199,14 @@ export function InstituteDetail({ id }: { id: number }) {
             <CardDescription>Calendar and enabled structures</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-x-8 gap-y-3 text-sm @xl/main:grid-cols-2">
+            <Row label="Students">
+              <ManageLink
+                href={`/students?institute=${institute.id}`}
+                count={students.length}
+                noun="student"
+                plural="students"
+              />
+            </Row>
             <Row label="Current academic year">
               <Link
                 href={`/institutes/${institute.id}/years`}

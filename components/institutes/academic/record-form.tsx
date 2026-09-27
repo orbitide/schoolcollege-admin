@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -17,7 +17,9 @@ import {
   type FieldDef,
   type FieldValue,
   type FieldValues,
+  type FormState,
 } from "@/components/institutes/academic/kinds"
+import { ClassYearSubjectForm } from "@/components/institutes/academic/class-year-subject-form"
 import { NotFound } from "@/components/institutes/academic/record-list"
 import { SelectField } from "@/components/institutes/institute-form"
 import { Button } from "@/components/ui/button"
@@ -58,8 +60,14 @@ import { cn } from "@/lib/utils"
 // Radix Select can't use "" as a value, so optional selects map "" to this.
 const ALL = "__all"
 
-// Form state keeps inputs as strings (and checkboxes as booleans) until submit.
-type FormState = Record<string, string | boolean>
+// Where Back, Cancel and Save lead: the institute's list, or the
+// all-institutes admin list the form was opened from (`?returnTo=`).
+function useListHref(instituteId: number, segment: string) {
+  const returnTo = useSearchParams().get("returnTo")
+  return returnTo?.startsWith("/basic-settings/")
+    ? returnTo
+    : `/institutes/${instituteId}/${segment}`
+}
 
 export function RecordForm({
   instituteId,
@@ -73,6 +81,7 @@ export function RecordForm({
   const config = kindConfig(kind)
   const institute = useInstitute(instituteId)
   const record = config.store.useOne(recordId ?? -1)
+  const listHref = useListHref(instituteId, config.segment)
 
   if (!institute) return <NotFound />
   const { singular, plural } = kindLabels(kind, institute)
@@ -83,7 +92,6 @@ export function RecordForm({
     return <NotFound what={singular} />
   }
 
-  const listHref = `/institutes/${instituteId}/${config.segment}`
   if (!isKindEnabled(kind, institute)) {
     return (
       <div className="flex flex-col items-start gap-3">
@@ -94,6 +102,19 @@ export function RecordForm({
           <Link href={listHref}>Back to {plural.toLowerCase()}</Link>
         </Button>
       </div>
+    )
+  }
+
+  if (config.customForm) {
+    return (
+      <ClassYearSubjectForm
+        key={recordId ?? "new"}
+        institute={institute}
+        record={record}
+        singular={singular}
+        plural={plural}
+        listHref={listHref}
+      />
     )
   }
 
@@ -119,6 +140,8 @@ function initialValue(field: FieldDef, record?: EditableRecord) {
       return String(value ?? 0)
     case "select":
       return String(value ?? (field.required ? field.options?.[0] ?? "" : ""))
+    case "multiselect":
+      return Array.isArray(value) ? value.map(String) : []
     default:
       return String(value ?? "")
   }
@@ -126,6 +149,7 @@ function initialValue(field: FieldDef, record?: EditableRecord) {
 
 function blankValue(field: FieldDef): FieldValue {
   if (field.type === "record") return null
+  if (field.type === "multiselect") return []
   if (field.type === "integer" || field.type === "decimal") return 0
   return ""
 }
@@ -148,7 +172,6 @@ function RecordFormBody({
   const siblings = config.store
     .useList(institute.id)
     .filter((sibling) => sibling.id !== record?.id)
-  const fields = visibleFields(kind, institute)
   const [name, setName] = React.useState(record?.name ?? "")
   const [status, setStatus] = React.useState<RecordStatus>(
     record?.status ?? "Active"
@@ -157,10 +180,15 @@ function RecordFormBody({
     Object.fromEntries(config.fields.map((f) => [f.key, initialValue(f, record)]))
   )
   const [errors, setErrors] = React.useState<Errors>({})
-  const listHref = `/institutes/${institute.id}/${config.segment}`
+  // Fields the institute uses, then those the other inputs currently allow.
+  const institutionFields = visibleFields(kind, institute)
+  const fields = institutionFields.filter(
+    (field) => !field.showWhenValues || field.showWhenValues(values)
+  )
+  const listHref = useListHref(institute.id, config.segment)
   const lower = singular.toLowerCase()
 
-  function set(key: string, value: string | boolean) {
+  function set(key: string, value: string | boolean | string[]) {
     setValues((current) => ({ ...current, [key]: value }))
   }
 
@@ -176,10 +204,24 @@ function RecordFormBody({
         continue
       }
       // Fields the institute has turned off keep whatever the record had.
-      if (!fields.includes(field)) {
+      if (!institutionFields.includes(field)) {
         parsed[field.key] = record
           ? ((record[field.key] ?? null) as FieldValue)
           : (field.fallback ?? blankValue(field))
+        continue
+      }
+      // Fields hidden by another input (e.g. groups without "Has subject
+      // group") are cleared.
+      if (!fields.includes(field)) {
+        parsed[field.key] = field.fallback ?? blankValue(field)
+        continue
+      }
+      if (field.type === "multiselect") {
+        const picked = Array.isArray(raw) ? raw : []
+        parsed[field.key] = field.source ? picked.map(Number) : picked
+        if (field.required && !picked.length) {
+          next[field.key] = `Pick at least one ${field.label.toLowerCase()}.`
+        }
         continue
       }
       const text = String(raw ?? "").trim()
@@ -236,7 +278,7 @@ function RecordFormBody({
     }
 
     if (Object.values(next).every((error) => !error) && config.validate) {
-      Object.assign(next, config.validate(parsed, { institute, siblings }))
+      Object.assign(next, config.validate(parsed, { institute, siblings, record }))
     }
     return { parsed, next }
   }
@@ -312,6 +354,8 @@ function RecordFormBody({
               locked={field.current && Boolean(record?.[field.key])}
               lower={lower}
               onChange={(value) => set(field.key, value)}
+              // A record can't point at itself, e.g. as its own previous class.
+              excludeId={field.source === config.store ? record?.id : undefined}
             />
           ))}
         </CardContent>
@@ -335,14 +379,16 @@ function RecordField({
   locked,
   lower,
   onChange,
+  excludeId,
 }: {
   field: FieldDef
-  value: string | boolean
+  value: string | boolean | string[]
   error?: string
   institute: Institute
   locked?: boolean
   lower: string
-  onChange: (value: string | boolean) => void
+  onChange: (value: string | boolean | string[]) => void
+  excludeId?: number
 }) {
   const id = field.key
   const wide = field.wide || field.type === "textarea" || field.type === "checkbox"
@@ -370,6 +416,36 @@ function RecordField({
     )
   }
 
+  if (field.type === "multiselect") {
+    const picked = Array.isArray(value) ? value : []
+    return (
+      <Field data-invalid={!!error} className="sm:col-span-2">
+        <FieldLabel>{field.label}</FieldLabel>
+        {field.source ? (
+          <RecordCheckboxes
+            id={id}
+            source={field.source}
+            instituteId={institute.id}
+            picked={picked}
+            onChange={onChange}
+          />
+        ) : (
+          <Checkboxes
+            id={id}
+            options={(field.options ?? []).map((option) => ({
+              value: option,
+              label: option,
+            }))}
+            picked={picked}
+            onChange={onChange}
+          />
+        )}
+        {field.description && <FieldDescription>{field.description}</FieldDescription>}
+        <FieldError>{error}</FieldError>
+      </Field>
+    )
+  }
+
   let control: React.ReactNode
   if (field.type === "record" && field.source) {
     control = (
@@ -380,6 +456,7 @@ function RecordField({
         instituteId={institute.id}
         value={String(value)}
         invalid={!!error}
+        excludeId={excludeId}
         onChange={onChange}
       />
     )
@@ -455,6 +532,7 @@ function RecordSelect({
   instituteId,
   value,
   invalid,
+  excludeId,
   onChange,
 }: {
   id: string
@@ -463,11 +541,13 @@ function RecordSelect({
   instituteId: number
   value: string
   invalid: boolean
+  excludeId?: number
   onChange: (value: string) => void
 }) {
   const options = source
     .useList(instituteId)
     .filter((record) => record.status === "Active" || String(record.id) === value)
+    .filter((record) => record.id !== excludeId)
 
   if (!options.length) {
     return (
@@ -500,4 +580,72 @@ function RecordSelect({
       </SelectContent>
     </Select>
   )
+}
+
+type CheckboxOption = { value: string; label: string }
+
+// A grid of checkboxes whose value is the list of ticked option values.
+function Checkboxes({
+  id,
+  options,
+  picked,
+  onChange,
+}: {
+  id: string
+  options: CheckboxOption[]
+  picked: string[]
+  onChange: (value: string[]) => void
+}) {
+  function toggle(value: string, checked: boolean) {
+    // Keep the options' order rather than the order they were ticked in.
+    const next = new Set(picked)
+    if (checked) next.add(value)
+    else next.delete(value)
+    onChange(options.map((o) => o.value).filter((v) => next.has(v)))
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-3">
+      {options.map((option) => {
+        const optionId = `${id}-${option.value}`
+        return (
+          <Field key={option.value} orientation="horizontal">
+            <Checkbox
+              id={optionId}
+              checked={picked.includes(option.value)}
+              onCheckedChange={(checked) => toggle(option.value, checked === true)}
+            />
+            <FieldLabel htmlFor={optionId} className="font-normal">
+              {option.label}
+            </FieldLabel>
+          </Field>
+        )
+      })}
+    </div>
+  )
+}
+
+// Checkboxes for the institute's records (e.g. a class's subject groups).
+function RecordCheckboxes({
+  id,
+  source,
+  instituteId,
+  picked,
+  onChange,
+}: {
+  id: string
+  source: RecordStore<EditableRecord>
+  instituteId: number
+  picked: string[]
+  onChange: (value: string[]) => void
+}) {
+  const options = source
+    .useList(instituteId)
+    .filter((record) => record.status === "Active" || picked.includes(String(record.id)))
+    .map((record) => ({ value: String(record.id), label: record.name }))
+
+  if (!options.length) {
+    return <p className="text-sm text-muted-foreground">Nothing to pick yet. Add some first.</p>
+  }
+  return <Checkboxes id={id} options={options} picked={picked} onChange={onChange} />
 }

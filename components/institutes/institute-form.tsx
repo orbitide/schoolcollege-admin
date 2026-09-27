@@ -57,7 +57,7 @@ type BooleanKey<T> = {
   [K in keyof T]: T[K] extends boolean ? K : never
 }[keyof T]
 
-const IMAGE_TYPES = ["image/jpeg", "image/png"]
+export const IMAGE_TYPES = ["image/jpeg", "image/png"]
 
 const emptyInstitute: InstituteInput = {
   ...defaultSettings,
@@ -625,7 +625,7 @@ export function Toggle<T>({
   )
 }
 
-function ImageField({
+export function ImageField({
   name,
   label,
   value,

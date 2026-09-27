@@ -4,6 +4,8 @@ import * as React from "react"
 
 import { NavDocuments } from "@/components/nav-documents"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
+import { basicSettingsHref, basicSettingsMenu } from "@/lib/basic-settings"
+import { useCurrentUser } from "@/lib/current-user"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -16,20 +18,29 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, SchoolIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon } from "lucide-react"
 
 const data = {
-  user: {
-    name: "Super Admin",
-    email: "admin@sms.app",
-    avatar: "",
-  },
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
     {
+      title: "Students",
+      icon: <GraduationCapIcon />,
+      items: [
+        { title: "Manage Students", url: "/students" },
+        { title: "Add Student", url: "/students/new" },
+        { title: "Add Previous Student", url: "/students/previous" },
+        { title: "Student Transfer", url: "/students/transfer" },
+        { title: "Clear Student", url: "/students/clear" },
+      ],
+    },
+    {
       title: "Basic Settings",
       icon: <SlidersHorizontalIcon />,
-      items: [{ title: "Institutes", url: "/institutes", icon: <SchoolIcon /> }],
+      items: basicSettingsMenu.map((item) => ({
+        title: item.title,
+        url: basicSettingsHref(item.segment),
+      })),
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon /> },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon /> },
@@ -48,6 +59,7 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const user = useCurrentUser()
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -71,7 +83,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={{ name: user.name, email: user.email, avatar: "" }} />
       </SidebarFooter>
     </Sidebar>
   )

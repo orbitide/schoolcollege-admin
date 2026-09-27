@@ -2,18 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CalendarCheckIcon,
-  CircleCheckIcon,
-  CircleMinusIcon,
-  EllipsisVerticalIcon,
-  PencilIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react"
-import { toast } from "sonner"
+import { ArrowDownIcon, ArrowUpIcon, PencilIcon, PlusIcon } from "lucide-react"
 
 import {
   isKindEnabled,
@@ -21,19 +10,9 @@ import {
   kindConfig,
   kindLabels,
   type AcademicKind,
-  type EditableRecord,
 } from "@/components/institutes/academic/kinds"
+import { RecordActions } from "@/components/institutes/academic/record-actions"
 import { StatusBadge } from "@/components/institutes/status-badge"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,13 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -71,7 +43,6 @@ export function RecordList({
   const config = kindConfig(kind)
   const institute = useInstitute(instituteId)
   const records = config.store.useList(instituteId)
-  const [deleting, setDeleting] = React.useState<EditableRecord | null>(null)
 
   if (!institute) return <NotFound />
 
@@ -82,36 +53,6 @@ export function RecordList({
   const ranked = config.ranked !== false
   const hasCurrent = config.fields.some((field) => field.current)
   const columnCount = columns.length + (ranked ? 4 : 3)
-
-  function toggleStatus(record: EditableRecord) {
-    const next = record.status === "Active" ? "Inactive" : "Active"
-    config.store.setStatus(record.id, next)
-    toast.success(`${record.name} ${next === "Active" ? "activated" : "inactivated"}`)
-  }
-
-  function makeCurrent(record: EditableRecord) {
-    config.store.setCurrent(record.id)
-    toast.success(`${record.name} is now the current ${singular.toLowerCase()}`)
-  }
-
-  // Records other records still point at can't be deleted yet.
-  function requestDelete(record: EditableRecord) {
-    const reason = config.inUse?.(record)
-    if (reason) {
-      toast.error(`${record.name} can't be deleted`, {
-        description: `${reason} Move or delete those first, or inactivate it instead.`,
-      })
-      return
-    }
-    setDeleting(record)
-  }
-
-  function remove() {
-    if (!deleting) return
-    config.store.remove(deleting.id)
-    toast.success(`${deleting.name} deleted`)
-    setDeleting(null)
-  }
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -224,48 +165,13 @@ export function RecordList({
                       <StatusBadge status={record.status} />
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground data-[state=open]:bg-muted"
-                          >
-                            <EllipsisVerticalIcon />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem asChild>
-                            <Link href={`${base}/${record.id}/edit`}>
-                              <PencilIcon />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          {hasCurrent && !record.isCurrent && (
-                            <DropdownMenuItem onSelect={() => makeCurrent(record)}>
-                              <CalendarCheckIcon />
-                              Set as current
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onSelect={() => toggleStatus(record)}>
-                            {record.status === "Active" ? (
-                              <CircleMinusIcon />
-                            ) : (
-                              <CircleCheckIcon />
-                            )}
-                            {record.status === "Active" ? "Inactivate" : "Activate"}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => requestDelete(record)}
-                          >
-                            <Trash2Icon />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <RecordActions
+                        kind={kind}
+                        record={record}
+                        singular={singular}
+                        instituteName={institute.name}
+                        editHref={`${base}/${record.id}/edit`}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -283,27 +189,6 @@ export function RecordList({
           </Table>
         </div>
       )}
-
-      <AlertDialog
-        open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the {singular.toLowerCase()} from {institute.name}.
-              This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={remove}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

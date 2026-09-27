@@ -3,6 +3,8 @@
 import * as React from "react"
 
 import { removeInstituteRecords } from "@/lib/academic-store"
+import { removeInstituteUsers } from "@/lib/global-settings"
+import { removeInstituteStudents } from "@/lib/students"
 import {
   seedInstitutes,
   type Institute,
@@ -66,4 +68,6 @@ export function setInstituteStatus(id: number, status: InstituteStatus) {
 export function deleteInstitute(id: number) {
   emit(institutes.filter((i) => i.id !== id))
   removeInstituteRecords(id)
+  removeInstituteUsers(id)
+  removeInstituteStudents(id)
 }
