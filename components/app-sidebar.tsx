@@ -20,7 +20,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -48,6 +48,15 @@ const data = {
       ],
     },
     {
+      title: "Attendance",
+      icon: <CalendarCheckIcon />,
+      tone: "emerald",
+      items: [
+        { title: "Take Attendance By Admin", url: "/attendance" },
+        { title: "Exam Attendance By Admin", url: "/attendance/exam" },
+      ],
+    },
+    {
       title: "Term Exam",
       icon: <ClipboardListIcon />,
       tone: "amber",
@@ -62,6 +71,7 @@ const data = {
       icon: <FileSpreadsheetIcon />,
       tone: "rose",
       items: [
+        { title: "Student Marks Manage", url: "/term-exam-marks" },
         { title: "Marks Upload", url: "/term-exam-marks/upload" },
         { title: "Edit Student Marks", url: "/term-exam-marks/edit" },
         { title: "Subject Marks Edit", url: "/term-exam-marks/subject-edit" },

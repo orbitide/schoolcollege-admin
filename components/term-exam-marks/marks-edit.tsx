@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SearchIcon, TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -72,6 +73,7 @@ type Loaded = { exam: TermExam; student: Student; enrolment: Enrolment; subjects
 // subject, with grace marks where the exam allows them, and their
 // attendance and result notes. Saving regenerates the exam's pass status.
 export function MarksEdit() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const user = useCurrentUser()
   const institutes = useAccessibleInstitutes()
@@ -80,6 +82,9 @@ export function MarksEdit() {
   const name = useStudentLookups()
 
   const param = (key: string) => searchParams.get(key) ?? ""
+  // Opened from Student Marks Manage (legacy returnUrl): go back there after
+  // saving, as legacy redirects to ManageAdmin.
+  const returnTo = param("returnTo").startsWith("/") ? param("returnTo") : ""
   const [instituteId, setInstituteId] = React.useState(
     institutes.length === 1 ? String(institutes[0].id) : param("institute")
   )
@@ -224,7 +229,8 @@ export function MarksEdit() {
       toast.success(result.message, {
         description: result.saved ? `${result.saved} subject marks saved. Generate the merit list again to update positions.` : undefined,
       })
-      open(loaded)
+      if (returnTo) router.push(returnTo)
+      else open(loaded)
     } catch (error) {
       if (error instanceof MarkEditError) {
         setErrors({ [`${error.subjectId}.${error.field}`]: error.message })
@@ -457,9 +463,15 @@ export function MarksEdit() {
               />
             </CardContent>
             <CardFooter className="justify-end gap-2 border-t">
-              <Button type="button" variant="outline" onClick={() => setLoaded(null)}>
-                Back
-              </Button>
+              {returnTo ? (
+                <Button asChild type="button" variant="outline">
+                  <Link href={returnTo}>Back</Link>
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setLoaded(null)}>
+                  Back
+                </Button>
+              )}
               <Button type="submit" disabled={!loaded.exam.editEnable || !loaded.subjects.length}>
                 Update
               </Button>
