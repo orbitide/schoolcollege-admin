@@ -3,7 +3,8 @@
 import * as React from "react"
 
 import { NavDocuments } from "@/components/nav-documents"
-import { NavMain, type NavMainItem } from "@/components/nav-main"
+import { NavMain, filterNavItems, type NavMainItem } from "@/components/nav-main"
+import { NavSearch, matchesQuery } from "@/components/nav-search"
 import { basicSettingsHref, basicSettingsMenu } from "@/lib/basic-settings"
 import { useCurrentUser } from "@/lib/current-user"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -16,16 +17,18 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, SearchXIcon } from "lucide-react"
 
 const data = {
   navMain: [
-    { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
+    { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon />, tone: "blue" },
     {
       title: "Students",
       icon: <GraduationCapIcon />,
+      tone: "violet",
       items: [
         { title: "Manage Students", url: "/students" },
         { title: "Student Import", url: "/students/import" },
@@ -35,56 +38,90 @@ const data = {
         { title: "Clear Student", url: "/students/clear" },
       ],
     },
-    { title: "Term Exam", url: "/term-exam", icon: <ClipboardListIcon /> },
+    {
+      title: "Term Exam",
+      icon: <ClipboardListIcon />,
+      tone: "amber",
+      items: [
+        { title: "Manage Term Exam", url: "/term-exam" },
+        { title: "Correct Answer", url: "/term-exam/correct-answers" },
+      ],
+    },
     {
       title: "Basic Settings",
       icon: <SlidersHorizontalIcon />,
+      tone: "emerald",
       items: basicSettingsMenu.map((item) => ({
         title: item.title,
         url: basicSettingsHref(item.segment),
       })),
     },
-    { title: "Plans", url: "/plans", icon: <PackageIcon /> },
-    { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon /> },
-    { title: "Users", url: "/users", icon: <UsersIcon /> },
+    { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
+    { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose" },
+    { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky" },
   ] satisfies NavMainItem[],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
     { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
-    { title: "Search", url: "#", icon: <SearchIcon /> },
   ],
   documents: [
-    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon /> },
-    { name: "Reports", url: "/reports", icon: <FileChartColumnIcon /> },
-    { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon /> },
+    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
+    { name: "Reports", url: "/reports", icon: <FileChartColumnIcon />, tone: "violet" as const },
+    { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const },
   ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = useCurrentUser()
+  const [query, setQuery] = React.useState("")
+  const nothingFound =
+    query.trim() !== "" &&
+    filterNavItems(data.navMain, query).length === 0 &&
+    !data.documents.some((item) => matchesQuery(item.name, query)) &&
+    !data.navSecondary.some((item) => matchesQuery(item.title, query))
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="gap-3 p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+              size="lg"
+              className="gap-3 px-1.5 hover:bg-transparent active:bg-transparent"
             >
               <Link href="/dashboard">
-                <GraduationCapIcon className="size-5!" />
-                <span className="text-base font-semibold">SMS Admin</span>
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/30 [&_svg]:size-5!">
+                  <GraduationCapIcon />
+                </span>
+                <span className="grid flex-1 leading-tight">
+                  <span className="text-base font-bold tracking-tight">SMS Admin</span>
+                  <span className="text-xs text-sidebar-foreground/60">Control Panel</span>
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <NavSearch value={query} onChange={setQuery} />
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+      <SidebarSeparator className="mx-0" />
+      <SidebarContent className="gap-0 py-1">
+        <NavMain items={data.navMain} query={query} />
+        <NavDocuments items={data.documents} query={query} />
+        {nothingFound && (
+          <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+            <span className="flex size-10 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground/60">
+              <SearchXIcon className="size-5" />
+            </span>
+            <p className="text-sm font-medium">No menu found</p>
+            <p className="text-xs text-sidebar-foreground/60">
+              Nothing matches &ldquo;{query.trim()}&rdquo;.
+            </p>
+          </div>
+        )}
+        <NavSecondary items={data.navSecondary} query={query} className="mt-auto" />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border">
         <NavUser user={{ name: user.name, email: user.email, avatar: "" }} />
       </SidebarFooter>
     </Sidebar>

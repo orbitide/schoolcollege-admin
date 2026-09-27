@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { Highlight, matchesQuery } from "@/components/nav-search"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -12,6 +13,7 @@ import {
 
 export function NavSecondary({
   items,
+  query = "",
   ...props
 }: {
   items: {
@@ -19,17 +21,28 @@ export function NavSecondary({
     url: string
     icon: React.ReactNode
   }[]
+  query?: string
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  const visible = items.filter((item) => matchesQuery(item.title, query))
+
+  if (visible.length === 0) return null
+
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
+          {visible.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton
+                asChild
+                size="sm"
+                className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              >
                 <a href={item.url}>
                   {item.icon}
-                  <span>{item.title}</span>
+                  <span>
+                    <Highlight text={item.title} query={query} />
+                  </span>
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

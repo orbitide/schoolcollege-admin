@@ -6,10 +6,11 @@ import { usePathname } from "next/navigation"
 
 import { Collapsible } from "radix-ui"
 
-import { Button } from "@/components/ui/button"
+import { Highlight, matchesQuery } from "@/components/nav-search"
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -17,16 +18,89 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { ChevronRightIcon, CirclePlusIcon, MailIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ChevronRightIcon } from "lucide-react"
+
+export type NavTone =
+  | "blue"
+  | "violet"
+  | "amber"
+  | "emerald"
+  | "rose"
+  | "sky"
+  | "orange"
+  | "slate"
 
 export type NavItem = {
   title: string
   url: string
   icon?: React.ReactNode
+  tone?: NavTone
 }
 
 // A top-level entry is either a link or a collapsible menu of links.
 export type NavMainItem = NavItem | (Omit<NavItem, "url"> & { items: NavItem[] })
+
+// Spelled out in full so Tailwind can see every class.
+const toneClasses: Record<NavTone, string> = {
+  blue: "bg-blue-500/12 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300",
+  violet: "bg-violet-500/12 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300",
+  amber: "bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300",
+  emerald: "bg-emerald-500/12 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300",
+  rose: "bg-rose-500/12 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300",
+  sky: "bg-sky-500/12 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300",
+  orange: "bg-orange-500/12 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300",
+  slate: "bg-slate-500/12 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300",
+}
+
+// A menu icon on a small tinted tile; each section has its own colour so the
+// menu is quick to scan.
+export function NavIcon({
+  icon,
+  tone = "slate",
+  className,
+}: {
+  icon: React.ReactNode
+  tone?: NavTone
+  className?: string
+}) {
+  return (
+    <span
+      className={cn(
+        "flex size-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover/menu-button:scale-110",
+        toneClasses[tone],
+        className
+      )}
+    >
+      {icon}
+    </span>
+  )
+}
+
+// Shared look for top-level entries: taller rows, and a primary tint on the
+// current page.
+export const navButtonClass =
+  "relative h-10 gap-3 overflow-visible rounded-lg px-2 font-medium text-sidebar-foreground/80 transition-colors hover:text-sidebar-foreground data-active:bg-sidebar-primary/10 data-active:font-semibold data-active:text-sidebar-primary data-active:hover:bg-sidebar-primary/15 data-active:hover:text-sidebar-primary"
+
+// The coloured bar at the sidebar's edge beside the current page.
+export function ActiveBar() {
+  return (
+    <span className="absolute inset-y-2 -left-2 hidden w-1 rounded-r-full bg-sidebar-primary group-data-[active=true]/menu-button:block" />
+  )
+}
+
+// The entries left after a menu search: a link stays when its title matches;
+// a menu stays with all its links when its own title matches, otherwise with
+// just the matching links.
+export function filterNavItems(items: NavMainItem[], query: string) {
+  if (!query.trim()) return items
+  return items.flatMap<NavMainItem>((item) => {
+    if (matchesQuery(item.title, query)) return [item]
+    if (!("items" in item)) return []
+    const subs = item.items.filter((sub) => matchesQuery(sub.title, query))
+    return subs.length ? [{ ...item, items: subs }] : []
+  })
+}
 
 // Which collapsible menus the user opened or closed, kept in localStorage so
 // the sidebar looks the same after a refresh. Keyed by menu title.
@@ -78,9 +152,17 @@ function useSavedMenus() {
   return React.useSyncExternalStore(subscribeMenus, readSavedMenus, () => null)
 }
 
-export function NavMain({ items }: { items: NavMainItem[] }) {
+export function NavMain({
+  items,
+  query = "",
+}: {
+  items: NavMainItem[]
+  query?: string
+}) {
   const pathname = usePathname()
   const savedOpen = useSavedMenus()
+  const searching = query.trim() !== ""
+  const visible = filterNavItems(items, query)
   // The most specific matching link, so /students/new marks "Add Student"
   // rather than also "Manage Students".
   const activeSub = (subs: NavItem[]) =>
@@ -90,63 +172,64 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
   const isActive = (url: string) =>
     pathname === url || pathname.startsWith(`${url}/`)
 
+  if (visible.length === 0) return null
+
   return (
     <SidebarGroup>
-      <SidebarGroupContent className="flex flex-col gap-2">
-        <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-2">
-            <SidebarMenuButton
-              asChild
-              tooltip="Add Institute"
-              className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-            >
-              <Link href="/institutes/new">
-                <CirclePlusIcon />
-                <span>Add Institute</span>
-              </Link>
-            </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-            >
-              <MailIcon
-              />
-              <span className="sr-only">Messages</span>
-            </Button>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <SidebarMenu>
-          {items.map((item) =>
+      <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-sidebar-foreground/50 uppercase">
+        Main Menu
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-1">
+          {visible.map((item) =>
             "items" in item ? (
               <Collapsible.Root
                 key={item.title}
                 asChild
-                // The user's last choice wins; until they make one, a menu is
+                // While searching, every matching menu is open. Otherwise the
+                // user's last choice wins; until they make one, a menu is
                 // open when it holds the current page.
-                open={savedOpen?.[item.title] ?? item.items.some((sub) => isActive(sub.url))}
-                onOpenChange={(open) => saveMenuOpen(item.title, open)}
+                open={
+                  searching ||
+                  (savedOpen?.[item.title] ?? item.items.some((sub) => isActive(sub.url)))
+                }
+                onOpenChange={(open) => {
+                  if (!searching) saveMenuOpen(item.title, open)
+                }}
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
                   <Collapsible.Trigger asChild>
-                    <SidebarMenuButton tooltip={item.title}>
-                      {item.icon}
-                      <span>{item.title}</span>
-                      <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      isActive={item.items.some((sub) => isActive(sub.url))}
+                      className={navButtonClass}
+                    >
+                      <ActiveBar />
+                      {item.icon && <NavIcon icon={item.icon} tone={item.tone} />}
+                      <span className="truncate">
+                        <Highlight text={item.title} query={query} />
+                      </span>
+                      <span className="ml-auto rounded-full bg-sidebar-accent px-1.5 py-px text-[10px] font-semibold text-sidebar-foreground/60 tabular-nums">
+                        {item.items.length}
+                      </span>
+                      <ChevronRightIcon className="text-sidebar-foreground/50 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </Collapsible.Trigger>
                   <Collapsible.Content>
-                    <SidebarMenuSub>
+                    <SidebarMenuSub className="mt-1 mr-0 ml-5.5 gap-0.5 pl-3">
                       {item.items.map((sub) => (
                         <SidebarMenuSubItem key={sub.title}>
                           <SidebarMenuSubButton
                             asChild
                             isActive={activeSub(item.items)?.url === sub.url}
+                            className="h-8 text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground data-active:bg-sidebar-primary/10 data-active:font-medium data-active:text-sidebar-primary"
                           >
                             <Link href={sub.url}>
                               {sub.icon}
-                              <span>{sub.title}</span>
+                              <span>
+                                <Highlight text={sub.title} query={query} />
+                              </span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -161,10 +244,14 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
                   asChild
                   tooltip={item.title}
                   isActive={isActive(item.url)}
+                  className={navButtonClass}
                 >
                   <Link href={item.url}>
-                    {item.icon}
-                    <span>{item.title}</span>
+                    <ActiveBar />
+                    {item.icon && <NavIcon icon={item.icon} tone={item.tone} />}
+                    <span>
+                      <Highlight text={item.title} query={query} />
+                    </span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

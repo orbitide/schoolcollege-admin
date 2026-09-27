@@ -1,5 +1,15 @@
 "use client"
 
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+
+import {
+  ActiveBar,
+  NavIcon,
+  navButtonClass,
+  type NavTone,
+} from "@/components/nav-main"
+import { Highlight, matchesQuery } from "@/components/nav-search"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,32 +30,48 @@ import { MoreHorizontalIcon, FolderIcon, ShareIcon, Trash2Icon } from "lucide-re
 
 export function NavDocuments({
   items,
+  query = "",
 }: {
   items: {
     name: string
     url: string
     icon: React.ReactNode
+    tone?: NavTone
   }[]
+  query?: string
 }) {
   const { isMobile } = useSidebar()
+  const pathname = usePathname()
+  const visible = items.filter((item) => matchesQuery(item.name, query))
+
+  if (visible.length === 0) return null
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Operations</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => (
+      <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-sidebar-foreground/50 uppercase">
+        Operations
+      </SidebarGroupLabel>
+      <SidebarMenu className="gap-1">
+        {visible.map((item) => (
           <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
-                {item.icon}
-                <span>{item.name}</span>
-              </a>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+              className={navButtonClass}
+            >
+              <Link href={item.url}>
+                <ActiveBar />
+                <NavIcon icon={item.icon} tone={item.tone} />
+                <span>
+                  <Highlight text={item.name} query={query} />
+                </span>
+              </Link>
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
                   showOnHover
-                  className="rounded-sm data-[state=open]:bg-accent"
+                  className="top-2.5! rounded-sm data-[state=open]:bg-accent"
                 >
                   <MoreHorizontalIcon
                   />
@@ -77,12 +103,6 @@ export function NavDocuments({
             </DropdownMenu>
           </SidebarMenuItem>
         ))}
-        <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontalIcon className="text-sidebar-foreground/70" />
-            <span>More</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
   )
