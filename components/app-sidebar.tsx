@@ -28,9 +28,8 @@ const data = {
       icon: <GraduationCapIcon />,
       items: [
         { title: "Manage Students", url: "/students" },
-        { title: "Add Student", url: "/students/new" },
-        { title: "Add Previous Student", url: "/students/previous" },
         { title: "Student Transfer", url: "/students/transfer" },
+        { title: "Manage Testimonial", url: "/students/testimonials" },
         { title: "Clear Student", url: "/students/clear" },
       ],
     },

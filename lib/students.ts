@@ -172,6 +172,16 @@ function seedStudent(index: number): Student {
               totalMarks: "",
               eiin: "108888",
             },
+            // Class Ten sat SSC in 2026; its results feed the testimonials.
+            SSC: {
+              passingYear: "2026",
+              board: "Dhaka",
+              roll: String(410000 + index),
+              registrationNo: String(2110000000 + index),
+              gpa: ["5.00", "4.94", "4.67", "4.28", "3.89", "5.00"][index % 6],
+              totalMarks: String(1020 + ((index * 37) % 180)),
+              eiin: "108888",
+            },
           }
         : {},
     enrolments: [
@@ -238,8 +248,29 @@ export function addStudent(input: StudentInput) {
   return student
 }
 
-export function updateStudent(id: number, input: StudentInput) {
+export function updateStudent(id: number, input: Partial<StudentInput>) {
   emit(students.map((s) => (s.id === id ? { ...s, ...input } : s)))
+}
+
+// Full names of the public exams, as printed on testimonials.
+export const publicExamNames: Record<PublicExam, string> = {
+  JSC: "Junior School Certificate (JSC)",
+  SSC: "Secondary School Certificate (SSC)",
+  HSC: "Higher Secondary Certificate (HSC)",
+  "O Level": "Ordinary Level (O Level)",
+  "A Level": "Advanced Level (A Level)",
+}
+
+// The enrolment a testimonial for this exam is about: the latest one in a
+// class whose testimonials cover the exam (legacy EnableTestimonialFor…).
+export function testimonialEnrolment(
+  student: Student,
+  exam: PublicExam,
+  classes: { id: number; testimonialExams: string[] }[]
+) {
+  return [...student.enrolments]
+    .reverse()
+    .find((e) => classes.find((c) => c.id === e.classId)?.testimonialExams.includes(exam))
 }
 
 export function setStudentStatus(id: number, status: RecordStatus) {

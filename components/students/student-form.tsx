@@ -256,16 +256,18 @@ function NewStudentForm() {
 // The legacy page frame: one panel titled "Add Student" with a
 // "Manage Student" button back to the list. `actions` holds page-wide
 // controls such as the super admin's institute selector.
-function FormPanel({
+export function FormPanel({
   title,
   subtitle,
   listHref,
+  listLabel = "Manage Students",
   actions,
   children,
 }: {
   title: string
   subtitle?: string
   listHref: string
+  listLabel?: string
   actions?: React.ReactNode
   children: React.ReactNode
 }) {
@@ -282,7 +284,7 @@ function FormPanel({
             <Button asChild variant="outline" size="sm">
               <Link href={listHref}>
                 <ListIcon data-icon="inline-start" />
-                Manage Students
+                {listLabel}
               </Link>
             </Button>
           </div>
@@ -1199,7 +1201,7 @@ function StudentFormBody({
 }
 
 // A bordered section with a legend, like the legacy <fieldset>.
-function Fieldset({
+export function Fieldset({
   legend,
   description,
   children,
@@ -1220,7 +1222,7 @@ function Fieldset({
 }
 
 // The legacy "info-table": bordered rows of label and input.
-function InfoTable({ children }: { children: React.ReactNode }) {
+export function InfoTable({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-fit flex-col divide-y overflow-hidden rounded-md border">
       {children}
@@ -1229,7 +1231,7 @@ function InfoTable({ children }: { children: React.ReactNode }) {
 }
 
 // One label | input row of an info table; stacks on narrow screens.
-function Row({
+export function Row({
   label,
   required,
   htmlFor,
@@ -1308,7 +1310,7 @@ function PhotoField({
   )
 }
 
-function TextField({
+export function TextField({
   label,
   required,
   error,
@@ -1338,7 +1340,7 @@ function TextField({
   )
 }
 
-function Pick({
+export function Pick({
   label,
   required,
   value,

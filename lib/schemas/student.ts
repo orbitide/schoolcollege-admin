@@ -193,6 +193,31 @@ export const boardResultSchema = z.object({
   eiin: text,
 })
 
+// Legacy EditStudentTestimonial: the details a testimonial prints, which the
+// office corrects before issuing it. Board results go through
+// boardResultSchema (plus a 4-digit passing year there).
+export const testimonialEditSchema = z.object({
+  name: z.string().trim().min(1, "Name is required."),
+  fatherName: text,
+  motherName: text,
+  gender: z.enum(genders),
+  dateOfBirth: z
+    .string()
+    .refine(
+      (value) => !value || value <= new Date().toISOString().slice(0, 10),
+      "Date of birth can't be in the future."
+    ),
+})
+
+export type TestimonialEditValues = z.infer<typeof testimonialEditSchema>
+
+export const testimonialBoardSchema = boardResultSchema.extend({
+  passingYear: z
+    .string()
+    .trim()
+    .refine((value) => !value || /^\d{4}$/.test(value), "Enter a 4-digit year."),
+})
+
 // Zod issues as a field → first message map, e.g. { "board.SSC.gpa": "…" }.
 export function issuesToErrors(error: z.ZodError, prefix = "") {
   const errors: Record<string, string> = {}
