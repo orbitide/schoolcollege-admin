@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { classYearSubjectStore } from "@/lib/academic-store"
+import { logChanges } from "@/lib/common-log"
 import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import type { ClassYearSubjectDetail } from "@/lib/institutes"
 
@@ -217,6 +218,7 @@ let exams: TermExam[] = seed
 const listeners = new Set<() => void>()
 
 function emit(next: TermExam[]) {
+  logChanges("TermExam", exams, next)
   exams = next
   listeners.forEach((listener) => listener())
 }

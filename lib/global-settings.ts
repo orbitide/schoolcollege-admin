@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { RecordStatus } from "@/lib/institutes"
 
 // Admin users and the institutes they may work with (legacy User
@@ -70,6 +71,7 @@ const seedUserInstitutes = userInstitutes
 const listeners = new Set<() => void>()
 
 function emit(next: UserInstitute[]) {
+  logChanges("UserInstitute", userInstitutes, next)
   userInstitutes = next
   listeners.forEach((listener) => listener())
 }

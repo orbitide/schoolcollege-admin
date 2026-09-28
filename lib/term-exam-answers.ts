@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { TermExam } from "@/lib/term-exams"
 
 // Legacy OnlineCollege TermExamSubjectCorrectAnswer: the MCQ answer key of
@@ -102,6 +103,7 @@ let answers: TermExamAnswer[] = seed
 const listeners = new Set<() => void>()
 
 function emit(next: TermExamAnswer[]) {
+  logChanges("TermExamSubjectCorrectAnswer", answers, next)
   answers = next
   listeners.forEach((listener) => listener())
 }

@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { branchStore } from "@/lib/academic-store"
+import { logChanges } from "@/lib/common-log"
 
 // Legacy SchoolCollege SmsTemplate: a reusable message of one institute (and
 // optionally one branch) for an SMS type, with keywords such as [{Name}]
@@ -321,6 +322,7 @@ let templates: SmsTemplate[] = seed
 const listeners = new Set<() => void>()
 
 function emit(next: SmsTemplate[]) {
+  logChanges("SmsTemplate", templates, next)
   templates = next
   listeners.forEach((listener) => listener())
 }

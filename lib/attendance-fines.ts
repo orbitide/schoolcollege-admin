@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { InstituteConfiguration } from "@/lib/institutes"
 import {
   getStudentAttendance,
@@ -254,6 +255,7 @@ function current() {
 }
 
 function emit(next: AttendanceFine[]) {
+  logChanges("MonthlyAttendanceFine", fines, next)
   fines = next
   listeners.forEach((listener) => listener())
 }

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import { holidayStore } from "@/lib/holidays"
 import { seedInstitutes, type HolidayEvent, type Institute } from "@/lib/institutes"
 import { fitsPlace, getStudents, type Enrolment, type EnrolmentPlace, type Student } from "@/lib/students"
@@ -181,6 +182,7 @@ let attendance: StudentAttendance[] = seed
 const listeners = new Set<() => void>()
 
 function emit(next: StudentAttendance[]) {
+  logChanges("StudentAttendance", attendance, next)
   attendance = next
   listeners.forEach((listener) => listener())
 }

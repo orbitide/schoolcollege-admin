@@ -13,6 +13,11 @@ import { useTeachers } from "@/lib/teachers"
 const currentUserId = 1
 
 export function useCurrentUser() {
+  return getCurrentUser()
+}
+
+// The same user outside React, for stores that stamp what they write.
+export function getCurrentUser() {
   return adminUsers.find((user) => user.id === currentUserId) ?? adminUsers[0]
 }
 

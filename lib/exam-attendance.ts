@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import { todayIso } from "@/lib/student-attendance"
 import { getStudents, type Enrolment, type Student } from "@/lib/students"
 import { examStudents, getTermExamMarks, isActiveMark, takesSubject } from "@/lib/term-exam-marks"
@@ -170,7 +171,9 @@ export function saveExamAttendance(exam: TermExam, subjectId: number, entries: E
   }
 
   if (changed.size || fresh.length) {
-    attendance = [...current.map((r) => changed.get(r.id) ?? r), ...fresh]
+    const next = [...current.map((r) => changed.get(r.id) ?? r), ...fresh]
+    logChanges("ExamStudentAttendance", current, next)
+    attendance = next
     listeners.forEach((listener) => listener())
   }
   return { added: fresh.length, updated: changed.size }

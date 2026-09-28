@@ -2,6 +2,8 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
+
 // Legacy SchoolCollege District: one ranked list shared by every institute.
 // Deleting only marks the district "Deleted" (it can be retrieved); a
 // permanent delete removes it. In-memory like the rest of admin; replace
@@ -52,6 +54,7 @@ const seed = districts
 const listeners = new Set<() => void>()
 
 function emit(next: District[]) {
+  logChanges("District", districts, next)
   districts = next
   listeners.forEach((listener) => listener())
 }

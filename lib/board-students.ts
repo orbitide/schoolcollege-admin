@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { EducationBoard } from "@/lib/education-boards"
 import type { Cell, SheetRows } from "@/lib/student-import"
 
@@ -55,6 +56,7 @@ const seed = boardStudents
 const listeners = new Set<() => void>()
 
 function emit(next: BoardStudent[]) {
+  logChanges("BoardStudent", boardStudents, next)
   boardStudents = next
   listeners.forEach((listener) => listener())
 }

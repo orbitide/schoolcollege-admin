@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { letterGradeStore } from "@/lib/academic-store"
+import { logChanges } from "@/lib/common-log"
 import { seedInstitutes, type Institute, type LetterGrade } from "@/lib/institutes"
 import { getStudents, type Enrolment, type Student } from "@/lib/students"
 import { getTermExamAnswers } from "@/lib/term-exam-answers"
@@ -245,6 +246,16 @@ export function getTermExamMarks() {
   return (marks ??= seed())
 }
 
+// Common Log compares against the marks as it last saw them.
+let logged: TermExamStudentMark[] | null = null
+
+function notify() {
+  const current = getTermExamMarks()
+  logChanges("TermExamStudentMarks", logged ?? seed(), current)
+  logged = current
+  listeners.forEach((listener) => listener())
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
@@ -320,7 +331,7 @@ export function saveTermExamMarks(rows: MarkUpload[], user: string) {
   }
 
   marks = [...current.map((m) => changed.get(m.id) ?? m), ...added]
-  listeners.forEach((listener) => listener())
+  notify()
   return changed.size + added.length
 }
 
@@ -377,7 +388,7 @@ export function regeneratePassStatus(exam: TermExam, institute: Institute) {
 
   const calculated = withPassStatus(current, exam, institute)
   marks = calculated.marks
-  listeners.forEach((listener) => listener())
+  notify()
   return calculated.count
 }
 
@@ -558,7 +569,7 @@ function saveChanged(exam: TermExam, institute: Institute, changed: TermExamStud
   const byId = new Map(changed.map((m) => [m.id, m]))
   const existing = new Set(current.map((m) => m.id))
   marks = [...current.map((m) => byId.get(m.id) ?? m), ...changed.filter((m) => !existing.has(m.id))]
-  listeners.forEach((listener) => listener())
+  notify()
   regeneratePassStatus(exam, institute)
 }
 
@@ -644,7 +655,7 @@ export function changeSetCode(exam: TermExam, targets: TermExamStudentMark[], ne
   marks = getTermExamMarks().map((m) =>
     ids.has(m.id) ? { ...m, setCode: code, modifiedBy: user, modifiedAt: stamp } : m
   )
-  listeners.forEach((listener) => listener())
+  notify()
   return ids.size
 }
 
@@ -675,7 +686,7 @@ export function clearMarks(exam: TermExam, targets: TermExamStudentMark[]) {
   if (!exam.editEnable) throw new Error(`${exam.name} is restricted to make any changes`)
   const ids = new Set(targets.map((m) => m.id))
   marks = getTermExamMarks().filter((m) => !ids.has(m.id))
-  listeners.forEach((listener) => listener())
+  notify()
   return ids.size
 }
 
@@ -765,7 +776,7 @@ export function applyGraceMarks(
     ])
   )
   marks = getTermExamMarks().map((m) => updated.get(m.id) ?? m)
-  listeners.forEach((listener) => listener())
+  notify()
   regeneratePassStatus(exam, institute)
   return updated.size
 }
@@ -874,7 +885,7 @@ export function recalculateMarks(
     rescored.map(({ mark }) => [mark.id, { ...mark, ...notCalculated, modifiedBy: user, modifiedAt: stamp }])
   )
   marks = getTermExamMarks().map((m) => updated.get(m.id) ?? m)
-  listeners.forEach((listener) => listener())
+  notify()
   regeneratePassStatus(exam, institute)
   return { recalculated: updated.size, changed: rescored.filter((r) => r.changed).length }
 }
@@ -893,7 +904,7 @@ function patchMark(id: number, changes: Partial<TermExamStudentMark>, user: stri
   marks = getTermExamMarks().map((m) =>
     m.id === id ? { ...m, ...changes, ...notCalculated, modifiedBy: user, modifiedAt: stamp } : m
   )
-  listeners.forEach((listener) => listener())
+  notify()
 }
 
 // Active ⇄ Inactive.
@@ -919,5 +930,5 @@ export function retrieveMark(id: number, user: string) {
 
 export function deleteMarkPermanently(id: number) {
   marks = getTermExamMarks().filter((m) => m.id !== id)
-  listeners.forEach((listener) => listener())
+  notify()
 }

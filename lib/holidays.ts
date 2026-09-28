@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { HolidayEvent } from "@/lib/institutes"
 
 // Legacy SchoolCollege HolidayAndEventSettings: an institute's holidays and
@@ -52,6 +53,7 @@ const seed = holidays
 const listeners = new Set<() => void>()
 
 function emit(next: HolidayEvent[]) {
+  logChanges("HolidayAndEventSettings", holidays, next)
   holidays = next
   listeners.forEach((listener) => listener())
 }

@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { removeInstituteRecords } from "@/lib/academic-store"
+import { logChanges } from "@/lib/common-log"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteHolidays } from "@/lib/holidays"
 import { removeInstituteMenuView } from "@/lib/menu-views"
@@ -24,6 +25,7 @@ let institutes: Institute[] = seedInstitutes
 const listeners = new Set<() => void>()
 
 function emit(next: Institute[]) {
+  logChanges("Institute", institutes, next)
   institutes = next
   listeners.forEach((listener) => listener())
 }

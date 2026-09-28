@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { yearStore } from "@/lib/academic-store"
+import { logChanges } from "@/lib/common-log"
 import type { Institute, RecordStatus, publicExams } from "@/lib/institutes"
 
 // Students and their yearly enrolments, as in the legacy SchoolCollege
@@ -288,6 +289,7 @@ let students: Student[] = seedStudents
 const listeners = new Set<() => void>()
 
 function emit(next: Student[]) {
+  logChanges("Student", students, next, (s) => String(s.studentIdentificationNo))
   students = next
   listeners.forEach((listener) => listener())
 }

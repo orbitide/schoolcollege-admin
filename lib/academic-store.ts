@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type {
   AcademicClass,
   AcademicGroup,
@@ -36,6 +37,8 @@ const SEED_USER = "Super Admin"
 const SEED_STAMP = "2026-01-10T09:30:00.000Z"
 
 export function createRecordStore<T extends AcademicRecord>(
+  // The legacy entity, as Common Log names its table.
+  table: string,
   seed: T[],
   {
     sortKey,
@@ -63,6 +66,7 @@ export function createRecordStore<T extends AcademicRecord>(
   const listeners = new Set<() => void>()
 
   function emit(next: T[]) {
+    logChanges(table, records, next)
     records = next
     listeners.forEach((listener) => listener())
   }
@@ -279,7 +283,7 @@ export function createRecordStore<T extends AcademicRecord>(
   }
 }
 
-export const branchStore = createRecordStore<Branch>([
+export const branchStore = createRecordStore<Branch>("Branch", [
   {
     id: 1,
     instituteId: 1,
@@ -309,7 +313,7 @@ const room = (id: number, name: string, totalColumns: number, benchesPerColumn: 
 })
 
 // The exam buildings of institute 1: two on the main campus, one in Uttara.
-export const buildingStore = createRecordStore<Building>([
+export const buildingStore = createRecordStore<Building>("Building", [
   {
     id: 1,
     instituteId: 1,
@@ -339,13 +343,13 @@ export const buildingStore = createRecordStore<Building>([
   },
 ])
 
-export const shiftStore = createRecordStore<Shift>([
+export const shiftStore = createRecordStore<Shift>("Shift", [
   { id: 1, instituteId: 1, name: "Morning", rank: 1, status: "Active" },
   { id: 2, instituteId: 1, name: "Day", rank: 2, status: "Active" },
   { id: 3, instituteId: 2, name: "Morning", rank: 1, status: "Active" },
 ])
 
-export const yearStore = createRecordStore<AcademicYear>([
+export const yearStore = createRecordStore<AcademicYear>("AcademicYear", [
   {
     id: 1,
     instituteId: 1,
@@ -375,7 +379,7 @@ export const yearStore = createRecordStore<AcademicYear>([
   })),
 ])
 
-export const sessionStore = createRecordStore<AcademicSession>([
+export const sessionStore = createRecordStore<AcademicSession>("AcademicSession", [
   { id: 1, instituteId: 1, name: "2025-26", rank: 1, status: "Active" },
   ...["2023-24", "2024-25", "2025-26", "2026-27"].map((name, index) => ({
     id: 2 + index,
@@ -389,6 +393,7 @@ export const sessionStore = createRecordStore<AcademicSession>([
 // Legacy StudentHouse: for the whole institute, or one medium and/or class,
 // ranked within that scope.
 export const houseStore = createRecordStore<StudentHouse>(
+  "StudentHouse",
   ["Red", "Blue", "Green", "Yellow"].map((color, index) => ({
     id: index + 1,
     instituteId: 1,
@@ -407,7 +412,7 @@ export const houseStore = createRecordStore<StudentHouse>(
   }
 )
 
-export const categoryStore = createRecordStore<StudentCategory>([
+export const categoryStore = createRecordStore<StudentCategory>("StudentCategory", [
   { id: 1, instituteId: 1, name: "General", rank: 1, status: "Active" },
   {
     id: 2,
@@ -432,6 +437,7 @@ const gradeScale: [string, number, number, number][] = [
 ]
 
 export const letterGradeStore = createRecordStore<LetterGrade>(
+  "LetterGrade",
   seedInstituteIds.flatMap((instituteId, i) =>
     gradeScale.map(([name, minMarks, maxMarks, gradePoint], index) => ({
       id: i * gradeScale.length + index + 1,
@@ -458,6 +464,7 @@ const remarkScale: Omit<ResultRemark, "id" | "instituteId" | "classId" | "rank" 
 ]
 
 export const resultRemarkStore = createRecordStore<ResultRemark>(
+  "ResultRemarks",
   seedInstituteIds.flatMap((instituteId, i) =>
     remarkScale.map((remark, index) => ({
       ...remark,
@@ -477,6 +484,7 @@ export const resultRemarkStore = createRecordStore<ResultRemark>(
 )
 
 export const groupStore = createRecordStore<AcademicGroup>(
+  "AcademicClassGroup",
   [
     ["Science", "SCI", "বিজ্ঞান"],
     ["Business Studies", "BUS", "ব্যবসায় শিক্ষা"],
@@ -494,6 +502,7 @@ export const groupStore = createRecordStore<AcademicGroup>(
 
 // Each class promotes from the one before it; Nine and Ten split into groups.
 export const classStore = createRecordStore<AcademicClass>(
+  "AcademicClass",
   [
     ["Class Six", "ষষ্ঠ শ্রেণি", "601"],
     ["Class Seven", "সপ্তম শ্রেণি", "701"],
@@ -527,6 +536,7 @@ export const classStore = createRecordStore<AcademicClass>(
 
 // Sections A and B of every seeded class, in the morning and day shifts.
 export const sectionStore = createRecordStore<Section>(
+  "Section",
   [1, 2, 3, 4, 5].flatMap((classId) =>
     ["A", "B"].map((name, index) => {
       const n = (classId - 1) * 2 + index
@@ -559,6 +569,7 @@ export const sectionStore = createRecordStore<Section>(
 )
 
 export const subjectStore = createRecordStore<Subject>(
+  "Subject",
   (
     [
       ["Bangla", "বাংলা", "BAN", 100, 33],
@@ -612,6 +623,7 @@ const none: [number, number] = [0, 0]
 
 // Class Nine and Ten of institute 1 take the four catalog subjects in 2026.
 export const classYearSubjectStore = createRecordStore<ClassYearSubject>(
+  "ClassYearSubject",
   [
     [4, "Class Nine"],
     [5, "Class Ten"],
@@ -634,7 +646,7 @@ export const classYearSubjectStore = createRecordStore<ClassYearSubject>(
   }))
 )
 
-export const dashboardMenuGroupStore = createRecordStore<DashboardMenuGroup>([
+export const dashboardMenuGroupStore = createRecordStore<DashboardMenuGroup>("DashboardMenuGroup", [
   { id: 1, instituteId: 1, name: "Student", rank: 1, status: "Active" },
   { id: 2, instituteId: 1, name: "Attendance", rank: 2, status: "Active" },
   { id: 3, instituteId: 1, name: "Exam & Result", rank: 3, status: "Active" },
@@ -669,6 +681,7 @@ const menu = (
 // Ranked within their group (legacy ranks per institute and group), listed
 // group by group in the groups' order.
 export const dashboardMenuStore = createRecordStore<DashboardMenu>(
+  "DashboardMenu",
   [
     menu(1, 1, "Manage Students", "/students", "users", "#2563eb", 1),
     menu(2, 1, "Student Import", "/students/import", "upload", "#0891b2", 2),

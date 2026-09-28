@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
 import type { Section } from "@/lib/institutes"
 
 // Legacy SchoolCollege Teacher (+ TeacherSection, TeacherSubject): a teacher
@@ -123,6 +124,7 @@ let teachers: Teacher[] = seed
 const listeners = new Set<() => void>()
 
 function emit(next: Teacher[]) {
+  logChanges("Teacher", teachers, next)
   teachers = next
   listeners.forEach((listener) => listener())
 }

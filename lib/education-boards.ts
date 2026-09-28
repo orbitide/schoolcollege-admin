@@ -2,6 +2,8 @@
 
 import * as React from "react"
 
+import { logChanges } from "@/lib/common-log"
+
 // Legacy SchoolCollege EducationBoard (Online Admission menu): the boards a
 // board student passed SSC under, shared by every institute. The legacy
 // board-student import matches a sheet's board column against these names in
@@ -51,6 +53,7 @@ const seed = boards
 const listeners = new Set<() => void>()
 
 function emit(next: EducationBoard[]) {
+  logChanges("EducationBoard", boards, next)
   boards = next
   listeners.forEach((listener) => listener())
 }
