@@ -16,7 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { groupStore, holidayStore } from "@/lib/academic-store"
+import { groupStore } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import {
   attendanceSummary,
   presentPercent,

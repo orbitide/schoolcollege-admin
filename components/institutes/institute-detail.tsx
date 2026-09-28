@@ -10,10 +10,7 @@ import {
   UserIcon,
 } from "lucide-react"
 
-import {
-  formatDateRange,
-  kindLabels,
-} from "@/components/institutes/academic/kinds"
+import { kindLabels } from "@/components/institutes/academic/kinds"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,7 +37,6 @@ import {
   categoryStore,
   classStore,
   groupStore,
-  holidayStore,
   houseStore,
   letterGradeStore,
   resultRemarkStore,
@@ -49,6 +45,7 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
+import { formatDateRange, holidayStore } from "@/lib/holidays"
 import { useInstitute } from "@/lib/institutes-store"
 import { useStudents } from "@/lib/students"
 

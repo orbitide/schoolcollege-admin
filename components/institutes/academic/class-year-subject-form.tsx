@@ -41,6 +41,7 @@ import {
   type ClassYearSubject,
   type ClassYearSubjectDetail,
   type Institute,
+  editableStatus,
   type RecordStatus,
 } from "@/lib/institutes"
 import { cn } from "@/lib/utils"
@@ -139,7 +140,7 @@ export function ClassYearSubjectForm({
   const [perStudent, setPerStudent] = React.useState(
     String(existing?.perStudentSubjectCount ?? "")
   )
-  const [status, setStatus] = React.useState<RecordStatus>(existing?.status ?? "Active")
+  const [status, setStatus] = React.useState<RecordStatus>(editableStatus(existing?.status))
   const [rows, setRows] = React.useState<Row[]>(() =>
     existing?.details.length ? existing.details.map(toRow) : [toRow()]
   )

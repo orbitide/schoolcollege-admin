@@ -27,6 +27,7 @@ import {
   type Building,
   type BuildingRoom,
   type Institute,
+  editableStatus,
   type RecordStatus,
 } from "@/lib/institutes"
 
@@ -71,7 +72,7 @@ export function BuildingForm({
 
   const [name, setName] = React.useState(existing?.name ?? "")
   const [branchId, setBranchId] = React.useState(existing?.branchId != null ? String(existing.branchId) : "")
-  const [status, setStatus] = React.useState<RecordStatus>(existing?.status ?? "Active")
+  const [status, setStatus] = React.useState<RecordStatus>(editableStatus(existing?.status))
   const [rows, setRows] = React.useState<Row[]>(() => (existing?.rooms.length ? existing.rooms.map(toRow) : [toRow()]))
   const [errors, setErrors] = React.useState<Errors>({})
 

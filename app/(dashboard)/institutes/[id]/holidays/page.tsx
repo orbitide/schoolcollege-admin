@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 
-import { RecordList } from "@/components/institutes/academic/record-list"
+import { InstituteHolidays } from "@/components/holidays/holiday-list"
 
 export const metadata: Metadata = {
   title: "Holidays & events · SMS Admin",
@@ -11,5 +12,9 @@ export default async function HolidaysPage({
 }: PageProps<"/institutes/[id]/holidays">) {
   const { id } = await params
 
-  return <RecordList instituteId={Number(id)} kind="holidays" />
+  return (
+    <Suspense>
+      <InstituteHolidays instituteId={Number(id)} />
+    </Suspense>
+  )
 }

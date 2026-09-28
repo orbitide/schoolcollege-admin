@@ -8,14 +8,20 @@ export const metadata: Metadata = {
   title: "Add holiday and event · SMS Admin",
 }
 
-export default async function NewHolidaysPage({
-  params,
-}: PageProps<"/institutes/[id]/holidays/new">) {
-  const { id } = await params
+const one = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value
+
+export default async function NewHolidayPage({
+  searchParams,
+}: PageProps<"/basic-settings/holidays/new">) {
+  const query = await searchParams
 
   return (
     <RequireSurface resource={HOLIDAYS_RESOURCE} surface={["Admin", "Manage"]}>
-      <HolidayForm instituteId={Number(id)} />
+      <HolidayForm
+        initialInstituteId={Number(one(query.institute)) || undefined}
+        returnTo={one(query.returnTo)}
+      />
     </RequireSurface>
   )
 }

@@ -2,37 +2,11 @@
 
 import * as React from "react"
 
-import { createRecordStore } from "@/lib/academic-store"
-import type { AcademicRecord, RecordStatus } from "@/lib/institutes"
+import type { RecordStatus } from "@/lib/institutes"
 
-// Settings shared by every institute (legacy District, User Institute).
-// In-memory dummy stores like the rest of admin; replace with API calls once
-// the backend endpoints exist.
-
-// Global records reuse the ranked record store under this institute id.
-export const GLOBAL = 0
-
-export type District = AcademicRecord & { nameBn: string }
-
-export const districtStore = createRecordStore<District>(
-  [
-    ["Dhaka", "ঢাকা"],
-    ["Chattogram", "চট্টগ্রাম"],
-    ["Rajshahi", "রাজশাহী"],
-    ["Khulna", "খুলনা"],
-    ["Barishal", "বরিশাল"],
-    ["Sylhet", "সিলেট"],
-    ["Rangpur", "রংপুর"],
-    ["Mymensingh", "ময়মনসিংহ"],
-  ].map(([name, nameBn], index) => ({
-    id: index + 1,
-    instituteId: GLOBAL,
-    name,
-    nameBn,
-    rank: index + 1,
-    status: "Active" as const,
-  }))
-)
+// Admin users and the institutes they may work with (legacy User
+// Institute). Districts live in lib/districts.ts. In-memory dummy stores like
+// the rest of admin; replace with API calls once the backend endpoints exist.
 
 export const userRoles = [
   "Super Admin",

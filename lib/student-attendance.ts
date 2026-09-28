@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { holidayStore } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import { seedInstitutes, type HolidayEvent, type Institute } from "@/lib/institutes"
 import { fitsPlace, getStudents, type Enrolment, type EnrolmentPlace, type Student } from "@/lib/students"
 import { getTeachers, type Teacher } from "@/lib/teachers"
@@ -47,19 +47,20 @@ export function weekdayOf(date: string) {
 }
 
 // Why the institute would normally be closed on the date, if it would: a
-// weekend or an active holiday for the class's medium. Legacy lets
+// weekend or an active holiday for the class (and its medium). Legacy lets
 // attendance be taken anyway, so this only warns.
 export function dayOffNote(
   institute: Institute,
   holidays: HolidayEvent[],
   date: string,
-  medium = ""
+  medium = "",
+  classId?: number
 ) {
   const weekday = weekdayOf(date)
   if (isWeekend(institute, date)) {
     return `${weekday} is a weekend for this institute.`
   }
-  const holiday = holidayOn(institute, holidays, date, medium)
+  const holiday = holidayOn(institute, holidays, date, medium, classId)
   return holiday ? `${holiday.name} (${holiday.type.toLowerCase()} holiday) falls on this day.` : undefined
 }
 
@@ -67,12 +68,21 @@ export function isWeekend(institute: Institute, date: string) {
   return (institute.weekend as string[]).includes(weekdayOf(date))
 }
 
-// The institute's active holiday on the date for the medium, if any.
-export function holidayOn(institute: Institute, holidays: HolidayEvent[], date: string, medium = "") {
+// The institute's active holiday on the date for the medium and class, if
+// any. One for a single medium or class only counts when that one (or none)
+// is asked about.
+export function holidayOn(
+  institute: Institute,
+  holidays: HolidayEvent[],
+  date: string,
+  medium = "",
+  classId?: number
+) {
   const monthDay = date.slice(5)
   return holidays.find((h) => {
     if (h.instituteId !== institute.id || h.status !== "Active") return false
     if (h.medium && medium && h.medium !== medium) return false
+    if (h.classId != null && classId != null && h.classId !== classId) return false
     const end = h.endDate || h.startDate
     if (h.repetition === "Once") return h.startDate <= date && date <= end
     // Yearly: compare month and day, allowing a range across New Year.

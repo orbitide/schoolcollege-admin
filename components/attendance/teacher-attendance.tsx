@@ -14,7 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { classStore, holidayStore, sectionStore, shiftStore, yearStore } from "@/lib/academic-store"
+import { classStore, sectionStore, shiftStore, yearStore } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import { useCurrentTeacher, useCurrentUser } from "@/lib/current-user"
 import { useInstitute } from "@/lib/institutes-store"
 import { teacherSectionIds } from "@/lib/section-teachers"
@@ -192,7 +193,7 @@ function TeacherSheet({ teacher }: { teacher: Teacher }) {
           rows={picked.rows}
           date={date}
           title={`${picked.academicClass?.name ?? "Class"}, Section ${picked.section.name}`}
-          note={dayOffNote(institute, holidays, date, picked.academicClass?.medium)}
+          note={dayOffNote(institute, holidays, date, picked.academicClass?.medium, picked.academicClass?.id)}
         />
       ) : (
         <Card>

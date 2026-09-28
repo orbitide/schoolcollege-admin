@@ -14,6 +14,7 @@ import {
 import { RecordActions } from "@/components/institutes/academic/record-actions"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { SurfaceTabs } from "@/components/surface-tabs"
+import { stamp } from "@/components/term-exams/term-exam-fields"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -66,7 +67,11 @@ export function ManageAdminList({
   surface: AccessSurface
 }) {
   const config = kindConfig(kind)
-  const can = capabilitiesFor(surface)
+  const soft = Boolean(config.softDelete)
+  const can = {
+    ...capabilitiesFor(surface),
+    ...(config.manageDeletes && surface === "Manage" && { delete: true }),
+  }
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -76,6 +81,8 @@ export function ManageAdminList({
   config.store.useAll()
 
   const [status, setStatus] = React.useState(ALL)
+  // Legacy grids filter Without / With Deleted instead of by status.
+  const [withDeleted, setWithDeleted] = React.useState(false)
   const [medium, setMedium] = React.useState(ALL)
   const [query, setQuery] = React.useState("")
 
@@ -95,8 +102,10 @@ export function ManageAdminList({
 
   const needle = query.trim().toLowerCase()
   const rows = listed.flatMap((institute) =>
-    config.store
-      .getList(institute.id)
+    (soft && can.restore && withDeleted
+      ? config.store.getListWithDeleted(institute.id)
+      : config.store.getList(institute.id)
+    )
       .filter(
         (record) =>
           (status === ALL || record.status === status) &&
@@ -109,7 +118,7 @@ export function ManageAdminList({
   // Keep the institute filter in the URL so it survives a trip to the form.
   const returnTo = selected ? `${pathname}?institute=${selected.id}` : pathname
   const recordHref = (institute: Institute, path: string) =>
-    `/institutes/${institute.id}/${config.segment}/${path}?returnTo=${encodeURIComponent(returnTo)}`
+    `/institutes/${institute.id}/${config.segment}${path ? `/${path}` : ""}?returnTo=${encodeURIComponent(returnTo)}`
 
   function selectInstitute(value: string) {
     const params = new URLSearchParams(searchParams)
@@ -119,7 +128,7 @@ export function ManageAdminList({
     router.replace(search ? `${pathname}?${search}` : pathname)
   }
 
-  const columnCount = columns.length + 6
+  const columnCount = columns.length + (soft ? 8 : 6)
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
@@ -187,13 +196,25 @@ export function ManageAdminList({
             options={academicMediums.map((m) => ({ value: m, label: m }))}
           />
         )}
-        <FilterSelect
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          allLabel="All statuses"
-          options={recordStatuses.map((s) => ({ value: s, label: s }))}
-        />
+        {!soft ? (
+          <FilterSelect
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            allLabel="All statuses"
+            options={recordStatuses.map((s) => ({ value: s, label: s }))}
+          />
+        ) : (
+          can.restore && (
+            <FilterSelect
+              label="Deleted"
+              value={withDeleted ? "with" : ALL}
+              onChange={(value) => setWithDeleted(value === "with")}
+              allLabel="Without Deleted"
+              options={[{ value: "with", label: "With Deleted" }]}
+            />
+          )
+        )}
         <div className="relative w-full sm:w-56">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -221,7 +242,13 @@ export function ManageAdminList({
                   {column.label}
                 </TableHead>
               ))}
-              <TableHead className={selected && ranked ? "w-28" : "w-16"}>Rank</TableHead>
+              {soft && (
+                <>
+                  <TableHead>User</TableHead>
+                  <TableHead>Date</TableHead>
+                </>
+              )}
+              <TableHead className={selected && ranked && !soft ? "w-28" : "w-16"}>Rank</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -229,7 +256,10 @@ export function ManageAdminList({
           <TableBody>
             {rows.length ? (
               rows.map(({ record, institute }, index) => (
-                <TableRow key={record.id}>
+                <TableRow
+                  key={record.id}
+                  className={cn(record.status === "Deleted" && "text-muted-foreground")}
+                >
                   <TableCell className="tabular-nums text-muted-foreground">
                     {index + 1}
                   </TableCell>
@@ -257,6 +287,7 @@ export function ManageAdminList({
                         : "—"}
                     </TableCell>
                   ))}
+                  {soft && <AuditCells record={record} />}
                   <TableCell>
                     <RankCell
                       kind={kind}
@@ -264,6 +295,7 @@ export function ManageAdminList({
                       // Rank is per institute, so it can only be moved
                       // while one institute is shown.
                       movable={
+                        !soft &&
                         can.reorder &&
                         Boolean(selected) &&
                         ranked &&
@@ -283,6 +315,7 @@ export function ManageAdminList({
                       singular={config.singular}
                       instituteName={institute.name}
                       editHref={recordHref(institute, `${record.id}/edit`)}
+                      detailHref={recordHref(institute, String(record.id))}
                       can={can}
                     />
                   </TableCell>
@@ -317,7 +350,9 @@ function RankCell({
   movable: boolean
 }) {
   const { store, ranked } = kindConfig(kind)
-  if (ranked === false) return <span className="text-muted-foreground">—</span>
+  if (ranked === false || record.status === "Deleted") {
+    return <span className="text-muted-foreground">—</span>
+  }
   if (!movable) return <span className="tabular-nums">{record.rank}</span>
   return (
     <div className="flex items-center gap-1">
@@ -343,6 +378,36 @@ function RankCell({
         <span className="sr-only">Move down</span>
       </Button>
     </div>
+  )
+}
+
+// Who created / last modified the record and when, as the legacy grids show.
+export function AuditCells({ record }: { record: EditableRecord }) {
+  const edited = record.createdAt !== record.modifiedAt
+  const at = (iso?: string) => (iso ? stamp(iso) : "—")
+  return (
+    <>
+      <TableCell className="whitespace-nowrap text-xs">
+        {edited ? (
+          <>
+            <div>Cr: {record.createdBy ?? "—"}</div>
+            <div>Mo: {record.modifiedBy ?? "—"}</div>
+          </>
+        ) : (
+          (record.createdBy ?? "—")
+        )}
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-xs tabular-nums">
+        {edited ? (
+          <>
+            <div>Cr: {at(record.createdAt)}</div>
+            <div>Mo: {at(record.modifiedAt)}</div>
+          </>
+        ) : (
+          at(record.createdAt)
+        )}
+      </TableCell>
+    </>
   )
 }
 

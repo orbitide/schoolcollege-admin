@@ -82,14 +82,24 @@ export const academicVersions = ["Bangla Version", "English Version"] as const
 export const recordStatuses = ["Active", "Inactive"] as const
 export type RecordStatus = (typeof recordStatuses)[number]
 
-// Ranked, per-institute records such as branches and shifts.
+// Ranked, per-institute records such as branches and shifts. "Deleted" is
+// a soft-deleted record of a kind that keeps them (legacy Delete / Retrieve);
+// the store fills in the created / modified stamps.
 export type AcademicRecord = {
   id: number
   instituteId: number
   name: string
   rank: number
-  status: RecordStatus
+  status: RecordStatus | "Deleted"
+  createdBy?: string
+  createdAt?: string
+  modifiedBy?: string
+  modifiedAt?: string
 }
+
+// A record's status as its form edits it (deleted records aren't edited).
+export const editableStatus = (status: AcademicRecord["status"] | undefined): RecordStatus =>
+  status === "Inactive" ? "Inactive" : "Active"
 
 export type Shift = AcademicRecord
 export type AcademicSession = AcademicRecord
@@ -259,14 +269,22 @@ export type ResultRemark = AcademicRecord & {
   maxFailCount: number
 }
 
-// Dates are ISO "YYYY-MM-DD" strings.
-export type HolidayEvent = AcademicRecord & {
+// Legacy HolidayAndEventSettings, kept in lib/holidays.ts. `medium` is ""
+// and `classId` null when it applies to all; dates are ISO "YYYY-MM-DD"
+// strings. Deleting only marks it "Deleted" (it can be retrieved).
+export type HolidayEvent = Omit<AcademicRecord, "status"> & {
+  status: RecordStatus | "Deleted"
   medium: string
+  classId: number | null
   startDate: string
   endDate: string
   type: (typeof holidayTypes)[number]
   repetition: (typeof repetitions)[number]
   description: string
+  createdBy: string
+  createdAt: string
+  modifiedBy: string
+  modifiedAt: string
 }
 
 // Per-institute configuration for results, reports, SMS and exams.

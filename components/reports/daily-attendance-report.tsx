@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { holidayStore } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import {
   attendanceStatuses,
   dailyAttendanceReport,

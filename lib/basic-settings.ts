@@ -2,11 +2,13 @@ import type { AcademicKind } from "@/components/institutes/academic/kinds"
 
 // The sidebar's Basic Settings menu, following the legacy SchoolCollege menu.
 // Items with a `kind` open that kind's all-institutes "Manage (Admin)" page;
-// the others (districts, user institutes) have their own static pages.
+// the others have their own static pages. `surfaces` marks a static page with
+// Admin / Manage / View surfaces (holidays), which is permissioned like a kind.
 export const basicSettingsMenu: {
   title: string
   segment: string
   kind?: AcademicKind
+  surfaces?: boolean
 }[] = [
   { title: "Institutes", segment: "institutes" },
   { title: "Branches", segment: "branches", kind: "branches" },
@@ -22,7 +24,7 @@ export const basicSettingsMenu: {
   { title: "Student Categories", segment: "categories", kind: "categories" },
   { title: "Letter Grades", segment: "grades", kind: "grades" },
   { title: "Result Remarks", segment: "remarks", kind: "remarks" },
-  { title: "Holidays & Events", segment: "holidays", kind: "holidays" },
+  { title: "Holidays & Events", segment: "holidays", surfaces: true },
   { title: "Districts", segment: "districts" },
   { title: "User Institutes", segment: "user-institutes" },
 ]

@@ -14,7 +14,7 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
-import { districtStore, GLOBAL } from "@/lib/global-settings"
+import { useAllDistricts } from "@/lib/districts"
 import type { Institute } from "@/lib/institutes"
 
 // Id → name maps for everything a student record points at, across all
@@ -30,7 +30,7 @@ export function useStudentLookups() {
   const categories = categoryStore.useAll()
   const sessions = sessionStore.useAll()
   const subjects = subjectStore.useAll()
-  const districts = districtStore.useList(GLOBAL)
+  const districts = useAllDistricts()
 
   return React.useMemo(() => {
     const names = (list: { id: number; name: string }[]) =>

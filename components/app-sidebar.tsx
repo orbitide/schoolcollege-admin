@@ -142,7 +142,7 @@ const data = {
       items: basicSettingsMenu.map((item) => ({
         title: item.title,
         url: basicSettingsHref(item.segment),
-        resource: item.kind && basicSettingsResource(item.segment),
+        resource: item.kind || item.surfaces ? basicSettingsResource(item.segment) : undefined,
       })),
     },
     {

@@ -90,7 +90,7 @@ export function dailyAttendanceReport(
 
   // Legacy: on a weekend or holiday nobody attended, there's no report;
   // on one some did, only those whose attendance was taken are listed.
-  const offNote = dayOffNote(institute, data.holidays, filter.date, filter.medium)
+  const offNote = dayOffNote(institute, data.holidays, filter.date, filter.medium, filter.classId ?? undefined)
   const anyPresent = rows.some((r) => r.isPresent)
   if (offNote && rows.length && !anyPresent) {
     return { rows: [], totals: { students: 0, present: 0, absent: 0, sms: 0 }, dayOff: offNote }

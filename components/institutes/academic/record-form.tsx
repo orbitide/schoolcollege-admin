@@ -54,8 +54,10 @@ import type { RecordStore } from "@/lib/academic-store"
 import {
   recordStatuses,
   type Institute,
+  editableStatus,
   type RecordStatus,
 } from "@/lib/institutes"
+import { useCurrentUser } from "@/lib/current-user"
 import { useInstitute } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
 
@@ -89,7 +91,7 @@ export function RecordForm({
   const { singular, plural } = kindLabels(kind, institute)
   if (
     recordId !== undefined &&
-    (!record || record.instituteId !== instituteId)
+    (!record || record.instituteId !== instituteId || record.status === "Deleted")
   ) {
     return <NotFound what={singular} />
   }
@@ -177,12 +179,13 @@ function RecordFormBody({
 }) {
   const config = kindConfig(kind)
   const router = useRouter()
+  const user = useCurrentUser()
   const siblings = config.store
     .useList(institute.id)
     .filter((sibling) => sibling.id !== record?.id)
   const [name, setName] = React.useState(record?.name ?? "")
   const [status, setStatus] = React.useState<RecordStatus>(
-    record?.status ?? "Active"
+    editableStatus(record?.status)
   )
   const [values, setValues] = React.useState<FormState>(() =>
     Object.fromEntries(config.fields.map((f) => [f.key, initialValue(f, record)]))
@@ -291,8 +294,8 @@ function RecordFormBody({
     return { parsed, next }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  // Legacy "Save And New" (kinds with `softDelete`) stays on a blank form.
+  function save(andNew: boolean) {
     const { parsed, next } = parse()
     setErrors(next)
     if (Object.values(next).some(Boolean)) return
@@ -307,13 +310,24 @@ function RecordFormBody({
     }
 
     const id = record
-      ? (config.store.update(record.id, input), record.id)
-      : config.store.add({ ...input, instituteId: institute.id } as EditableRecord).id
+      ? (config.store.update(record.id, input, user.name), record.id)
+      : config.store.add({ ...input, instituteId: institute.id } as EditableRecord, user.name).id
     if (currentField && parsed[currentField.key] && !record?.[currentField.key]) {
       config.store.setCurrent(id)
     }
     toast.success(`${name.trim()} ${record ? "updated" : "added"}`)
-    router.push(listHref)
+    if (andNew) {
+      setName("")
+      setValues(Object.fromEntries(config.fields.map((f) => [f.key, initialValue(f)])))
+      setErrors({})
+    } else {
+      router.push(listHref)
+    }
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    save(false)
   }
 
   return (
@@ -345,13 +359,16 @@ function RecordFormBody({
             />
             <FieldError>{errors.name}</FieldError>
           </Field>
-          <SelectField
-            name="status"
-            label="Status"
-            options={recordStatuses}
-            value={status}
-            onChange={setStatus}
-          />
+          {/* Legacy grids change status from the list, not the form. */}
+          {!config.softDelete && (
+            <SelectField
+              name="status"
+              label="Status"
+              options={recordStatuses}
+              value={status}
+              onChange={setStatus}
+            />
+          )}
           {fields.map((field) => (
             <RecordField
               key={field.key}
@@ -373,6 +390,11 @@ function RecordFormBody({
         <Button asChild variant="outline">
           <Link href={listHref}>Cancel</Link>
         </Button>
+        {config.softDelete && !record && (
+          <Button type="button" variant="secondary" onClick={() => save(true)}>
+            Save and new
+          </Button>
+        )}
         <Button type="submit">{record ? "Save changes" : `Add ${lower}`}</Button>
       </div>
     </form>

@@ -53,7 +53,7 @@ export function monthlyAttendanceRegister(
     const marks = days.map((date): RegisterMark => {
       const present = taken.get(`${student.id}|${date}`)
       if (present != null) return present ? "P" : "A"
-      const off = isWeekend(institute, date) || !!holidayOn(institute, data.holidays, date, enrolment.medium)
+      const off = isWeekend(institute, date) || !!holidayOn(institute, data.holidays, date, enrolment.medium, enrolment.classId)
       return off ? "-" : "N/A"
     })
     return {

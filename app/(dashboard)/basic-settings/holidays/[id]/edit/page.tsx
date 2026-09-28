@@ -5,17 +5,19 @@ import { HOLIDAYS_RESOURCE } from "@/components/holidays/holiday-list"
 import { RequireSurface } from "@/components/require-surface"
 
 export const metadata: Metadata = {
-  title: "Add holiday and event · SMS Admin",
+  title: "Edit holiday and event · SMS Admin",
 }
 
-export default async function NewHolidaysPage({
+export default async function EditHolidayPage({
   params,
-}: PageProps<"/institutes/[id]/holidays/new">) {
+  searchParams,
+}: PageProps<"/basic-settings/holidays/[id]/edit">) {
   const { id } = await params
+  const { returnTo } = await searchParams
 
   return (
     <RequireSurface resource={HOLIDAYS_RESOURCE} surface={["Admin", "Manage"]}>
-      <HolidayForm instituteId={Number(id)} />
+      <HolidayForm id={Number(id)} returnTo={Array.isArray(returnTo) ? returnTo[0] : returnTo} />
     </RequireSurface>
   )
 }

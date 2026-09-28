@@ -114,7 +114,12 @@ export function RecordList({
               {records.length ? (
                 records.map((record, index) => (
                   <TableRow key={record.id}>
-                    {ranked && (
+                    {ranked && config.softDelete && (
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {record.rank}
+                      </TableCell>
+                    )}
+                    {ranked && !config.softDelete && (
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <span className="w-6 tabular-nums text-muted-foreground">
@@ -171,6 +176,7 @@ export function RecordList({
                         singular={singular}
                         instituteName={institute.name}
                         editHref={`${base}/${record.id}/edit`}
+                        detailHref={`${base}/${record.id}`}
                       />
                     </TableCell>
                   </TableRow>

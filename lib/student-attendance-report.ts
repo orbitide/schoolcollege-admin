@@ -89,7 +89,7 @@ export function studentAttendanceReport(
         ? "Present"
         : present === false
           ? "Absent"
-          : holidayOn(institute, data.holidays, date, enrolment.medium)
+          : holidayOn(institute, data.holidays, date, enrolment.medium, enrolment.classId)
             ? "Holiday"
             : isWeekend(institute, date)
               ? "Weekend"

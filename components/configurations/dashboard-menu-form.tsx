@@ -27,6 +27,7 @@ import {
   recordStatuses,
   type DashboardMenu,
   type Institute,
+  editableStatus,
   type RecordStatus,
 } from "@/lib/institutes"
 
@@ -84,7 +85,7 @@ export function DashboardMenuForm({
   const [values, setValues] = React.useState<Values>(() =>
     existing ? { ...existing, groupId: String(existing.groupId) } : blank
   )
-  const [status, setStatus] = React.useState<RecordStatus>(existing?.status ?? "Active")
+  const [status, setStatus] = React.useState<RecordStatus>(editableStatus(existing?.status))
   const [errors, setErrors] = React.useState<Errors>({})
   const lower = singular.toLowerCase()
 

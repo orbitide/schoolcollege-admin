@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { holidayStore } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import type { Institute } from "@/lib/institutes"
 import { monthlyAttendanceRegister, type AttendanceRegister } from "@/lib/monthly-attendance-report"
 import { orientations, pageSizeFor, paperSizes, ROWS_PER_PAGE } from "@/lib/report-paper"

@@ -14,7 +14,6 @@ import type {
   ClassYearSubjectDetail,
   DashboardMenu,
   DashboardMenuGroup,
-  HolidayEvent,
   LetterGrade,
   RecordStatus,
   ResultRemark,
@@ -28,8 +27,14 @@ import type {
 // In-memory dummy stores for per-institute ranked records (branches, shifts, …).
 // Replace with API calls once the backend endpoints exist.
 // Records are listed by rank unless a `sortKey` is given (e.g. a start date)
-// or a `compare` of their own. With `rankWithin`, records are reordered only
+// or a `compare` of their own. With `rankWithin`, records are ranked only
 // among those sharing that key (a dashboard menu within its group).
+// Kinds that keep deleted records (legacy Delete / Retrieve) mark them
+// "Deleted": they hold no rank and are left out of the per-institute lists;
+// `useAll` / `useOne` still return them, so names keep resolving.
+const SEED_USER = "Super Admin"
+const SEED_STAMP = "2026-01-10T09:30:00.000Z"
+
 export function createRecordStore<T extends AcademicRecord>(
   seed: T[],
   {
@@ -38,7 +43,14 @@ export function createRecordStore<T extends AcademicRecord>(
     rankWithin,
   }: { sortKey?: keyof T; compare?: (a: T, b: T) => number; rankWithin?: keyof T } = {}
 ) {
-  let records = seed
+  const stamped: T[] = seed.map((record) => ({
+    createdBy: SEED_USER,
+    createdAt: SEED_STAMP,
+    modifiedBy: SEED_USER,
+    modifiedAt: SEED_STAMP,
+    ...record,
+  }))
+  let records = stamped
   const listeners = new Set<() => void>()
 
   function emit(next: T[]) {
@@ -55,21 +67,61 @@ export function createRecordStore<T extends AcademicRecord>(
     return React.useSyncExternalStore(
       subscribe,
       () => records,
-      () => seed
+      () => stamped
     )
+  }
+
+  function order(a: T, b: T) {
+    return compare
+      ? compare(a, b)
+      : sortKey
+        ? String(a[sortKey]).localeCompare(String(b[sortKey])) || a.rank - b.rank
+        : a.rank - b.rank
   }
 
   function forInstitute(all: T[], instituteId: number) {
     return all
+      .filter((record) => record.instituteId === instituteId && record.status !== "Deleted")
+      .sort(order)
+  }
+
+  // Deleted ones last, as the legacy admin lists show them.
+  function withDeleted(all: T[], instituteId: number) {
+    return all
       .filter((record) => record.instituteId === instituteId)
-      .sort((a, b) =>
-        compare
-          ? compare(a, b)
-          : sortKey
-            ? String(a[sortKey]).localeCompare(String(b[sortKey])) ||
-              a.rank - b.rank
-            : a.rank - b.rank
+      .sort(
+        (a, b) =>
+          Number(a.status === "Deleted") - Number(b.status === "Deleted") || order(a, b)
       )
+  }
+
+  // The records ranked together with `record` (its institute, and its
+  // `rankWithin` key), not deleted.
+  function rankedWith(all: T[], record: Pick<T, "instituteId"> & Partial<T>) {
+    return all.filter(
+      (r) =>
+        r.instituteId === record.instituteId &&
+        r.status !== "Deleted" &&
+        (!rankWithin || r[rankWithin] === record[rankWithin])
+    )
+  }
+
+  function maxRank(record: Pick<T, "instituteId"> & Partial<T>) {
+    return Math.max(0, ...rankedWith(records, record).map((r) => r.rank))
+  }
+
+  // Close the gap a record leaves in its ranks.
+  function withoutRank(all: T[], record: T) {
+    const siblings = new Set(rankedWith(all, record).map((r) => r.id))
+    return all.map((r) =>
+      siblings.has(r.id) && r.rank > record.rank ? { ...r, rank: r.rank - 1 } : r
+    )
+  }
+
+  // Changes plus the modified stamp, when a user makes the change.
+  function patch(id: number, changes: Partial<T>, user?: string) {
+    const stamp = user ? { modifiedBy: user, modifiedAt: new Date().toISOString() } : {}
+    emit(records.map((r) => (r.id === id ? { ...r, ...changes, ...stamp } : r)))
   }
 
   // The record a move swaps rank with: its neighbour in the institute's
@@ -85,7 +137,7 @@ export function createRecordStore<T extends AcademicRecord>(
   }
 
   return {
-    // Every institute's records, for the all-institutes admin lists.
+    // Every institute's records, deleted ones included.
     useAll,
     useList(instituteId: number) {
       const all = useAll()
@@ -98,30 +150,71 @@ export function createRecordStore<T extends AcademicRecord>(
     getList(instituteId: number) {
       return forInstitute(records, instituteId)
     },
+    // The institute's records with the deleted ones, for the admin lists.
+    getListWithDeleted(instituteId: number) {
+      return withDeleted(records, instituteId)
+    },
     useOne(id: number) {
       return useAll().find((record) => record.id === id)
     },
-    add(input: Omit<T, "id" | "rank">) {
-      const siblings = forInstitute(records, input.instituteId)
+    // A new record goes last in its ranks.
+    add(input: Omit<T, "id" | "rank">, user?: string) {
+      const stamp = new Date().toISOString()
       const record = {
+        ...(user && { createdBy: user, createdAt: stamp, modifiedBy: user, modifiedAt: stamp }),
         ...input,
         id: Math.max(0, ...records.map((r) => r.id)) + 1,
-        rank: Math.max(0, ...siblings.map((r) => r.rank)) + 1,
+        rank: maxRank(input as unknown as Pick<T, "instituteId"> & Partial<T>) + 1,
       } as T
       emit([...records, record])
       return record
     },
-    update(id: number, input: Partial<Omit<T, "id" | "instituteId">>) {
-      emit(records.map((r) => (r.id === id ? { ...r, ...input } : r)))
+    update(id: number, input: Partial<Omit<T, "id" | "instituteId">>, user?: string) {
+      patch(id, input as Partial<T>, user)
     },
-    setStatus(id: number, status: RecordStatus) {
-      emit(records.map((r) => (r.id === id ? { ...r, status } : r)))
+    setStatus(id: number, status: RecordStatus, user?: string) {
+      patch(id, { status } as Partial<T>, user)
     },
+    // Legacy Delete: marks it deleted and gives up its rank.
+    softDelete(id: number, user: string) {
+      const record = records.find((r) => r.id === id)
+      if (!record || record.status === "Deleted") return
+      emit(withoutRank(records, record))
+      patch(id, { status: "Deleted" } as Partial<T>, user)
+    },
+    // Legacy Retrieve: back as active, last in its ranks.
+    retrieve(id: number, user: string) {
+      const record = records.find((r) => r.id === id)
+      if (!record || record.status !== "Deleted") return
+      patch(id, { status: "Active", rank: maxRank(record) + 1 } as Partial<T>, user)
+    },
+    // Removes it for good.
     remove(id: number) {
-      emit(records.filter((r) => r.id !== id))
+      const record = records.find((r) => r.id === id)
+      if (!record) return
+      const rest = records.filter((r) => r.id !== id)
+      emit(record.status === "Deleted" ? rest : withoutRank(rest, record))
     },
     removeForInstitute(instituteId: number) {
       emit(records.filter((r) => r.instituteId !== instituteId))
+    },
+    maxRank,
+    // Legacy UpdateRank: move it to `newRank` (1..max) within its ranks,
+    // shifting the records in between by one.
+    setRank(id: number, newRank: number, user: string) {
+      const record = records.find((r) => r.id === id)
+      if (!record || record.status === "Deleted" || newRank === record.rank) return
+      const old = record.rank
+      const [low, high, step] = newRank < old ? [newRank, old - 1, 1] : [old + 1, newRank, -1]
+      const siblings = new Set(rankedWith(records, record).map((r) => r.id))
+      emit(
+        records.map((r) =>
+          r.id !== id && siblings.has(r.id) && r.rank >= low && r.rank <= high
+            ? { ...r, rank: r.rank + step }
+            : r
+        )
+      )
+      patch(id, { rank: newRank } as Partial<T>, user)
     },
     canMove(id: number, direction: "up" | "down") {
       return neighbourOf(id, direction) !== undefined
@@ -153,8 +246,8 @@ export function createRecordStore<T extends AcademicRecord>(
         )
       )
     },
-    // True when another record in the institute already uses this value.
-    // `scope` narrows the check, e.g. { medium: "Bangla Medium" }.
+    // True when another record in the institute (not deleted) already uses
+    // this value. `scope` narrows the check, e.g. { medium: "Bangla Medium" }.
     isTaken<K extends keyof T>(
       instituteId: number,
       key: K,
@@ -167,6 +260,7 @@ export function createRecordStore<T extends AcademicRecord>(
         (r) =>
           r.instituteId === instituteId &&
           r.id !== exceptId &&
+          r.status !== "Deleted" &&
           String(r[key]).trim().toLowerCase() === normalized &&
           Object.entries(scope).every(
             ([scopeKey, scopeValue]) => r[scopeKey as keyof T] === scopeValue
@@ -354,27 +448,6 @@ export const resultRemarkStore = createRecordStore<ResultRemark>(
       status: "Active" as const,
     }))
   )
-)
-
-const holidaySeed: Omit<HolidayEvent, "id" | "instituteId" | "rank" | "status">[] = [
-  { name: "International Mother Language Day", startDate: "2026-02-21", endDate: "2026-02-21", type: "Gazetted", repetition: "Yearly", description: "Shaheed Dibosh.", medium: "" },
-  { name: "Independence Day", startDate: "2026-03-26", endDate: "2026-03-26", type: "Gazetted", repetition: "Yearly", description: "", medium: "" },
-  { name: "Annual Sports", startDate: "2026-11-12", endDate: "2026-11-13", type: "Event", repetition: "Once", description: "Annual sports day on the school field.", medium: "" },
-  { name: "Victory Day", startDate: "2026-12-16", endDate: "2026-12-16", type: "Gazetted", repetition: "Yearly", description: "", medium: "" },
-  { name: "Winter vacation", startDate: "2026-12-20", endDate: "2026-12-31", type: "Management", repetition: "Yearly", description: "", medium: "" },
-]
-
-export const holidayStore = createRecordStore<HolidayEvent>(
-  seedInstituteIds.flatMap((instituteId, i) =>
-    holidaySeed.map((holiday, index) => ({
-      ...holiday,
-      id: i * holidaySeed.length + index + 1,
-      instituteId,
-      rank: index + 1,
-      status: "Active" as const,
-    }))
-  ),
-  { sortKey: "startDate" }
 )
 
 export const groupStore = createRecordStore<AcademicGroup>(
@@ -597,7 +670,6 @@ export function removeInstituteRecords(instituteId: number) {
     categoryStore,
     letterGradeStore,
     resultRemarkStore,
-    holidayStore,
   ]) {
     store.removeForInstitute(instituteId)
   }

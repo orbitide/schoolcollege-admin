@@ -56,7 +56,7 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
-import { districtStore, GLOBAL } from "@/lib/global-settings"
+import { useDistricts } from "@/lib/districts"
 import {
   academicMediums,
   academicVersions,
@@ -348,7 +348,7 @@ function StudentFormBody({
   const subjectSets = classYearSubjectStore.useList(institute.id)
   const branches = branchStore.useList(institute.id)
   const shifts = shiftStore.useList(institute.id)
-  const districts = districtStore.useList(GLOBAL)
+  const districts = useDistricts()
 
   const autoId = institute.enableAutoIncrementStudentId
   const showRoll = institute.showClassRoll

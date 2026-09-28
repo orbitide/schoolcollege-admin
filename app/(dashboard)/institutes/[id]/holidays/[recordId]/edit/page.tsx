@@ -1,9 +1,11 @@
 import type { Metadata } from "next"
 
-import { RecordForm } from "@/components/institutes/academic/record-form"
+import { HolidayForm } from "@/components/holidays/holiday-form"
+import { HOLIDAYS_RESOURCE } from "@/components/holidays/holiday-list"
+import { RequireSurface } from "@/components/require-surface"
 
 export const metadata: Metadata = {
-  title: "Edit holiday or event · SMS Admin",
+  title: "Edit holiday and event · SMS Admin",
 }
 
 export default async function EditHolidaysPage({
@@ -12,10 +14,8 @@ export default async function EditHolidaysPage({
   const { id, recordId } = await params
 
   return (
-    <RecordForm
-      instituteId={Number(id)}
-      kind="holidays"
-      recordId={Number(recordId)}
-    />
+    <RequireSurface resource={HOLIDAYS_RESOURCE} surface={["Admin", "Manage"]}>
+      <HolidayForm instituteId={Number(id)} id={Number(recordId)} />
+    </RequireSurface>
   )
 }

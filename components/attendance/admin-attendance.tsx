@@ -17,11 +17,11 @@ import {
   branchStore,
   classStore,
   groupStore,
-  holidayStore,
   sectionStore,
   shiftStore,
   yearStore,
 } from "@/lib/academic-store"
+import { holidayStore } from "@/lib/holidays"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { academicMediums, academicVersions } from "@/lib/institutes"
 import {
@@ -233,7 +233,7 @@ export function AdminAttendance() {
           rows={rows}
           date={date}
           title={`${selectedClass.name}, Section ${section.name}`}
-          note={dayOffNote(institute, holidays, date, selectedClass.medium || medium)}
+          note={dayOffNote(institute, holidays, date, selectedClass.medium || medium, selectedClass.id)}
         />
       ) : (
         <Card>

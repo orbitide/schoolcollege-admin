@@ -64,7 +64,7 @@ import {
   yearStore,
 } from "@/lib/academic-store"
 import { useAccessibleInstitutes } from "@/lib/current-user"
-import { districtStore, GLOBAL } from "@/lib/global-settings"
+import { useDistricts } from "@/lib/districts"
 import { academicMediums, academicVersions } from "@/lib/institutes"
 import {
   autoMap,
@@ -123,7 +123,7 @@ export function StudentImport() {
   const houses = houseStore.useList(iid)
   const subjects = subjectStore.useList(iid)
   const subjectSets = classYearSubjectStore.useList(iid)
-  const districts = districtStore.useList(GLOBAL)
+  const districts = useDistricts()
 
   // The fields this institute uses, in the legacy mapping order.
   const fields = institute ? importFields.filter((f) => !f.when || f.when(institute)) : []

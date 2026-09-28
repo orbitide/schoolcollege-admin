@@ -91,6 +91,14 @@ function InstituteNav({ institute }: { institute: Institute }) {
       })),
     { href: `${base}/configuration`, label: "Configuration", exact: false },
   ]
+  // Holidays have their own module (legacy HolidayAndEventSettings) but keep
+  // their tab where the generic list had it, before Buildings.
+  const buildings = tabs.findIndex((tab) => tab.href === `${base}/buildings`)
+  tabs.splice(buildings < 0 ? tabs.length - 1 : buildings, 0, {
+    href: `${base}/holidays`,
+    label: "Holidays & events",
+    exact: false,
+  })
 
   return (
     <nav

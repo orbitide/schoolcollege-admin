@@ -11,7 +11,6 @@ import {
   dashboardMenuGroupStore,
   dashboardMenuStore,
   groupStore,
-  holidayStore,
   houseStore,
   letterGradeStore,
   resultRemarkStore,
@@ -25,9 +24,7 @@ import {
 import {
   academicMediums,
   academicVersions,
-  holidayTypes,
   publicExams,
-  repetitions,
   roomCapacity,
   sectionGenders,
   type AcademicRecord,
@@ -129,6 +126,13 @@ export type KindConfig = {
   customForm?: boolean
   // Offer a medium filter on the admin list (for kinds without a medium field).
   mediumFilter?: boolean
+  // The legacy ManageAdmin grid: Delete only marks a record deleted (Retrieve
+  // brings it back, Permanent Delete removes it), rank is set in a box, rows
+  // show who created / modified them, and each has a Details page. Needs a
+  // [recordId] details route under the kind's institute segment.
+  softDelete?: boolean
+  // Legacy Manage (not only ManageAdmin) offers Delete.
+  manageDeletes?: boolean
   store: RecordStore<EditableRecord>
 }
 
@@ -237,49 +241,6 @@ function promotesFrom(classId: number, record: EditableRecord) {
 }
 
 const groupEnabled = (institute: Institute) => institute.enableGroup
-
-const jsWeekdays = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-]
-
-function parseIsoDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number)
-  return new Date(year, month - 1, day)
-}
-
-export function formatDateRange(start: string, end: string) {
-  const format = (value: string, withYear: boolean) =>
-    parseIsoDate(value).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      ...(withYear && { year: "numeric" }),
-    })
-  if (!end || start === end) return format(start, true)
-  return `${format(start, start.slice(0, 4) !== end.slice(0, 4))} – ${format(end, true)}`
-}
-
-function dayCount(start: string, end: string) {
-  const days =
-    Math.round(
-      (parseIsoDate(end || start).getTime() - parseIsoDate(start).getTime()) /
-        86_400_000
-    ) + 1
-  return `${days} day${days === 1 ? "" : "s"}`
-}
-
-function weekendHint(value: FieldValue, institute: Institute) {
-  if (typeof value !== "string" || !value) return undefined
-  const weekday = jsWeekdays[parseIsoDate(value).getDay()]
-  return (institute.weekend as string[]).includes(weekday)
-    ? `This is a ${weekday}, already a weekend for this institute.`
-    : undefined
-}
 
 function checkRange(
   errors: Errors,
@@ -774,6 +735,8 @@ export const academicKinds = {
     fields: [],
     columns: [],
     studentMatch: (r, s, e) => !e && s.categoryId === r.id,
+    softDelete: true,
+    manageDeletes: true,
     store: asEditable(categoryStore),
   },
   grades: {
@@ -885,52 +848,6 @@ export const academicKinds = {
     },
     store: asEditable(resultRemarkStore),
   },
-  holidays: {
-    segment: "holidays",
-    singular: "Holiday or event",
-    plural: "Holidays & events",
-    description: "The institute calendar: public holidays, closures and events.",
-    ranked: false,
-    fields: [
-      { key: "type", label: "Type", type: "select", options: holidayTypes, required: true },
-      { key: "repetition", label: "Repeats", type: "select", options: repetitions, required: true },
-      { key: "startDate", label: "Start date", type: "date", required: true, hint: weekendHint },
-      { key: "endDate", label: "End date", type: "date", required: true },
-      mediumField,
-      { key: "description", label: "Description", type: "textarea", wide: true },
-    ],
-    columns: [
-      {
-        label: "Date",
-        render: (r) => (
-          <span className="flex flex-col">
-            {formatDateRange(String(r.startDate), String(r.endDate))}
-            <span className="text-xs text-muted-foreground">
-              {dayCount(String(r.startDate), String(r.endDate))}
-            </span>
-          </span>
-        ),
-      },
-      {
-        label: "Type",
-        render: (r) => (
-          <Badge variant={r.type === "Gazetted" ? "default" : "outline"}>
-            {String(r.type)}
-          </Badge>
-        ),
-      },
-      { label: "Repeats", render: (r) => String(r.repetition) },
-      mediumColumn,
-    ],
-    validate: (values) => {
-      const errors: Errors = {}
-      if (values.startDate && values.endDate && values.endDate < values.startDate) {
-        errors.endDate = "End date must be on or after the start date."
-      }
-      return errors
-    },
-    store: asEditable(holidayStore),
-  },
   // Legacy Buildings, listed under the Seat Plan menu rather than Basic
   // Settings (/seat-plans/buildings/admin), but kept as an institute tab.
   buildings: {
@@ -1025,7 +942,6 @@ export const academicKindOrder: AcademicKind[] = [
   "categories",
   "grades",
   "remarks",
-  "holidays",
   "buildings",
 ]
 
