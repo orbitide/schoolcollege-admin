@@ -1,8 +1,8 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { CalendarOffIcon, CircleAlertIcon, DownloadIcon, PrinterIcon } from "lucide-react"
 
+import { AttendanceFilterFields, useAttendanceFilter } from "@/components/reports/attendance-filter"
 import { PrintArea } from "@/components/reports/print-area"
 import { useStudentLookups } from "@/components/students/student-lookups"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
@@ -16,26 +16,17 @@ import {
 } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  branchStore,
-  classStore,
-  groupStore,
-  holidayStore,
-  sectionStore,
-  shiftStore,
-  yearStore,
-} from "@/lib/academic-store"
-import { useAccessibleInstitutes } from "@/lib/current-user"
+import { holidayStore } from "@/lib/academic-store"
 import {
   attendanceStatuses,
   dailyAttendanceReport,
   type AttendanceStatusFilter,
   type DailyAttendanceRow,
 } from "@/lib/daily-attendance-report"
-import { academicMediums, academicVersions, type Institute } from "@/lib/institutes"
+import type { Institute } from "@/lib/institutes"
 import { FONT_SIZE, orientations, pageSizeFor, paperSizes, ROWS_PER_PAGE } from "@/lib/report-paper"
 import { downloadCsv, useSmsMessages } from "@/lib/sms-messages"
-import { todayIso, useStudentAttendance } from "@/lib/student-attendance"
+import { useStudentAttendance } from "@/lib/student-attendance"
 import { useStudents } from "@/lib/students"
 import { cn, parseInlineStyle } from "@/lib/utils"
 
@@ -156,51 +147,14 @@ function DailyAttendanceSheet({
 // taken, with the paper, orientation, rows per page and font size to print
 // on. Everything lives in the URL.
 export function DailyAttendanceReportPage() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const institutes = useAccessibleInstitutes()
+  const f = useAttendanceFilter()
+  const { institute, selection, date, param, setParam } = f
   const students = useStudents()
   const attendance = useStudentAttendance()
   const sms = useSmsMessages()
   const name = useStudentLookups()
-
-  const param = (key: string) => searchParams.get(key) ?? ""
-  const institute =
-    institutes.length === 1 ? institutes[0] : institutes.find((i) => String(i.id) === param("institute"))
-  const iid = institute?.id ?? -1
-  const branches = branchStore.useList(iid)
-  const classes = classStore.useList(iid)
-  const years = yearStore.useList(iid)
-  const groups = groupStore.useList(iid)
-  const shifts = shiftStore.useList(iid)
-  const sections = sectionStore.useList(iid)
-  const holidays = holidayStore.useList(iid)
-
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(param("date")) ? param("date") : todayIso()
+  const holidays = holidayStore.useList(institute?.id ?? -1)
   const status: AttendanceStatusFilter = attendanceStatuses.find((s) => s.value === param("status"))?.value ?? "all"
-  const year = years.find((y) => String(y.id) === param("year")) ?? years.find((y) => y.isCurrent)
-  const branch = institute?.enableBranch ? branches.find((b) => String(b.id) === param("branch")) : undefined
-  const medium = institute?.enableMedium ? param("medium") : ""
-  const academicClass = classes.find((c) => String(c.id) === param("class"))
-  const groupOptions =
-    institute?.enableGroup && academicClass?.hasSubjectGroup
-      ? groups.filter((g) => academicClass.groupIds.includes(g.id))
-      : []
-  const group = groupOptions.find((g) => String(g.id) === param("group"))
-  const version = institute?.enableVersion ? param("version") : ""
-  const shift = institute?.enableShift ? shifts.find((s) => String(s.id) === param("shift")) : undefined
-  const sectionOptions = academicClass
-    ? sections.filter(
-        (s) =>
-          s.classId === academicClass.id &&
-          (!branch || s.branchId == null || s.branchId === branch.id) &&
-          (!group || s.groupId == null || s.groupId === group.id) &&
-          (!version || !s.version || s.version === version) &&
-          (!shift || s.shiftId == null || s.shiftId === shift.id)
-      )
-    : []
-  const section = sectionOptions.find((s) => String(s.id) === param("section"))
   const roll = param("roll")
 
   const clamp = (key: string, { min, max, default: fallback }: { min: number; max: number; default: number }) => {
@@ -213,49 +167,20 @@ export function DailyAttendanceReportPage() {
   const orientation = orientations.find((o) => o.value === param("orientation")) ?? orientations[0]
   const pageSize = pageSizeFor(paper, orientation)
 
-  function setParam(updates: Record<string, string>) {
-    const params = new URLSearchParams(searchParams)
-    if (institute) params.set("institute", String(institute.id))
-    for (const [key, value] of Object.entries(updates)) {
-      if (value) params.set(key, value)
-      else params.delete(key)
-    }
-    const search = params.toString()
-    router.replace(search ? `${pathname}?${search}` : pathname)
-  }
-
   const rank = (list: { id: number; rank: number }[]) => new Map(list.map((r) => [r.id, r.rank]))
   const report =
-    institute && year
+    institute && selection
       ? dailyAttendanceReport(
           institute,
-          { students, attendance, sms, holidays, classRank: rank(classes), sectionRank: rank(sections) },
-          {
-            date,
-            yearId: year.id,
-            branchId: branch?.id ?? null,
-            medium,
-            classId: academicClass?.id ?? null,
-            groupId: group?.id ?? null,
-            version,
-            shiftId: shift?.id ?? null,
-            sectionId: section?.id ?? null,
-            roll,
-            status,
-          }
+          { students, attendance, sms, holidays, classRank: rank(f.classes), sectionRank: rank(f.sections) },
+          { ...selection, roll, status }
         )
       : undefined
 
   const statusTitle = attendanceStatuses.find((s) => s.value === status)!.label
   const info: [string, string | number][] = report
     ? [
-        ...(institute?.enableBranch ? [["Branch", branch?.name ?? "All"] as [string, string]] : []),
-        ...(institute?.enableMedium ? [["Medium", medium || "All"] as [string, string]] : []),
-        ["Class", academicClass?.name ?? "All"],
-        ...(groupOptions.length ? [["Group", group?.name ?? "All"] as [string, string]] : []),
-        ...(institute?.enableVersion ? [["Version", version || "All"] as [string, string]] : []),
-        ["Section", section?.name ?? "All"],
-        ...(institute?.enableShift ? [["Shift", shift?.name ?? "All"] as [string, string]] : []),
+        ...f.info,
         ["Total Student", report.totals.students],
         ["Total Present", report.totals.present],
         ["Total Absent", report.totals.absent],
@@ -302,107 +227,12 @@ export function DailyAttendanceReportPage() {
           <CardDescription>Who was present, absent or not taken on a day, with the attendance SMS sent.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field>
-            <FieldLabel htmlFor="daily-date">
-              Date
-              <span className="text-destructive" aria-hidden>
-                *
-              </span>
-            </FieldLabel>
-            <Input
-              id="daily-date"
-              type="date"
-              value={date}
-              onChange={(e) => setParam({ date: e.target.value === todayIso() ? "" : e.target.value })}
-            />
-          </Field>
+          <AttendanceFilterFields filter={f} />
           <FilterField
             label="Status"
             value={status}
             onChange={(v) => setParam({ status: v === "all" ? "" : v })}
             options={attendanceStatuses.map((s) => ({ value: s.value, label: s.label }))}
-          />
-          {institutes.length > 1 && (
-            <FilterField
-              label="Institute"
-              required
-              value={institute ? String(institute.id) : ""}
-              onChange={(v) =>
-                setParam({ institute: v, branch: "", medium: "", class: "", year: "", group: "", version: "", shift: "", section: "" })
-              }
-              options={institutes.map((i) => ({ value: String(i.id), label: i.name }))}
-              placeholder="Select institute"
-            />
-          )}
-          {institute?.enableBranch && (
-            <FilterField
-              label="Branch"
-              value={branch ? String(branch.id) : ""}
-              onChange={(v) => setParam({ branch: v, section: "" })}
-              options={branches.map((b) => ({ value: String(b.id), label: b.name }))}
-              allLabel="All branches"
-            />
-          )}
-          {institute?.enableMedium && (
-            <FilterField
-              label="Medium"
-              value={medium}
-              onChange={(v) => setParam({ medium: v })}
-              options={academicMediums.map((m) => ({ value: m, label: m }))}
-              allLabel="All mediums"
-            />
-          )}
-          <FilterField
-            label="Class"
-            value={academicClass ? String(academicClass.id) : ""}
-            onChange={(v) => setParam({ class: v, group: "", section: "" })}
-            options={classes.map((c) => ({ value: String(c.id), label: c.name }))}
-            allLabel="All classes"
-            disabled={!institute}
-          />
-          <FilterField
-            label="Academic year"
-            required
-            value={year ? String(year.id) : ""}
-            onChange={(v) => setParam({ year: v })}
-            options={years.map((y) => ({ value: String(y.id), label: y.isCurrent ? `${y.name} (current)` : y.name }))}
-            placeholder="Select year"
-            disabled={!institute}
-          />
-          {groupOptions.length > 0 && (
-            <FilterField
-              label="Group"
-              value={group ? String(group.id) : ""}
-              onChange={(v) => setParam({ group: v, section: "" })}
-              options={groupOptions.map((g) => ({ value: String(g.id), label: g.name }))}
-              allLabel="All groups"
-            />
-          )}
-          {institute?.enableVersion && (
-            <FilterField
-              label="Version"
-              value={version}
-              onChange={(v) => setParam({ version: v, section: "" })}
-              options={academicVersions.map((v) => ({ value: v, label: v }))}
-              allLabel="All versions"
-            />
-          )}
-          {institute?.enableShift && (
-            <FilterField
-              label="Shift"
-              value={shift ? String(shift.id) : ""}
-              onChange={(v) => setParam({ shift: v, section: "" })}
-              options={shifts.map((s) => ({ value: String(s.id), label: s.name }))}
-              allLabel="All shifts"
-            />
-          )}
-          <FilterField
-            label="Section"
-            value={section ? String(section.id) : ""}
-            onChange={(v) => setParam({ section: v })}
-            options={sectionOptions.map((s) => ({ value: String(s.id), label: s.name }))}
-            allLabel="All sections"
-            disabled={!academicClass}
           />
           <Field>
             <FieldLabel htmlFor="daily-roll">Roll</FieldLabel>
@@ -493,7 +323,7 @@ export function DailyAttendanceReportPage() {
               )}
               {!institute
                 ? "Select an institute"
-                : !year
+                : !f.year
                   ? "Select a year"
                   : report?.dayOff
                     ? `No attendance: ${report.dayOff}`

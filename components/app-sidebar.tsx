@@ -59,6 +59,7 @@ const data = {
         { title: "Daily Attendance Report", url: "/reports/daily-attendance", permission: "daily-attendance-report.view" },
         { title: "Student's Individual Attendance Report", url: "/reports/student-attendance", permission: "student-attendance-report.view" },
         { title: "Monthly Attendance Report", url: "/reports/monthly-attendance", permission: "monthly-attendance-report.view" },
+        { title: "Attendance Summary", url: "/reports/attendance-summary", permission: "attendance-summary.view" },
         { title: "Manage Monthly Attendance Fine", url: "/attendance/fines" },
         { title: "Absent Fine Date Configuration", url: "/attendance/fines/configuration" },
       ],
