@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -86,6 +86,12 @@ const data = {
         { title: "Pass Fail ReGenerate", url: "/term-exam-marks/pass-fail-regenerate" },
         { title: "Student Exam", url: "/term-exam-marks/students" },
       ],
+    },
+    {
+      title: "SMS",
+      icon: <MessageSquareTextIcon />,
+      tone: "sky",
+      items: [{ title: "Manage SMS Template", url: "/sms/templates", resource: "sms-template" }],
     },
     {
       title: "Basic Settings",
