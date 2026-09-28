@@ -122,6 +122,7 @@ const data = {
         { title: "Student Statistics", url: "/reports/student-statistics", permission: "student-statistics.view" },
         { title: "Subject Student List", url: "/reports/subject-students", permission: "subject-student-list.view" },
         { title: "Admit Card", url: "/reports/admit-card", permission: "admit-card.view" },
+        { title: "ID Card", url: "/reports/id-card", permission: "id-card.view" },
       ],
     },
     {
