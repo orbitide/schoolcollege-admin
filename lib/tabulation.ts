@@ -1,6 +1,6 @@
 import type { ClassYearSubject, Institute } from "@/lib/institutes"
 import type { MeritList, MeritResult } from "@/lib/merit-lists"
-import type { Student } from "@/lib/students"
+import type { Enrolment, Student } from "@/lib/students"
 import { examStudents, isActiveMark, takesSubject, type TermExamStudentMark } from "@/lib/term-exam-marks"
 import type { TermExam, TermExamSubject } from "@/lib/term-exams"
 
@@ -41,11 +41,14 @@ export type TabulationSubject = {
   // Null where the exam doesn't mark the subject in that part ("-").
   parts: Record<TabulationPart, TabulationCell | null>
   total: TabulationCell
+  // The parts' marks with grace added up (0 when absent).
+  marks: number
 }
 
 export type TabulationStudent = {
   result: MeritResult
   student: Student
+  enrolment: Enrolment
   passed: boolean
   // GPA when the exam calculates it (the legacy shows nothing for a failed
   // student, who has no letter grade), otherwise the total marks.
@@ -125,6 +128,7 @@ function subjectCells(
   }
   return {
     parts,
+    marks: total,
     total: mark
       ? { text: String(total), failed: !studentPassed && !optional && (partFailed || total < s.totalPassMarks) }
       : { text: "A", failed: !studentPassed && !optional },
@@ -175,6 +179,7 @@ export function tabulation(
       {
         result,
         student,
+        enrolment,
         passed,
         resultText: exam.calculateGpa ? (passed ? result.gpa.toFixed(2) : "-") : String(result.totalMarks),
         previousGpa: previousGpa(

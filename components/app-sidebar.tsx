@@ -110,6 +110,8 @@ const data = {
         { title: "Absent Summary", url: "/reports/absent-summary", permission: "absent-summary.view" },
         { title: "Pass/Fail Report", url: "/reports/pass-fail", permission: "pass-fail-report.view" },
         { title: "Tabulation", url: "/reports/tabulation", permission: "tabulation.view" },
+        { title: "Number Sheet", url: "/reports/number-sheet", permission: "number-sheet.view" },
+        { title: "Student Information", url: "/reports/student-information", permission: "student-information.view" },
       ],
     },
     {
