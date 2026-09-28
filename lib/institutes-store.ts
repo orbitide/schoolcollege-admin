@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { removeInstituteRecords } from "@/lib/academic-store"
 import { removeInstituteUsers } from "@/lib/global-settings"
+import { removeInstituteMenuView } from "@/lib/menu-views"
 import { removeInstituteSmsTemplates } from "@/lib/sms-templates"
 import { removeInstituteStudents } from "@/lib/students"
 import { removeInstituteTeachers } from "@/lib/teachers"
@@ -76,4 +77,5 @@ export function deleteInstitute(id: number) {
   removeInstituteTermExams(id)
   removeInstituteTeachers(id)
   removeInstituteSmsTemplates(id)
+  removeInstituteMenuView(id)
 }

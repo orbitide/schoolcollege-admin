@@ -152,6 +152,7 @@ const data = {
       tone: "slate",
       items: [
         { title: "Institute Configurations", url: "/configurations/institute", permission: "institute-configuration.manage" },
+        { title: "Menu View Configurations", url: "/configurations/menu-view", permission: "menu-view-configuration.manage" },
       ],
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
