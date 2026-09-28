@@ -974,7 +974,16 @@ function StudentFormBody({
                 required
                 value={v.houseId}
                 onChange={(value) => set("houseId", value)}
-                options={active(houses, v.houseId).map((h) => ({
+                // Houses for all, or for this student's medium and class.
+                options={active(
+                  houses.filter(
+                    (h) =>
+                      String(h.id) === v.houseId ||
+                      ((!h.medium || !institute.enableMedium || h.medium === v.medium) &&
+                        (h.classId == null || String(h.classId) === v.classId))
+                  ),
+                  v.houseId
+                ).map((h) => ({
                   value: String(h.id),
                   label: h.name,
                 }))}

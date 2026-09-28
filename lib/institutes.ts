@@ -155,7 +155,10 @@ export type AcademicYear = AcademicRecord & {
 }
 
 // Capacity 0 means unlimited.
+// `medium` is "" and `classId` null when the house is for all of them.
 export type StudentHouse = AcademicRecord & {
+  medium: string
+  classId: number | null
   capacity: number
 }
 

@@ -69,8 +69,10 @@ export type FieldDef = {
   options?: readonly string[]
   // Value a new record gets while the field is hidden (defaults to blank).
   fallback?: FieldValue
-  // For a record field: the store whose record ids it picks from.
+  // For a record field: the store whose record ids it picks from, and which
+  // of its records fit the other inputs (e.g. classes of the picked medium).
   source?: RecordStore<EditableRecord>
+  sourceFilter?: (record: EditableRecord, values: FormState) => boolean
   // For an optional select: label of the "" option, e.g. "All mediums".
   allLabel?: string
   required?: boolean
@@ -729,7 +731,21 @@ export const academicKinds = {
     description: "Student houses used for co-curricular groups and competitions.",
     toggle: "enableStudentHouse",
     labelKey: "studentHouseLabel",
+    // Legacy StudentHouse: for all of the institute, or one medium and/or
+    // class; names are unique, and ranked, within that scope.
+    uniqueScope: ["medium", "classId"],
+    softDelete: true,
+    manageDeletes: true,
     fields: [
+      mediumField,
+      {
+        key: "classId",
+        label: "Academic class",
+        type: "record",
+        source: asEditable(classStore),
+        allLabel: "All classes",
+        sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
+      },
       {
         key: "capacity",
         label: "Capacity",
@@ -739,6 +755,12 @@ export const academicKinds = {
       },
     ],
     columns: [
+      mediumColumn,
+      {
+        label: "Class",
+        render: (r) =>
+          r.classId == null ? "All" : <RecordName store={asEditable(classStore)} id={r.classId} />,
+      },
       {
         label: "Capacity",
         align: "right",

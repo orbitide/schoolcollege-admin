@@ -28,7 +28,7 @@ import type {
 // Replace with API calls once the backend endpoints exist.
 // Records are listed by rank unless a `sortKey` is given (e.g. a start date)
 // or a `compare` of their own. With `rankWithin`, records are ranked only
-// among those sharing that key (a dashboard menu within its group).
+// among those sharing that key, or keys (a dashboard menu within its group).
 // Kinds that keep deleted records (legacy Delete / Retrieve) mark them
 // "Deleted": they hold no rank and are left out of the per-institute lists;
 // `useAll` / `useOne` still return them, so names keep resolving.
@@ -41,8 +41,17 @@ export function createRecordStore<T extends AcademicRecord>(
     sortKey,
     compare,
     rankWithin,
-  }: { sortKey?: keyof T; compare?: (a: T, b: T) => number; rankWithin?: keyof T } = {}
+  }: {
+    sortKey?: keyof T
+    compare?: (a: T, b: T) => number
+    rankWithin?: keyof T | (keyof T)[]
+  } = {}
 ) {
+  const scopeKeys: (keyof T)[] =
+    rankWithin === undefined ? [] : Array.isArray(rankWithin) ? rankWithin : [rankWithin]
+  const sameScope = (a: Partial<T>, b: Partial<T>) =>
+    scopeKeys.every((key) => (a[key] ?? null) === (b[key] ?? null))
+
   const stamped: T[] = seed.map((record) => ({
     createdBy: SEED_USER,
     createdAt: SEED_STAMP,
@@ -96,13 +105,13 @@ export function createRecordStore<T extends AcademicRecord>(
   }
 
   // The records ranked together with `record` (its institute, and its
-  // `rankWithin` key), not deleted.
+  // `rankWithin` keys), not deleted.
   function rankedWith(all: T[], record: Pick<T, "instituteId"> & Partial<T>) {
     return all.filter(
       (r) =>
         r.instituteId === record.instituteId &&
         r.status !== "Deleted" &&
-        (!rankWithin || r[rankWithin] === record[rankWithin])
+        sameScope(r, record)
     )
   }
 
@@ -125,14 +134,14 @@ export function createRecordStore<T extends AcademicRecord>(
   }
 
   // The record a move swaps rank with: its neighbour in the institute's
-  // order, as long as both share the `rankWithin` key.
+  // order, as long as both share the `rankWithin` keys.
   function neighbourOf(id: number, direction: "up" | "down") {
     const record = records.find((r) => r.id === id)
     if (!record) return undefined
     const siblings = forInstitute(records, record.instituteId)
     const index = siblings.findIndex((r) => r.id === id)
     const neighbour = siblings[direction === "up" ? index - 1 : index + 1]
-    if (!neighbour || (rankWithin && neighbour[rankWithin] !== record[rankWithin])) return undefined
+    if (!neighbour || !sameScope(neighbour, record)) return undefined
     return { record, neighbour }
   }
 
@@ -377,15 +386,25 @@ export const sessionStore = createRecordStore<AcademicSession>([
   })),
 ])
 
+// Legacy StudentHouse: for the whole institute, or one medium and/or class,
+// ranked within that scope.
 export const houseStore = createRecordStore<StudentHouse>(
   ["Red", "Blue", "Green", "Yellow"].map((color, index) => ({
     id: index + 1,
     instituteId: 1,
     name: `${color} House`,
+    medium: "",
+    classId: null,
     capacity: 0,
     rank: index + 1,
     status: "Active" as const,
-  }))
+  })),
+  {
+    rankWithin: ["medium", "classId"],
+    // Legacy lists them by medium, then class, then rank.
+    compare: (a, b) =>
+      a.medium.localeCompare(b.medium) || (a.classId ?? 0) - (b.classId ?? 0) || a.rank - b.rank,
+  }
 )
 
 export const categoryStore = createRecordStore<StudentCategory>([

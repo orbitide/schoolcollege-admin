@@ -258,6 +258,10 @@ function RecordFormBody({
       if (field.type === "record") {
         parsed[field.key] = text === "" ? null : Number(text)
         if (text === "" && field.required) next[field.key] = `${field.label} is required.`
+        const picked = text && field.source?.getList(institute.id).find((r) => String(r.id) === text)
+        if (picked && field.sourceFilter && !field.sourceFilter(picked, values)) {
+          next[field.key] = `This ${field.label.toLowerCase()} doesn't fit the other choices.`
+        }
         continue
       }
       if (field.type === "integer" || field.type === "decimal") {
@@ -393,6 +397,7 @@ function RecordFormBody({
               key={field.key}
               field={field}
               value={values[field.key]}
+              values={values}
               error={errors[field.key]}
               institute={institute}
               locked={field.current && Boolean(record?.[field.key])}
@@ -423,6 +428,7 @@ function RecordFormBody({
 function RecordField({
   field,
   value,
+  values,
   error,
   institute,
   locked,
@@ -432,6 +438,8 @@ function RecordField({
 }: {
   field: FieldDef
   value: string | boolean | string[]
+  // Every input of the form, for fields whose options depend on others.
+  values: FormState
   error?: string
   institute: Institute
   locked?: boolean
@@ -504,6 +512,7 @@ function RecordField({
         source={field.source}
         instituteId={institute.id}
         value={String(value)}
+        values={values}
         invalid={!!error}
         excludeId={excludeId}
         onChange={onChange}
@@ -580,6 +589,7 @@ function RecordSelect({
   source,
   instituteId,
   value,
+  values,
   invalid,
   excludeId,
   onChange,
@@ -589,6 +599,7 @@ function RecordSelect({
   source: RecordStore<EditableRecord>
   instituteId: number
   value: string
+  values: FormState
   invalid: boolean
   excludeId?: number
   onChange: (value: string) => void
@@ -597,8 +608,12 @@ function RecordSelect({
     .useList(instituteId)
     .filter((record) => record.status === "Active" || String(record.id) === value)
     .filter((record) => record.id !== excludeId)
+    .filter(
+      (record) =>
+        !field.sourceFilter || field.sourceFilter(record, values) || String(record.id) === value
+    )
 
-  if (!options.length) {
+  if (!options.length && field.required) {
     return (
       <p className="text-sm text-muted-foreground">
         No active {field.label.toLowerCase()} records yet. Add one first.
