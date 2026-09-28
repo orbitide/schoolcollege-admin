@@ -56,6 +56,7 @@ const data = {
         { title: "Take Attendance", url: "/attendance/take" },
         { title: "Take Attendance By Admin", url: "/attendance" },
         { title: "Exam Attendance By Admin", url: "/attendance/exam" },
+        { title: "Daily Attendance Report", url: "/reports/daily-attendance", permission: "daily-attendance-report.view" },
         { title: "Manage Monthly Attendance Fine", url: "/attendance/fines" },
         { title: "Absent Fine Date Configuration", url: "/attendance/fines/configuration" },
       ],
