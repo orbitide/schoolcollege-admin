@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { ArrowLeftIcon, TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { HighlightedMessage } from "@/components/sms/sms-message"
+import { HighlightedMessage, insertAtCursor, KeywordPicker } from "@/components/sms/sms-message"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,6 @@ import {
   MAX_TEMPLATE_LENGTH,
   placeholder,
   smsAttendanceTypes,
-  smsKeywords,
   smsLength,
   smsResultTypes,
   smsTemplateErrors,
@@ -123,8 +122,6 @@ function FormBody({
   const institute = institutes.find((i) => String(i.id) === instituteId)
   const branches = branchStore.useList(institute?.id ?? -1)
   const sub = subTypeOf(smsType)
-  const keywords = smsKeywords(smsType)
-  const groups = [...new Set(keywords.map((k) => k.group ?? ""))]
   const unknown = unknownKeywords(smsType, message)
   const filled = fillTemplate(message)
   const length = smsLength(filled)
@@ -142,20 +139,9 @@ function FormBody({
     }
   }
 
-  // Puts the keyword where the cursor is (or replaces the selection) and
-  // leaves the cursor after it.
   function insertKeyword(keyword: string) {
-    const text = placeholder(keyword)
-    const area = messageRef.current
-    const start = area?.selectionStart ?? message.length
-    const end = area?.selectionEnd ?? message.length
-    const next = message.slice(0, start) + text + message.slice(end)
-    setMessage(next)
+    setMessage(insertAtCursor(messageRef.current, message, keyword))
     setErrors((current) => ({ ...current, message: undefined }))
-    requestAnimationFrame(() => {
-      area?.focus()
-      area?.setSelectionRange(start + text.length, start + text.length)
-    })
   }
 
   function save(andNew: boolean) {
@@ -331,31 +317,7 @@ function FormBody({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {groups.map((group) => (
-                <div key={group || "main"} className="flex flex-col gap-2">
-                  {group && (
-                    <p className="text-xs text-muted-foreground">
-                      {group}: filled only when the result SMS is sent for one subject.
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-1.5">
-                    {keywords
-                      .filter((k) => (k.group ?? "") === group)
-                      .map((k) => (
-                        <Button
-                          key={k.label}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 font-mono text-xs"
-                          onClick={() => insertKeyword(k.label)}
-                        >
-                          {placeholder(k.label)}
-                        </Button>
-                      ))}
-                  </div>
-                </div>
-              ))}
+              <KeywordPicker type={smsType} onPick={insertKeyword} />
               <Field data-invalid={!!errors.message}>
                 <FieldLabel htmlFor="template-message">
                   Message

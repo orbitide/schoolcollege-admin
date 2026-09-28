@@ -41,6 +41,9 @@ export type NavItem = {
   // Access resource (lib/access.ts): the item shows only to users holding
   // one of its surfaces.
   resource?: string
+  // Permission code (lib/access.ts) the item needs, for a single page with
+  // no surfaces to choose between (e.g. "sms-send.manage").
+  permission?: string
   icon?: React.ReactNode
   tone?: NavTone
 }

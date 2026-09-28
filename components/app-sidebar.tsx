@@ -91,7 +91,10 @@ const data = {
       title: "SMS",
       icon: <MessageSquareTextIcon />,
       tone: "sky",
-      items: [{ title: "Manage SMS Template", url: "/sms/templates", resource: "sms-template" }],
+      items: [
+        { title: "Send SMS", url: "/sms/send", permission: "sms-send.manage" },
+        { title: "Manage SMS Template", url: "/sms/templates", resource: "sms-template" },
+      ],
     },
     {
       title: "Basic Settings",
@@ -124,6 +127,7 @@ const data = {
 // tabs lead to the others.
 function resolveNav(items: NavMainItem[], can: (code: string) => boolean) {
   const resolve = (item: NavItem): NavItem[] => {
+    if (item.permission && !can(item.permission)) return []
     if (!item.resource) return [item]
     const surface = accessSurfaces.find((s) => can(permissionCode(item.resource!, s)))
     return surface ? [{ ...item, href: surfaceHref(item.url, surface) }] : []
