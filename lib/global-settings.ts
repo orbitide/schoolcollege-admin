@@ -71,15 +71,26 @@ export type UserInstitute = {
   userId: number
   instituteId: number
   status: RecordStatus
+  createdBy: string
+  createdAt: string
+  modifiedBy: string
+  modifiedAt: string
+}
+
+const seedStamp = {
+  createdBy: "Super Admin",
+  createdAt: "2026-01-10T09:30:00.000Z",
+  modifiedBy: "Super Admin",
+  modifiedAt: "2026-01-10T09:30:00.000Z",
 }
 
 let userInstitutes: UserInstitute[] = [
-  { id: 1, userId: 2, instituteId: 1, status: "Active" },
-  { id: 2, userId: 2, instituteId: 2, status: "Active" },
-  { id: 3, userId: 3, instituteId: 3, status: "Active" },
-  { id: 4, userId: 5, instituteId: 1, status: "Active" },
-  { id: 5, userId: 6, instituteId: 1, status: "Active" },
-  { id: 6, userId: 7, instituteId: 1, status: "Active" },
+  { id: 1, userId: 2, instituteId: 1, status: "Active", ...seedStamp },
+  { id: 2, userId: 2, instituteId: 2, status: "Active", ...seedStamp },
+  { id: 3, userId: 3, instituteId: 3, status: "Active", ...seedStamp },
+  { id: 4, userId: 5, instituteId: 1, status: "Active", ...seedStamp },
+  { id: 5, userId: 6, instituteId: 1, status: "Active", ...seedStamp },
+  { id: 6, userId: 7, instituteId: 1, status: "Active", ...seedStamp },
 ]
 const seedUserInstitutes = userInstitutes
 const listeners = new Set<() => void>()
@@ -102,25 +113,70 @@ export function useUserInstitutes() {
   )
 }
 
-// Returns false when the user is already linked to the institute.
-export function assignUserInstitute(userId: number, instituteId: number) {
-  if (userInstitutes.some((u) => u.userId === userId && u.instituteId === instituteId)) {
-    return false
-  }
+// Swaps the links `keep` rejects for fresh Active ones, as legacy
+// UserInstituteService.Save deletes the old rows and adds the ticked ones.
+function replaceLinks(
+  keep: (link: UserInstitute) => boolean,
+  pairs: { userId: number; instituteId: number }[],
+  by: string
+) {
+  const stamp = new Date().toISOString()
+  let nextId = Math.max(0, ...userInstitutes.map((u) => u.id))
   emit([
-    ...userInstitutes,
-    {
-      id: Math.max(0, ...userInstitutes.map((u) => u.id)) + 1,
-      userId,
-      instituteId,
-      status: "Active",
-    },
+    ...userInstitutes.filter(keep),
+    ...pairs.map((pair) => ({
+      ...pair,
+      id: ++nextId,
+      status: "Active" as const,
+      createdBy: by,
+      createdAt: stamp,
+      modifiedBy: by,
+      modifiedAt: stamp,
+    })),
   ])
-  return true
 }
 
-export function setUserInstituteStatus(id: number, status: RecordStatus) {
-  emit(userInstitutes.map((u) => (u.id === id ? { ...u, status } : u)))
+// Legacy "Add User Wise Institute": the user's institutes become exactly
+// `instituteIds`. Only institutes in `scope` (those the saver may work with)
+// are replaced; the user's links to other institutes stay.
+export function saveUserInstitutes(
+  userId: number,
+  instituteIds: number[],
+  scope: number[],
+  by: string
+) {
+  const inScope = new Set(scope)
+  replaceLinks(
+    (u) => u.userId !== userId || !inScope.has(u.instituteId),
+    instituteIds.map((instituteId) => ({ userId, instituteId })),
+    by
+  )
+}
+
+// Legacy "Add Institute Wise User": the institute's users become exactly
+// `userIds`.
+export function saveInstituteUsers(instituteId: number, userIds: number[], by: string) {
+  replaceLinks(
+    (u) => u.instituteId !== instituteId,
+    userIds.map((userId) => ({ userId, instituteId })),
+    by
+  )
+}
+
+// Active ⇄ Inactive.
+export function toggleUserInstituteStatus(id: number, by: string) {
+  emit(
+    userInstitutes.map((u) =>
+      u.id === id
+        ? {
+            ...u,
+            status: u.status === "Active" ? "Inactive" : "Active",
+            modifiedBy: by,
+            modifiedAt: new Date().toISOString(),
+          }
+        : u
+    )
+  )
 }
 
 export function removeUserInstitute(id: number) {
