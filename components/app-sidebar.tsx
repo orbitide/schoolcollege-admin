@@ -121,6 +121,7 @@ const data = {
         { title: "Student Information", url: "/reports/student-information", permission: "student-information.view" },
         { title: "Student Statistics", url: "/reports/student-statistics", permission: "student-statistics.view" },
         { title: "Subject Student List", url: "/reports/subject-students", permission: "subject-student-list.view" },
+        { title: "Subject Statistics (Section wise)", url: "/reports/subject-statistics", permission: "subject-statistics.view" },
         { title: "Admit Card", url: "/reports/admit-card", permission: "admit-card.view" },
         { title: "ID Card", url: "/reports/id-card", permission: "id-card.view" },
         { title: "Marks Upload Report", url: "/reports/marks-upload", permission: "marks-upload-report.view" },
