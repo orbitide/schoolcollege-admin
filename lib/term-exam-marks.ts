@@ -779,34 +779,37 @@ export function applyGraceMarks(
 // answer. Returns null when the key or the sheet is empty.
 export function scoreMcq(key: string, sheet: string, questions: number, perCorrect: number) {
   if (!key.trim() || !sheet.trim()) return null
-  const correctList = key.split(",").map((x) => x.trim().toLowerCase()).slice(0, questions > 0 ? questions : undefined)
-  const answered = sheet.split(",").map((x) => x.trim().toLowerCase())
+  const correctList = key.split(",").slice(0, questions > 0 ? questions : undefined)
+  const answered = sheet.split(",")
   let correct = 0
   let wrong = 0
   let notAnswered = 0
   for (let i = 0; i < correctList.length && i < answered.length; i++) {
-    const answer = correctList[i]
-    const given = answered[i]
-    if (answer === "-") {
-      if (!given) notAnswered++
-    } else if (answer === "+") {
-      correct++
-      if (!given) notAnswered++
-    } else if (answer === "$") {
-      if (given) correct++
-      else notAnswered++
-    } else if (answer.includes("|")) {
-      const options = answer.split("|")
-      if (given) {
-        if (options.includes(given)) correct++
-        else wrong++
-      } else if (options.some((o) => !o.trim())) correct++
-      else notAnswered++
-    } else if (answer === given) correct++
-    else if (!given) notAnswered++
-    else wrong++
+    const q = checkMcqAnswer(correctList[i], answered[i])
+    if (q.correct) correct++
+    if (q.wrong) wrong++
+    if (q.notAnswered) notAnswered++
   }
   return { correct, wrong, notAnswered, marks: correct * perCorrect }
+}
+
+// One question of `scoreMcq`: whether the given answer earns the mark, is
+// wrong, or is blank. "+" earns it even when blank; "-" never does, and an
+// answer to it is neither right nor wrong.
+export function checkMcqAnswer(keyEntry: string, givenAnswer: string) {
+  const answer = keyEntry.trim().toLowerCase()
+  const given = givenAnswer.trim().toLowerCase()
+  const result = { correct: false, wrong: false, notAnswered: !given }
+  if (answer === "-") return result
+  if (answer === "+") return { ...result, correct: true }
+  if (answer === "$") return { ...result, correct: !!given }
+  if (answer.includes("|")) {
+    const options = answer.split("|")
+    if (!given && options.some((o) => !o.trim())) return { ...result, correct: true, notAnswered: false }
+    return { ...result, correct: !!given && options.includes(given), wrong: !!given && !options.includes(given) }
+  }
+  if (answer === given) return { ...result, correct: true, notAnswered: false }
+  return { ...result, wrong: !!given }
 }
 
 // Legacy MarksRecalculation targets: the subject's uploaded marks on the set

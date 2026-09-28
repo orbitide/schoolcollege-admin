@@ -115,6 +115,7 @@ const data = {
         { title: "Year Book", url: "/reports/year-book", permission: "year-book.view" },
         { title: "Practical Mark Collection Sheet", url: "/reports/practical-mark-sheet", permission: "practical-mark-sheet.view" },
         { title: "Academic Transcript", url: "/reports/academic-transcript", permission: "academic-transcript.view" },
+        { title: "MCQ Mark Checker", url: "/reports/mcq-mark-checker", permission: "mcq-mark-checker.view" },
         { title: "Student Information", url: "/reports/student-information", permission: "student-information.view" },
         { title: "Student Statistics", url: "/reports/student-statistics", permission: "student-statistics.view" },
         { title: "Subject Student List", url: "/reports/subject-students", permission: "subject-student-list.view" },
