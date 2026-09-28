@@ -100,6 +100,14 @@ const data = {
       ],
     },
     {
+      title: "Reports",
+      icon: <FileChartColumnIcon />,
+      tone: "violet",
+      items: [
+        { title: "Result at a glance", url: "/reports/result-summary", permission: "result-summary.view" },
+      ],
+    },
+    {
       title: "Basic Settings",
       icon: <SlidersHorizontalIcon />,
       tone: "emerald",
@@ -119,7 +127,6 @@ const data = {
   ],
   documents: [
     { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
-    { name: "Reports", url: "/reports", icon: <FileChartColumnIcon />, tone: "violet" as const },
     { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const },
   ],
 }

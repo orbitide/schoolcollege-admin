@@ -213,7 +213,7 @@ export function NavMain({
         Main Menu
       </SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu className="gap-1">
+        <SidebarMenu className="gap-0 divide-y divide-sidebar-border">
           {visible.map((item) =>
             "items" in item ? (
               <Collapsible.Root
@@ -227,7 +227,7 @@ export function NavMain({
                 }}
                 className="group/collapsible"
               >
-                <SidebarMenuItem>
+                <SidebarMenuItem className="py-1">
                   <Collapsible.Trigger asChild>
                     <SidebarMenuButton
                       tooltip={item.title}
@@ -270,7 +270,7 @@ export function NavMain({
                 </SidebarMenuItem>
               </Collapsible.Root>
             ) : (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={item.title} className="py-1">
                 <SidebarMenuButton
                   asChild
                   tooltip={item.title}

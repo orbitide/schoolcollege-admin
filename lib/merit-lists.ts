@@ -3,16 +3,17 @@
 import * as React from "react"
 
 import { classStore, resultRemarkStore } from "@/lib/academic-store"
-import type { Institute } from "@/lib/institutes"
+import { seedInstitutes, type Institute } from "@/lib/institutes"
 import {
   examLetterGrades,
   examStudents,
   getTermExamMarks,
+  isPassRegenerated,
   isActiveMark,
   regeneratePassStatus,
   takesSubject,
 } from "@/lib/term-exam-marks"
-import type { TermExam } from "@/lib/term-exams"
+import { getTermExams, type TermExam } from "@/lib/term-exams"
 
 // Legacy SchoolCollege ResultCalculation/MeritListReGenerate: recheck each
 // mark's pass status (TermExamStudentMarksService.RegeneratePassStatus),
@@ -182,7 +183,15 @@ export function calculateMeritList(exam: TermExam, institute: Institute): MeritR
 // ---- Store ----
 // In-memory for the browser session, like the term exams.
 
-let lists: MeritList[] = []
+// Seeded with the exams whose pass status is already calculated.
+let lists: MeritList[] | null = null
+const getLists = () =>
+  (lists ??= getTermExams().flatMap((exam) => {
+    const institute = seedInstitutes.find((i) => i.id === exam.instituteId)
+    if (!institute || exam.status !== "Active" || !isPassRegenerated(exam.id)) return []
+    const at = `${exam.resultPublish}T09:00:00.000Z`
+    return [{ termExamId: exam.id, generatedBy: "Super Admin", generatedAt: at, results: calculateMeritList(exam, institute) }]
+  }))
 const listeners = new Set<() => void>()
 
 function subscribe(listener: () => void) {
@@ -193,8 +202,8 @@ function subscribe(listener: () => void) {
 export function useMeritLists() {
   return React.useSyncExternalStore(
     subscribe,
-    () => lists,
-    () => lists
+    getLists,
+    getLists
   )
 }
 
@@ -205,7 +214,7 @@ export function generateMeritList(exam: TermExam, institute: Institute, user: st
   regeneratePassStatus(exam, institute)
   const results = calculateMeritList(exam, institute)
   lists = [
-    ...lists.filter((l) => l.termExamId !== exam.id),
+    ...getLists().filter((l) => l.termExamId !== exam.id),
     { termExamId: exam.id, generatedBy: user, generatedAt: new Date().toISOString(), results },
   ]
   listeners.forEach((listener) => listener())

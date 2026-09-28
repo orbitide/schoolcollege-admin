@@ -3,7 +3,7 @@
 import * as React from "react"
 
 import { letterGradeStore } from "@/lib/academic-store"
-import type { Institute, LetterGrade } from "@/lib/institutes"
+import { seedInstitutes, type Institute, type LetterGrade } from "@/lib/institutes"
 import { getStudents, type Enrolment, type Student } from "@/lib/students"
 import { getTermExamAnswers } from "@/lib/term-exam-answers"
 import { classYearExamSubjects, getTermExams, type TermExam, type TermExamSubject } from "@/lib/term-exams"
@@ -220,7 +220,16 @@ function seedMarks(): TermExamStudentMark[] {
       }
     }
   }
-  return marks
+  // Exams whose result publish date has passed (the seeded Half Yearly and
+  // Test Exam) have had Pass Fail ReGenerate run, so they start with merit
+  // lists; the Annual is still to come.
+  const today = new Date().toLocaleDateString("en-CA")
+  return getTermExams()
+    .filter((exam) => exam.status === "Active" && exam.resultPublish <= today)
+    .reduce((all, exam) => {
+      const institute = seedInstitutes.find((i) => i.id === exam.instituteId)
+      return institute ? withPassStatus(all, exam, institute).marks : all
+    }, marks)
 }
 
 // ---- Store ----
@@ -366,11 +375,19 @@ export function regeneratePassStatus(exam: TermExam, institute: Institute) {
   if (!own.length) throw new Error("No student marks uploaded")
   if (!exam.subjects.length) throw new Error("Exam subject(s) not found")
 
+  const calculated = withPassStatus(current, exam, institute)
+  marks = calculated.marks
+  listeners.forEach((listener) => listener())
+  return calculated.count
+}
+
+// The marks with the exam's active ones rechecked; the rest as they were.
+function withPassStatus(all: TermExamStudentMark[], exam: TermExam, institute: Institute) {
   const grades = examLetterGrades(exam)
   const subtraction = institute.configuration.optionalGpaSubtraction
   const subjects = new Map(exam.subjects.map((s) => [s.subjectId, s]))
   let count = 0
-  marks = current.map((m) => {
+  const marks = all.map((m) => {
     if (m.termExamId !== exam.id || !isActiveMark(m)) return m
     const s = subjects.get(m.subjectId)
     if (!s) return m
@@ -390,8 +407,7 @@ export function regeneratePassStatus(exam: TermExam, institute: Institute) {
       letterGrade: grade?.name ?? "",
     }
   })
-  listeners.forEach((listener) => listener())
-  return count
+  return { marks, count }
 }
 
 // ---- Edit Student Marks ----
