@@ -1,5 +1,7 @@
 import { subjectTypes, type ClassYearSubject, type Institute } from "@/lib/institutes"
 import type { Enrolment, Student } from "@/lib/students"
+import { examStudents } from "@/lib/term-exam-marks"
+import type { TermExam } from "@/lib/term-exams"
 
 // Legacy RptStudent/StudentInformation (StudentRepository.LoadAllRaw): a
 // printable card per student of a section — their class details, parents
@@ -78,19 +80,58 @@ export function studentInformation(
       const key = institute.showClassRoll ? enrolment.classRoll.trim() : String(student.studentIdentificationNo)
       if (key !== rollOrId) return []
     }
-    const types = classSubjects(options.classYearSubjects, enrolment)
-    const taken = takenSubjects(types, enrolment)
-    const kindOf = (id: number): SubjectKind =>
-      id === enrolment.optionalSubjectId ? "optional" : (types.get(id) ?? 0) === 0 ? "compulsory" : "elective"
-    const kindOrder: SubjectKind[] = ["compulsory", "elective", "optional"]
-    const subjects = taken
-      .map((subjectId) => ({ subjectId, kind: kindOf(subjectId) }))
-      .sort(
-        (a, b) =>
-          kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) ||
-          options.subjectRank(a.subjectId) - options.subjectRank(b.subjectId)
-      )
+    const subjects = enrolmentSubjects(options.classYearSubjects, enrolment, options.subjectRank)
     return [{ student, enrolment, subjects }]
   })
-  return rows.sort((a, b) => a.enrolment.classRoll.localeCompare(b.enrolment.classRoll, undefined, { numeric: true }))
+  return rows.sort(byRoll)
+}
+
+const byRoll = (a: StudentInformation, b: StudentInformation) =>
+  a.enrolment.classRoll.localeCompare(b.enrolment.classRoll, undefined, { numeric: true })
+
+// The subjects the enrolment takes, each in its block, in the legacy order:
+// compulsory, elective, then the optional subject. `only` keeps just those
+// (an exam's subjects).
+function enrolmentSubjects(
+  sets: ClassYearSubject[],
+  enrolment: Enrolment,
+  subjectRank: (id: number) => number,
+  only?: Set<number>
+) {
+  const types = classSubjects(sets, enrolment)
+  const kindOf = (id: number): SubjectKind =>
+    id === enrolment.optionalSubjectId ? "optional" : (types.get(id) ?? 0) === 0 ? "compulsory" : "elective"
+  const kindOrder: SubjectKind[] = ["compulsory", "elective", "optional"]
+  return takenSubjects(types, enrolment)
+    .filter((id) => !only || only.has(id))
+    .map((subjectId) => ({ subjectId, kind: kindOf(subjectId) }))
+    .sort(
+      (a, b) =>
+        kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || subjectRank(a.subjectId) - subjectRank(b.subjectId)
+    )
+}
+
+// Legacy RptStudent/AdmitCard (StudentRepository.LoadAdmitCard): an admit
+// card per student of a section sitting the exam (or the one with `roll`),
+// with the subjects they take in it — those who take none are left out,
+// as the legacy joins on the exam's subjects.
+export function admitCards(
+  exam: TermExam,
+  students: Student[],
+  options: {
+    classYearSubjects: ClassYearSubject[]
+    subjectRank: (id: number) => number
+    sectionId: number
+    roll: string
+  }
+): StudentInformation[] {
+  const examSubjects = new Set(exam.subjects.map((s) => s.subjectId))
+  return examStudents(exam, students)
+    .flatMap(({ student, enrolment }): StudentInformation[] => {
+      if (enrolment.sectionId !== options.sectionId) return []
+      if (options.roll && enrolment.classRoll.trim() !== options.roll) return []
+      const subjects = enrolmentSubjects(options.classYearSubjects, enrolment, options.subjectRank, examSubjects)
+      return subjects.length ? [{ student, enrolment, subjects }] : []
+    })
+    .sort(byRoll)
 }
