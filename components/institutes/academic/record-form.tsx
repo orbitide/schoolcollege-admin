@@ -65,7 +65,7 @@ const ALL = "__all"
 // all-institutes admin list the form was opened from (`?returnTo=`).
 function useListHref(instituteId: number, segment: string) {
   const returnTo = useSearchParams().get("returnTo")
-  return returnTo?.startsWith("/basic-settings/")
+  return returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/")
     ? returnTo
     : `/institutes/${instituteId}/${segment}`
 }

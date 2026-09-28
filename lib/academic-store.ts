@@ -12,6 +12,7 @@ import type {
   Building,
   ClassYearSubject,
   ClassYearSubjectDetail,
+  DashboardMenuGroup,
   HolidayEvent,
   LetterGrade,
   RecordStatus,
@@ -503,8 +504,16 @@ export const classYearSubjectStore = createRecordStore<ClassYearSubject>(
   }))
 )
 
+export const dashboardMenuGroupStore = createRecordStore<DashboardMenuGroup>([
+  { id: 1, instituteId: 1, name: "Student", rank: 1, status: "Active" },
+  { id: 2, instituteId: 1, name: "Attendance", rank: 2, status: "Active" },
+  { id: 3, instituteId: 1, name: "Exam & Result", rank: 3, status: "Active" },
+  { id: 4, instituteId: 1, name: "SMS", rank: 4, status: "Inactive" },
+])
+
 export function removeInstituteRecords(instituteId: number) {
   for (const store of [
+    dashboardMenuGroupStore,
     classYearSubjectStore,
     buildingStore,
     branchStore,

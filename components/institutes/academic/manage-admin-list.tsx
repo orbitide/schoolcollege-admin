@@ -42,7 +42,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { capabilitiesFor, type AccessSurface } from "@/lib/access"
-import { basicSettingsHref, basicSettingsResource } from "@/lib/basic-settings"
 import { academicMediums, recordStatuses, type Institute } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
@@ -55,12 +54,15 @@ const ALL = "all"
 // (in)activates and reranks, Admin also deletes, View only reads.
 export function ManageAdminList({
   kind,
-  segment,
+  resource,
+  baseUrl,
   surface,
 }: {
   kind: AcademicKind
-  // The Basic Settings segment the page lives under.
-  segment: string
+  // Permission resource of the pages, e.g. "settings.shifts".
+  resource: string
+  // The Manage page's URL; Admin and View sit beside it.
+  baseUrl: string
   surface: AccessSurface
 }) {
   const config = kindConfig(kind)
@@ -131,8 +133,8 @@ export function ManageAdminList({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SurfaceTabs
-            resource={basicSettingsResource(segment)}
-            baseUrl={basicSettingsHref(segment)}
+            resource={resource}
+            baseUrl={baseUrl}
             current={surface}
           />
           {!can.create ? null : selected ? (

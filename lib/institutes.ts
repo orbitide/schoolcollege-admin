@@ -94,6 +94,9 @@ export type AcademicRecord = {
 export type Shift = AcademicRecord
 export type AcademicSession = AcademicRecord
 export type StudentCategory = AcademicRecord
+// A titled box of quick-link buttons on the institute dashboard (legacy
+// DashboardMenuGroup); its buttons are the dashboard menus.
+export type DashboardMenuGroup = AcademicRecord
 
 export type Branch = AcademicRecord & {
   code: string

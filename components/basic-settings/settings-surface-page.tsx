@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { ManageAdminList } from "@/components/institutes/academic/manage-admin-list"
 import { RequireSurface } from "@/components/require-surface"
 import type { AccessSurface } from "@/lib/access"
-import { basicSettingsItem, basicSettingsResource } from "@/lib/basic-settings"
+import { basicSettingsHref, basicSettingsItem, basicSettingsResource } from "@/lib/basic-settings"
 
 // Shared by the Manage page (/basic-settings/[segment]) and the Admin and
 // View pages beside it: one setup record kind across all institutes.
@@ -32,7 +32,12 @@ export async function SurfacePage({
 
   return (
     <RequireSurface resource={basicSettingsResource(segment)} surface={surface}>
-      <ManageAdminList kind={item.kind} segment={segment} surface={surface} />
+      <ManageAdminList
+        kind={item.kind}
+        resource={basicSettingsResource(segment)}
+        baseUrl={basicSettingsHref(segment)}
+        surface={surface}
+      />
     </RequireSurface>
   )
 }

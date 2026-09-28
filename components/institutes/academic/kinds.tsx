@@ -7,6 +7,7 @@ import {
   categoryStore,
   classStore,
   classYearSubjectStore,
+  dashboardMenuGroupStore,
   groupStore,
   holidayStore,
   houseStore,
@@ -959,6 +960,17 @@ export const academicKinds = {
       return count ? `Used by ${count} exam seat plan${count === 1 ? "" : "s"}.` : undefined
     },
     store: asEditable(buildingStore),
+  },
+  // Legacy DashboardMenuGroup, under Configurations rather than Basic
+  // Settings, so it has no institute tab (academicKindOrder).
+  dashboardMenuGroups: {
+    segment: "dashboard-menu-groups",
+    singular: "Dashboard Menu Group",
+    plural: "Dashboard Menu Groups",
+    description: "Titled boxes of quick-link buttons on the institute dashboard, shown in rank order.",
+    fields: [],
+    columns: [],
+    store: asEditable(dashboardMenuGroupStore),
   },
 } satisfies Record<string, KindConfig>
 
