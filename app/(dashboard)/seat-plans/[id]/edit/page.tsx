@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
+import { RequireSurface } from "@/components/require-surface"
 import { SeatPlanForm } from "@/components/seat-plans/seat-plan-form"
 
 export const metadata: Metadata = {
@@ -11,8 +12,10 @@ export default async function EditSeatPlanPage({ params }: PageProps<"/seat-plan
   const { id } = await params
 
   return (
-    <Suspense>
-      <SeatPlanForm planId={Number(id)} />
-    </Suspense>
+    <RequireSurface resource="exam-seat-plan" surface={["Admin", "Manage"]}>
+      <Suspense>
+        <SeatPlanForm planId={Number(id)} />
+      </Suspense>
+    </RequireSurface>
   )
 }

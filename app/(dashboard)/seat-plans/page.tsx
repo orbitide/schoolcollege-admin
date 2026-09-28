@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
+import { RequireSurface } from "@/components/require-surface"
 import { SeatPlanList } from "@/components/seat-plans/seat-plan-list"
 
 export const metadata: Metadata = {
@@ -10,8 +11,10 @@ export const metadata: Metadata = {
 // The filter lives in the URL, which needs a Suspense boundary on this otherwise static page.
 export default function SeatPlansPage() {
   return (
-    <Suspense>
-      <SeatPlanList />
-    </Suspense>
+    <RequireSurface resource="exam-seat-plan" surface={["Admin", "Manage"]}>
+      <Suspense>
+        <SeatPlanList />
+      </Suspense>
+    </RequireSurface>
   )
 }

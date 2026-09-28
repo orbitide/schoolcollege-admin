@@ -931,6 +931,8 @@ export const academicKinds = {
     },
     store: asEditable(holidayStore),
   },
+  // Legacy Buildings, listed under the Seat Plan menu rather than Basic
+  // Settings (/seat-plans/buildings/admin), but kept as an institute tab.
   buildings: {
     segment: "buildings",
     singular: "Building",

@@ -23,7 +23,6 @@ export const basicSettingsMenu: {
   { title: "Letter Grades", segment: "grades", kind: "grades" },
   { title: "Result Remarks", segment: "remarks", kind: "remarks" },
   { title: "Holidays & Events", segment: "holidays", kind: "holidays" },
-  { title: "Buildings & Rooms", segment: "buildings", kind: "buildings" },
   { title: "Districts", segment: "districts" },
   { title: "User Institutes", segment: "user-institutes" },
 ]

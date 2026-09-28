@@ -2,10 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
-import { ExamReportFilterFields, useExamReportFilter } from "@/components/reports/exam-report-filter"
 import { useStudentLookups } from "@/components/students/student-lookups"
 import {
   AlertDialog,
@@ -34,9 +34,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
-import { buildingStore, groupStore, subjectStore } from "@/lib/academic-store"
+import {
+  branchStore,
+  buildingStore,
+  classStore,
+  groupStore,
+  subjectStore,
+  yearStore,
+} from "@/lib/academic-store"
+import { useAccessibleInstitutes } from "@/lib/current-user"
 import { deleteExamSeatPlan, useExamSeatPlans, type ExamSeatPlan } from "@/lib/exam-seat-plans"
-import { academicVersions } from "@/lib/institutes"
+import { academicMediums, academicVersions } from "@/lib/institutes"
 import { useTermExams } from "@/lib/term-exams"
 
 export const formatExamDate = (iso: string) =>
@@ -49,25 +57,56 @@ export const formatTime = (hhmm: string) => {
   return `${String(((h + 11) % 12) + 1).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`
 }
 
-// Legacy ExamSeatPlan/ManageExamSeatPlan: the seat plans of the exams of a
-// class and year (or one exam), with their subject, the part of the exam
-// they cover, date and time and rooms, to edit or delete.
+// Legacy ExamSeatPlan/ManageExamSeatPlan: every institute's seat plans, one
+// per exam subject (and group / version), narrowed by institute, academic
+// structure, exam and subject — each filter "All" until chosen — with the
+// date and time and rooms, to edit or delete.
 export function SeatPlanList() {
-  const f = useExamReportFilter({ meritList: false })
-  const { institute, chosen, filter } = f
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const institutes = useAccessibleInstitutes()
   const plans = useExamSeatPlans()
   const exams = useTermExams()
   const name = useStudentLookups()
-  const iid = institute?.id ?? -1
-  const subjects = subjectStore.useList(iid)
-  const buildings = buildingStore.useList(iid)
-  const groups = groupStore.useList(iid)
+  const subjects = subjectStore.useAll()
+  const buildings = buildingStore.useAll()
+  const canPick = institutes.length > 1
   const [deleting, setDeleting] = React.useState<ExamSeatPlan | null>(null)
 
+  const param = (key: string) => searchParams.get(key) ?? ""
+  const institute = canPick
+    ? institutes.find((i) => String(i.id) === param("institute"))
+    : institutes[0]
+  const iid = institute?.id ?? -1
+  const branches = branchStore.useList(iid)
+  const classes = classStore.useList(iid)
+  const years = yearStore.useList(iid)
+  const groups = groupStore.useList(iid)
+
+  const medium = param("medium")
+  const version = param("version")
+  const is = (value: number | null, key: string) => !param(key) || String(value) === param(key)
   const examOf = new Map(exams.map((e) => [e.id, e]))
-  const byId = new Map(subjects.map((s) => [s.id, s]))
+  const instituteOf = new Map(institutes.map((i) => [i.id, i]))
+  // The exams the structure filters leave (legacy LoadTermExam).
+  const examOptions = institute
+    ? exams
+        .filter(
+          (e) =>
+            e.instituteId === institute.id &&
+            e.status !== "Deleted" &&
+            (!medium || e.medium === medium) &&
+            is(e.classId, "class") &&
+            is(e.yearId, "year") &&
+            is(e.branchId, "branch")
+        )
+        .sort((a, b) => a.rank - b.rank)
+    : []
+  const chosen = examOptions.find((e) => String(e.id) === param("exam"))
+
   const subjectLabel = (id: number) => {
-    const s = byId.get(id)
+    const s = subjects.find((subject) => subject.id === id)
     return s ? (s.code.trim() ? `${s.name} (${s.code.trim()})` : s.name) : name("subject", id)
   }
   const roomName = (buildingId: number, roomId: number) => {
@@ -76,35 +115,60 @@ export function SeatPlanList() {
     return room ? `${building!.name} ${room.name}` : "—"
   }
 
-  const ofExams = institute
-    ? plans.filter((p) => {
-        const exam = examOf.get(p.termExamId)
-        if (p.instituteId !== institute.id || !exam) return false
-        if (chosen) return p.termExamId === chosen.id
-        return (
-          (!filter.class || String(exam.classId) === filter.class) &&
-          (!filter.year || String(exam.yearId) === filter.year) &&
-          (!filter.branch || String(exam.branchId) === filter.branch) &&
-          (!filter.medium || exam.medium === filter.medium)
-        )
-      })
-    : []
+  const ofExams = plans.flatMap((plan) => {
+    const exam = examOf.get(plan.termExamId)
+    const planInstitute = instituteOf.get(plan.instituteId)
+    if (!exam || !planInstitute || (institute && plan.instituteId !== institute.id)) return []
+    const fits =
+      (!medium || exam.medium === medium) &&
+      is(exam.classId, "class") &&
+      is(exam.yearId, "year") &&
+      is(exam.branchId, "branch") &&
+      (!param("exam") || String(exam.id) === param("exam"))
+    return fits ? [{ plan, exam, institute: planInstitute }] : []
+  })
   // Legacy's group and version filters keep the plans made for all groups
   // (or versions) too, since they seat that group's students as well.
-  const subjectOptions = [...new Set(ofExams.map((p) => p.subjectId))].map((id) => ({ value: String(id), label: subjectLabel(id) }))
-  const subject = f.param("subject")
-  const group = f.param("group")
-  const version = f.param("version")
+  const subjectOptions = [...new Set(ofExams.map((row) => row.plan.subjectId))].map((id) => ({
+    value: String(id),
+    label: subjectLabel(id),
+  }))
   const rows = ofExams
     .filter(
-      (p) =>
-        (!subject || String(p.subjectId) === subject) &&
-        (!group || p.groupId == null || String(p.groupId) === group) &&
-        (!version || !p.version || p.version === version)
+      ({ plan }) =>
+        is(plan.subjectId, "subject") &&
+        (!param("group") || plan.groupId == null || String(plan.groupId) === param("group")) &&
+        (!version || !plan.version || plan.version === version)
     )
-    .sort((a, b) => a.examDate.localeCompare(b.examDate) || a.startTime.localeCompare(b.startTime))
+    .sort(
+      (a, b) =>
+        a.plan.instituteId - b.plan.instituteId ||
+        a.plan.examDate.localeCompare(b.plan.examDate) ||
+        a.plan.startTime.localeCompare(b.plan.startTime)
+    )
 
-  const newHref = `/seat-plans/new${chosen ? `?exam=${chosen.id}` : ""}`
+  function setParam(updates: Record<string, string>) {
+    const params = new URLSearchParams(searchParams)
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    const search = params.toString()
+    router.replace(search ? `${pathname}?${search}` : pathname)
+  }
+
+  const clearExam = { exam: "", subject: "" }
+  const newHref = `/seat-plans/new${chosen ? `?${new URLSearchParams({ exam: String(chosen.id), ...(param("subject") && { subject: param("subject") }) })}` : ""}`
+  // Optional columns only show when a listed plan's institute uses them (as
+  // the legacy grid hides its all-"-" branch and medium columns).
+  const show = {
+    institute: !institute,
+    branch: rows.some((r) => r.institute.enableBranch),
+    medium: rows.some((r) => r.institute.enableMedium),
+    group: rows.some((r) => r.institute.enableGroup),
+    version: rows.some((r) => r.institute.enableVersion),
+  }
+  const columnCount = 11 + Object.values(show).filter(Boolean).length
 
   function remove() {
     if (!deleting) return
@@ -130,12 +194,69 @@ export function SeatPlanList() {
             </Link>
           </Button>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <ExamReportFilterFields filter={f} />
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {canPick && (
+            <FilterField
+              label="Institute"
+              value={institute ? String(institute.id) : ""}
+              onChange={(v) =>
+                setParam({ institute: v, branch: "", medium: "", class: "", year: "", group: "", version: "", ...clearExam })
+              }
+              options={institutes.map((i) => ({ value: String(i.id), label: i.name }))}
+              allLabel="All institutes"
+            />
+          )}
+          {institute?.enableBranch && (
+            <FilterField
+              label="Branch"
+              value={param("branch")}
+              onChange={(v) => setParam({ branch: v, ...clearExam })}
+              options={branches.map((b) => ({ value: String(b.id), label: b.name }))}
+              allLabel="All branches"
+            />
+          )}
+          {institute?.enableMedium && (
+            <FilterField
+              label="Medium"
+              value={medium}
+              onChange={(v) => setParam({ medium: v, ...clearExam })}
+              options={academicMediums.map((m) => ({ value: m, label: m }))}
+              allLabel="All mediums"
+            />
+          )}
+          {institute && (
+            <FilterField
+              label="Class"
+              value={param("class")}
+              onChange={(v) => setParam({ class: v, ...clearExam })}
+              options={classes
+                .filter((c) => !medium || !c.medium || c.medium === medium)
+                .map((c) => ({ value: String(c.id), label: c.name }))}
+              allLabel="All classes"
+            />
+          )}
+          {institute && (
+            <FilterField
+              label="Academic year"
+              value={param("year")}
+              onChange={(v) => setParam({ year: v, ...clearExam })}
+              options={years.map((y) => ({ value: String(y.id), label: y.name }))}
+              allLabel="All years"
+            />
+          )}
+          {institute && (
+            <FilterField
+              label="Term exam"
+              value={chosen ? String(chosen.id) : ""}
+              onChange={(v) => setParam({ exam: v, subject: "" })}
+              options={examOptions.map((e) => ({ value: String(e.id), label: e.fullName }))}
+              allLabel="All term exams"
+            />
+          )}
           <FilterField
             label="Subject"
-            value={subjectOptions.some((o) => o.value === subject) ? subject : ""}
-            onChange={(v) => f.setParam({ subject: v })}
+            value={subjectOptions.some((o) => o.value === param("subject")) ? param("subject") : ""}
+            onChange={(v) => setParam({ subject: v })}
             options={subjectOptions}
             allLabel="All subjects"
             disabled={!subjectOptions.length}
@@ -143,8 +264,8 @@ export function SeatPlanList() {
           {institute?.enableGroup && (
             <FilterField
               label="Group"
-              value={group}
-              onChange={(v) => f.setParam({ group: v })}
+              value={param("group")}
+              onChange={(v) => setParam({ group: v })}
               options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
               allLabel="All groups"
             />
@@ -153,7 +274,7 @@ export function SeatPlanList() {
             <FilterField
               label="Version"
               value={version}
-              onChange={(v) => f.setParam({ version: v })}
+              onChange={(v) => setParam({ version: v })}
               options={academicVersions.map((v) => ({ value: v, label: v }))}
               allLabel="All versions"
             />
@@ -166,7 +287,7 @@ export function SeatPlanList() {
           <CardTitle>Seat plans</CardTitle>
           <CardDescription>
             {rows.length} seat plan{rows.length === 1 ? "" : "s"}
-            {chosen ? ` of ${chosen.fullName}` : filter.class ? " of the class's exams" : ""}
+            {chosen ? ` of ${chosen.fullName}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -175,13 +296,15 @@ export function SeatPlanList() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12">Sl</TableHead>
-                  {institute?.enableBranch && <TableHead>Branch</TableHead>}
-                  {institute?.enableMedium && <TableHead>Medium</TableHead>}
+                  {show.institute && <TableHead>Institute</TableHead>}
+                  {show.branch && <TableHead>Branch</TableHead>}
+                  {show.medium && <TableHead>Medium</TableHead>}
                   <TableHead>Class</TableHead>
-                  <TableHead>Exam</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Term exam</TableHead>
                   <TableHead>Subject</TableHead>
-                  {institute?.enableGroup && <TableHead>Group</TableHead>}
-                  {institute?.enableVersion && <TableHead>Version</TableHead>}
+                  {show.group && <TableHead>Group</TableHead>}
+                  {show.version && <TableHead>Version</TableHead>}
                   <TableHead>Subtitle</TableHead>
                   <TableHead>Exam date</TableHead>
                   <TableHead>Time</TableHead>
@@ -192,54 +315,65 @@ export function SeatPlanList() {
               </TableHeader>
               <TableBody>
                 {rows.length ? (
-                  rows.map((p, i) => {
-                    const exam = examOf.get(p.termExamId)!
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="tabular-nums text-muted-foreground">{i + 1}</TableCell>
-                        {institute?.enableBranch && (
-                          <TableCell className="whitespace-nowrap">{exam.branchId != null ? name("branch", exam.branchId) : "All"}</TableCell>
-                        )}
-                        {institute?.enableMedium && <TableCell>{exam.medium || "All"}</TableCell>}
-                        <TableCell>{name("class", exam.classId)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{exam.fullName}</TableCell>
-                        <TableCell className="whitespace-nowrap">{subjectLabel(p.subjectId)}</TableCell>
-                        {institute?.enableGroup && (
-                          <TableCell>{p.groupId != null ? name("group", p.groupId) : "All"}</TableCell>
-                        )}
-                        {institute?.enableVersion && <TableCell>{p.version || "All"}</TableCell>}
-                        <TableCell className="max-w-48 truncate">{p.subtitle || "—"}</TableCell>
-                        <TableCell className="whitespace-nowrap tabular-nums">{formatExamDate(p.examDate)}</TableCell>
-                        <TableCell className="whitespace-nowrap tabular-nums">
-                          {formatTime(p.startTime)} – {formatTime(p.endTime)}
+                  rows.map(({ plan: p, exam, institute: planInstitute }, i) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="tabular-nums text-muted-foreground">{i + 1}</TableCell>
+                      {show.institute && (
+                        <TableCell className="whitespace-nowrap">
+                          {planInstitute.shortName || planInstitute.name}
                         </TableCell>
-                        <TableCell className="max-w-56 truncate text-muted-foreground">
-                          {p.rooms.map((r) => roomName(r.buildingId, r.roomId)).join(", ")}
+                      )}
+                      {show.branch && (
+                        <TableCell className="whitespace-nowrap">
+                          {!planInstitute.enableBranch ? "—" : exam.branchId != null ? name("branch", exam.branchId) : "All"}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {p.rooms.reduce((sum, r) => sum + r.students, 0)}
-                        </TableCell>
+                      )}
+                      {show.medium && (
+                        <TableCell>{!planInstitute.enableMedium ? "—" : exam.medium || "All"}</TableCell>
+                      )}
+                      <TableCell className="whitespace-nowrap">{name("class", exam.classId)}</TableCell>
+                      <TableCell>{name("year", exam.yearId)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{exam.name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{subjectLabel(p.subjectId)}</TableCell>
+                      {show.group && (
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button asChild variant="outline" size="sm">
-                              <Link href={`/seat-plans/${p.id}/edit`}>
-                                <PencilIcon data-icon="inline-start" />
-                                Edit
-                              </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setDeleting(p)}>
-                              <Trash2Icon data-icon="inline-start" />
-                              Delete
-                            </Button>
-                          </div>
+                          {!planInstitute.enableGroup ? "—" : p.groupId != null ? name("group", p.groupId) : "All"}
                         </TableCell>
-                      </TableRow>
-                    )
-                  })
+                      )}
+                      {show.version && (
+                        <TableCell>{!planInstitute.enableVersion ? "—" : p.version || "All"}</TableCell>
+                      )}
+                      <TableCell className="max-w-48 truncate">{p.subtitle || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">{formatExamDate(p.examDate)}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {formatTime(p.startTime)} – {formatTime(p.endTime)}
+                      </TableCell>
+                      <TableCell className="max-w-56 truncate text-muted-foreground">
+                        {p.rooms.map((r) => roomName(r.buildingId, r.roomId)).join(", ")}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {p.rooms.reduce((sum, r) => sum + r.students, 0)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/seat-plans/${p.id}/edit`}>
+                              <PencilIcon data-icon="inline-start" />
+                              Edit
+                            </Link>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setDeleting(p)}>
+                            <Trash2Icon data-icon="inline-start" />
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">
-                      {institute ? "No seat plan yet." : "Select an institute."}
+                    <TableCell colSpan={columnCount} className="h-24 text-center text-muted-foreground">
+                      No seat plans match these filters.
                     </TableCell>
                   </TableRow>
                 )}

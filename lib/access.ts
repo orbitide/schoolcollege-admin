@@ -22,6 +22,7 @@ export const SURFACE_PATH: Record<AccessSurface, string> = {
 // has no ManageView); every other resource offers all three.
 const resourceSurfaces: Record<string, readonly AccessSurface[]> = {
   "correct-answer": ["Admin", "Manage"],
+  building: ["Admin"],
 }
 
 export const surfacesOf = (resource: string) => resourceSurfaces[resource] ?? accessSurfaces

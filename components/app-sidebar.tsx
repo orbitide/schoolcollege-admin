@@ -160,7 +160,10 @@ const data = {
       title: "Seat Plan",
       icon: <ArmchairIcon />,
       tone: "orange",
-      items: [{ title: "Manage Exam Seat Plan", url: "/seat-plans" }],
+      items: [
+        { title: "Manage Exam Seat Plan", url: "/seat-plans", permission: "exam-seat-plan.manage" },
+        { title: "Manage Building Room", url: "/seat-plans/buildings", resource: "building" },
+      ],
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose" },

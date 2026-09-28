@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
+import { RequireSurface } from "@/components/require-surface"
 import { SeatPlanForm } from "@/components/seat-plans/seat-plan-form"
 
 export const metadata: Metadata = {
@@ -10,8 +11,10 @@ export const metadata: Metadata = {
 // The exam and subject live in the URL, which needs a Suspense boundary on this otherwise static page.
 export default function NewSeatPlanPage() {
   return (
-    <Suspense>
-      <SeatPlanForm />
-    </Suspense>
+    <RequireSurface resource="exam-seat-plan" surface={["Admin", "Manage"]}>
+      <Suspense>
+        <SeatPlanForm />
+      </Suspense>
+    </RequireSurface>
   )
 }
