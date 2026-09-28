@@ -60,24 +60,33 @@ export function InstituteConfigurationForm({ id }: { id: number }) {
     )
   }
 
-  return <ConfigurationFormBody key={id} id={id} institute={institute} />
+  return (
+    <ConfigurationFormBody
+      key={id}
+      institute={institute}
+      backHref={`/institutes/${id}`}
+    />
+  )
 }
 
-function ConfigurationFormBody({
-  id,
+// The form on its own, for pages that pick the institute themselves (the
+// legacy InstituteConfiguration/GeneralConfiguration). With a backHref it
+// leaves for it on save and offers Cancel; without one it stays put.
+// Key it by the institute so it starts over from what is saved.
+export function ConfigurationFormBody({
   institute,
+  backHref,
 }: {
-  id: number
   institute: Institute
+  backHref?: string
 }) {
-  const { name, configuration: initial } = institute
+  const { id, name, configuration: initial } = institute
   const router = useRouter()
   const [values, setValues] = React.useState<Config>({
     ...defaultConfiguration,
     ...initial,
   })
   const [errors, setErrors] = React.useState<Errors>({})
-  const backHref = `/institutes/${id}`
 
   function set<K extends keyof Config>(key: K, value: Config[K]) {
     setValues((current) => ({ ...current, [key]: value }))
@@ -165,7 +174,7 @@ function ConfigurationFormBody({
 
     updateInstituteConfiguration(id, input)
     toast.success(`${name} configuration saved`)
-    router.push(backHref)
+    if (backHref) router.push(backHref)
   }
 
   return (
@@ -419,9 +428,11 @@ function ConfigurationFormBody({
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t bg-background px-4 py-3 lg:-mx-6 lg:px-6">
-        <Button asChild variant="outline">
-          <Link href={backHref}>Cancel</Link>
-        </Button>
+        {backHref && (
+          <Button asChild variant="outline">
+            <Link href={backHref}>Cancel</Link>
+          </Button>
+        )}
         <Button type="submit">Save configuration</Button>
       </div>
     </form>

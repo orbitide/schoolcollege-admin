@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -76,6 +76,7 @@ const data = {
         { title: "Generate Merit List", url: "/term-exam/merit-list" },
         { title: "Manage Exam Seat Plan", url: "/term-exam/seat-plans" },
         { title: "Seat Plan At a Glance", url: "/reports/seat-plan", permission: "seat-plan-report.view" },
+        { title: "Seat Plan (Room Wise)", url: "/reports/seat-plan-rooms", permission: "seat-plan-report.view" },
       ],
     },
     {
@@ -144,6 +145,14 @@ const data = {
         url: basicSettingsHref(item.segment),
         resource: item.kind && basicSettingsResource(item.segment),
       })),
+    },
+    {
+      title: "Configurations",
+      icon: <WrenchIcon />,
+      tone: "slate",
+      items: [
+        { title: "Institute Configurations", url: "/configurations/institute", permission: "institute-configuration.manage" },
+      ],
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose" },

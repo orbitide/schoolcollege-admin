@@ -247,3 +247,44 @@ export function seatPlanProblems(
   }
   return problems
 }
+
+// ---- Room-wise seating ----
+
+const rollNumber = (roll: string) => Number.parseInt(roll, 10)
+
+// The students a plan seats in one of its rooms (legacy LoadRoomWiseRoll):
+// the plan's students of the room's group and version whose roll falls in
+// the room's saved range, in roll order.
+export function roomStudents(
+  plan: ExamSeatPlan,
+  room: SeatPlanRoom,
+  exam: TermExam,
+  data: { students: Student[]; meritLists: MeritList[] }
+) {
+  const from = rollNumber(room.rollFrom)
+  const to = rollNumber(room.rollTo)
+  return seatPlanStudents(exam, plan.subjectId, { groupId: plan.groupId, version: plan.version }, data).filter(
+    ({ enrolment: e }) => {
+      if (room.groupId != null && e.groupId !== room.groupId) return false
+      if (room.version && e.version !== room.version) return false
+      const roll = rollNumber(e.classRoll)
+      return roll >= from && roll <= to
+    }
+  )
+}
+
+// Legacy SeatPlanReport: the room's seats column by column — `rolls`
+// padded with "-" to the capacity, each column filled a seat position at
+// a time down its benches (every bench's first seat, then every second
+// seat …). Returns per column its benches, each with its seats in order.
+export function seatLayout(
+  rolls: string[],
+  room: Pick<BuildingRoom, "totalColumns" | "benchesPerColumn" | "studentsPerBench">
+) {
+  const perColumn = room.benchesPerColumn * room.studentsPerBench
+  return Array.from({ length: room.totalColumns }, (_, c) =>
+    Array.from({ length: room.benchesPerColumn }, (_, b) =>
+      Array.from({ length: room.studentsPerBench }, (_, s) => rolls[c * perColumn + s * room.benchesPerColumn + b] ?? "-")
+    )
+  )
+}
