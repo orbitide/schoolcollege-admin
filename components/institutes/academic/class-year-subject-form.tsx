@@ -498,7 +498,7 @@ export function ClassYearSubjectForm({
   )
 }
 
-function PickField({
+export function PickField({
   id,
   label,
   value,

@@ -74,6 +74,8 @@ const data = {
         { title: "Manage Term Exam", url: "/term-exam" },
         { title: "Correct Answer", url: "/term-exam/correct-answers" },
         { title: "Generate Merit List", url: "/term-exam/merit-list" },
+        { title: "Manage Exam Seat Plan", url: "/term-exam/seat-plans" },
+        { title: "Seat Plan At a Glance", url: "/reports/seat-plan", permission: "seat-plan-report.view" },
       ],
     },
     {

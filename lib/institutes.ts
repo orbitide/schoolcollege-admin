@@ -100,6 +100,28 @@ export type Branch = AcademicRecord & {
   address: string
 }
 
+// A room of a building exams are seated in (legacy BuildingRoom): benches
+// in columns, so many students to a bench. Capacity is the product.
+export type BuildingRoom = {
+  id: number
+  // The room number or name, e.g. "101".
+  name: string
+  totalColumns: number
+  benchesPerColumn: number
+  studentsPerBench: number
+}
+
+export const roomCapacity = (
+  room: Pick<BuildingRoom, "totalColumns" | "benchesPerColumn" | "studentsPerBench">
+) => room.totalColumns * room.benchesPerColumn * room.studentsPerBench
+
+// Legacy Building: a building (its location) of the institute, in a branch
+// when the institute has branches, with its rooms in order.
+export type Building = AcademicRecord & {
+  branchId: number | null
+  rooms: BuildingRoom[]
+}
+
 export type AcademicYear = AcademicRecord & {
   code: string
   isCurrent: boolean

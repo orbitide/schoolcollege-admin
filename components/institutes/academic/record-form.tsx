@@ -19,6 +19,7 @@ import {
   type FieldValues,
   type FormState,
 } from "@/components/institutes/academic/kinds"
+import { BuildingForm } from "@/components/institutes/academic/building-form"
 import { ClassYearSubjectForm } from "@/components/institutes/academic/class-year-subject-form"
 import { NotFound } from "@/components/institutes/academic/record-list"
 import { SelectField } from "@/components/institutes/institute-form"
@@ -106,8 +107,9 @@ export function RecordForm({
   }
 
   if (config.customForm) {
+    const CustomForm = kind === "buildings" ? BuildingForm : ClassYearSubjectForm
     return (
-      <ClassYearSubjectForm
+      <CustomForm
         key={recordId ?? "new"}
         institute={institute}
         record={record}

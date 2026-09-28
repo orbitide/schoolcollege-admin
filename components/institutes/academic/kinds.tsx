@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { Badge } from "@/components/ui/badge"
 import {
   branchStore,
+  buildingStore,
   categoryStore,
   classStore,
   classYearSubjectStore,
@@ -24,11 +25,14 @@ import {
   holidayTypes,
   publicExams,
   repetitions,
+  roomCapacity,
   sectionGenders,
   type AcademicRecord,
+  type BuildingRoom,
   type Institute,
   type InstituteSettings,
 } from "@/lib/institutes"
+import { plansUsingRoom } from "@/lib/exam-seat-plans"
 import type { Enrolment, Student } from "@/lib/students"
 
 // Any per-institute record; extra fields are described by the kind's `fields`.
@@ -309,7 +313,8 @@ export const academicKinds = {
       },
     ],
     inUse: (record) =>
-      usedBy(asEditable(sectionStore), "branchId", record, "section", "sections"),
+      usedBy(asEditable(sectionStore), "branchId", record, "section", "sections") ??
+      usedBy(asEditable(buildingStore), "branchId", record, "building", "buildings"),
     studentMatch: (r, _s, e) => e?.branchId === r.id,
     store: asEditable(branchStore),
   },
@@ -922,6 +927,39 @@ export const academicKinds = {
     },
     store: asEditable(holidayStore),
   },
+  buildings: {
+    segment: "buildings",
+    singular: "Building",
+    plural: "Buildings & Rooms",
+    description: "Buildings and their rooms, with the seats in each, that exams are seated in.",
+    customForm: true,
+    fields: [],
+    columns: [
+      {
+        label: "Branch",
+        showWhen: (institute) => institute.enableBranch,
+        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+      },
+      {
+        label: "Rooms",
+        render: (r) => (
+          <span className="block max-w-80 truncate text-muted-foreground">
+            {(r.rooms as BuildingRoom[]).map((room) => `${room.name} (${roomCapacity(room)})`).join(", ") || "—"}
+          </span>
+        ),
+      },
+      {
+        label: "Capacity",
+        align: "right",
+        render: (r) => (r.rooms as BuildingRoom[]).reduce((sum, room) => sum + roomCapacity(room), 0),
+      },
+    ],
+    inUse: (record) => {
+      const count = plansUsingRoom(record.id).length
+      return count ? `Used by ${count} exam seat plan${count === 1 ? "" : "s"}.` : undefined
+    },
+    store: asEditable(buildingStore),
+  },
 } satisfies Record<string, KindConfig>
 
 export type AcademicKind = keyof typeof academicKinds
@@ -941,6 +979,7 @@ export const academicKindOrder: AcademicKind[] = [
   "grades",
   "remarks",
   "holidays",
+  "buildings",
 ]
 
 export function kindConfig(kind: AcademicKind): KindConfig {

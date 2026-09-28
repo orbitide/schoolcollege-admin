@@ -9,6 +9,7 @@ import type {
   AcademicSession,
   AcademicYear,
   Branch,
+  Building,
   ClassYearSubject,
   ClassYearSubjectDetail,
   HolidayEvent,
@@ -170,6 +171,45 @@ export const branchStore = createRecordStore<Branch>([
     code: "UB",
     address: "Sector 7, Uttara, Dhaka",
     rank: 2,
+    status: "Active",
+  },
+])
+
+const room = (id: number, name: string, totalColumns: number, benchesPerColumn: number, studentsPerBench: number) => ({
+  id,
+  name,
+  totalColumns,
+  benchesPerColumn,
+  studentsPerBench,
+})
+
+// The exam buildings of institute 1: two on the main campus, one in Uttara.
+export const buildingStore = createRecordStore<Building>([
+  {
+    id: 1,
+    instituteId: 1,
+    name: "Main Building",
+    branchId: 1,
+    rooms: [room(1, "101", 4, 5, 2), room(2, "102", 4, 5, 2), room(3, "103", 3, 5, 2)],
+    rank: 1,
+    status: "Active",
+  },
+  {
+    id: 2,
+    instituteId: 1,
+    name: "Science Building",
+    branchId: 1,
+    rooms: [room(4, "Lab 1", 3, 4, 2)],
+    rank: 2,
+    status: "Active",
+  },
+  {
+    id: 3,
+    instituteId: 1,
+    name: "Uttara Building",
+    branchId: 2,
+    rooms: [room(5, "201", 4, 6, 2)],
+    rank: 3,
     status: "Active",
   },
 ])
@@ -466,6 +506,7 @@ export const classYearSubjectStore = createRecordStore<ClassYearSubject>(
 export function removeInstituteRecords(instituteId: number) {
   for (const store of [
     classYearSubjectStore,
+    buildingStore,
     branchStore,
     shiftStore,
     groupStore,
