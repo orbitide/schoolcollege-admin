@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { DashboardMenuButton } from "@/components/configurations/dashboard-menu-button"
+import { ClassYearSubjectDetails } from "@/components/institutes/academic/class-year-subject-details"
 import { Badge } from "@/components/ui/badge"
 import {
   branchStore,
@@ -29,6 +30,7 @@ import {
   sectionGenders,
   type AcademicRecord,
   type BuildingRoom,
+  type ClassYearSubject,
   type DashboardMenu,
   type Institute,
   type InstituteSettings,
@@ -133,6 +135,14 @@ export type KindConfig = {
   softDelete?: boolean
   // Legacy Manage (not only ManageAdmin) offers Delete.
   manageDeletes?: boolean
+  // Legacy Copy: a row action opening the new form started from that record
+  // (the form reads `?copy=`).
+  copyable?: boolean
+  // Extra admin-list filters on a record reference (e.g. class, year), shown
+  // once an institute is picked.
+  recordFilters?: { key: string; label: string; allLabel: string; store: RecordStore<EditableRecord> }[]
+  // More of the record on its Details page, below the fields.
+  detailSection?: (record: EditableRecord) => ReactNode
   store: RecordStore<EditableRecord>
 }
 
@@ -634,12 +644,25 @@ export const academicKinds = {
       "Subjects each class takes in an academic year, with how every subject is marked.",
     customForm: true,
     mediumFilter: true,
-    fields: [],
+    softDelete: true,
+    manageDeletes: true,
+    copyable: true,
+    recordFilters: [
+      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "yearId", label: "Year", allLabel: "All years", store: asEditable(yearStore) },
+    ],
+    detailSection: (r) => <ClassYearSubjectDetails record={r as unknown as ClassYearSubject} />,
+    fields: [
+      { key: "medium", label: "Academic medium", type: "select", options: academicMediums, allLabel: "All medium", showWhen: mediumEnabled },
+      { key: "classId", label: "Academic class", type: "record", source: asEditable(classStore) },
+      { key: "yearId", label: "Academic year", type: "record", source: asEditable(yearStore) },
+      { key: "perStudentSubjectCount", label: "Per student subject count", type: "integer" },
+    ],
     columns: [
       {
         label: "Medium",
         showWhen: mediumEnabled,
-        render: (r) => String(r.medium || "—"),
+        render: (r) => String(r.medium || "All medium"),
       },
       {
         label: "Class",

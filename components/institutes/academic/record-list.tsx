@@ -177,6 +177,7 @@ export function RecordList({
                         instituteName={institute.name}
                         editHref={`${base}/${record.id}/edit`}
                         detailHref={`${base}/${record.id}`}
+                        copyHref={`${base}/new?copy=${record.id}`}
                       />
                     </TableCell>
                   </TableRow>

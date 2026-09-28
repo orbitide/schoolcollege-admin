@@ -108,6 +108,8 @@ export function RecordDetail({
           </dl>
         </CardContent>
       </Card>
+
+      {config.detailSection?.(record)}
     </div>
   )
 }

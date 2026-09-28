@@ -6,6 +6,7 @@ import {
   ArchiveRestoreIcon,
   ArrowUpDownIcon,
   CalendarCheckIcon,
+  CopyIcon,
   CircleCheckIcon,
   CircleMinusIcon,
   EllipsisVerticalIcon,
@@ -66,6 +67,7 @@ export function RecordActions({
   instituteName,
   editHref,
   detailHref,
+  copyHref,
   can = capabilitiesFor("Admin"),
 }: {
   kind: AcademicKind
@@ -74,6 +76,8 @@ export function RecordActions({
   instituteName: string
   editHref: string
   detailHref?: string
+  // Legacy Copy: the new form started from this record.
+  copyHref?: string
   can?: Capabilities
 }) {
   const config = kindConfig(kind)
@@ -196,6 +200,14 @@ export function RecordActions({
                 <DropdownMenuItem onSelect={() => setRanking(true)}>
                   <ArrowUpDownIcon />
                   Rank
+                </DropdownMenuItem>
+              )}
+              {config.copyable && copyHref && can.create && (
+                <DropdownMenuItem asChild>
+                  <Link href={copyHref}>
+                    <CopyIcon />
+                    Copy
+                  </Link>
                 </DropdownMenuItem>
               )}
             </>

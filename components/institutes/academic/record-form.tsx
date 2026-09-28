@@ -86,6 +86,13 @@ export function RecordForm({
   const institute = useInstitute(instituteId)
   const record = config.store.useOne(recordId ?? -1)
   const listHref = useListHref(instituteId, config.segment)
+  // Legacy Copy (`?copy=` on the new page): a new record started from this one.
+  const copyId = Number(useSearchParams().get("copy")) || undefined
+  const copied = config.store.useOne(copyId ?? -1)
+  const copyFrom =
+    recordId === undefined && copied?.instituteId === instituteId && copied.status !== "Deleted"
+      ? copied
+      : undefined
 
   if (!institute) return <NotFound />
   const { singular, plural } = kindLabels(kind, institute)
@@ -109,13 +116,25 @@ export function RecordForm({
     )
   }
 
+  if (kind === "classSubjects") {
+    return (
+      <ClassYearSubjectForm
+        key={recordId ?? `copy-${copyFrom?.id ?? "new"}`}
+        institute={institute}
+        record={record}
+        copyFrom={copyFrom}
+        singular={singular}
+        plural={plural}
+        listHref={listHref}
+      />
+    )
+  }
+
   if (config.customForm) {
     const CustomForm =
       kind === "buildings"
         ? BuildingForm
-        : kind === "dashboardMenus"
-          ? DashboardMenuForm
-          : ClassYearSubjectForm
+        : DashboardMenuForm
     return (
       <CustomForm
         key={recordId ?? "new"}

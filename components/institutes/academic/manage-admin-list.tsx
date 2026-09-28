@@ -83,6 +83,8 @@ export function ManageAdminList({
   const [status, setStatus] = React.useState(ALL)
   // Legacy grids filter Without / With Deleted instead of by status.
   const [withDeleted, setWithDeleted] = React.useState(false)
+  // Values of the kind's `recordFilters` (e.g. class, year), by key.
+  const [refs, setRefs] = React.useState<Record<string, string>>({})
   const [medium, setMedium] = React.useState(ALL)
   const [query, setQuery] = React.useState("")
 
@@ -110,6 +112,10 @@ export function ManageAdminList({
         (record) =>
           (status === ALL || record.status === status) &&
           (medium === ALL || record.medium === medium || !record.medium) &&
+          (!selected ||
+            (config.recordFilters ?? []).every(
+              (f) => !refs[f.key] || refs[f.key] === ALL || String(record[f.key]) === refs[f.key]
+            )) &&
           (!needle || record.name.toLowerCase().includes(needle))
       )
       .map((record) => ({ record, institute }))
@@ -122,6 +128,7 @@ export function ManageAdminList({
 
   function selectInstitute(value: string) {
     const params = new URLSearchParams(searchParams)
+    setRefs({})
     if (value === ALL) params.delete("institute")
     else params.set("institute", value)
     const search = params.toString()
@@ -215,6 +222,19 @@ export function ManageAdminList({
             />
           )
         )}
+        {selected &&
+          config.recordFilters?.map((f) => (
+            <FilterSelect
+              key={f.key}
+              label={f.label}
+              value={refs[f.key] ?? ALL}
+              onChange={(value) => setRefs((current) => ({ ...current, [f.key]: value }))}
+              allLabel={f.allLabel}
+              options={f.store
+                .getList(selected.id)
+                .map((r) => ({ value: String(r.id), label: r.name }))}
+            />
+          ))}
         <div className="relative w-full sm:w-56">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -316,6 +336,7 @@ export function ManageAdminList({
                       instituteName={institute.name}
                       editHref={recordHref(institute, `${record.id}/edit`)}
                       detailHref={recordHref(institute, String(record.id))}
+                      copyHref={`${recordHref(institute, "new")}&copy=${record.id}`}
                       can={can}
                     />
                   </TableCell>

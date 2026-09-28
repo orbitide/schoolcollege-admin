@@ -7,7 +7,6 @@ import { ArrowLeftIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { EditableRecord, Errors } from "@/components/institutes/academic/kinds"
-import { SelectField } from "@/components/institutes/institute-form"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -34,15 +33,13 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
+import { useCurrentUser } from "@/lib/current-user"
 import {
   academicMediums,
-  recordStatuses,
   subjectTypes,
   type ClassYearSubject,
   type ClassYearSubjectDetail,
   type Institute,
-  editableStatus,
-  type RecordStatus,
 } from "@/lib/institutes"
 import { cn } from "@/lib/utils"
 
@@ -107,42 +104,47 @@ function totals(row: Row) {
 }
 
 // Legacy ClassYearSubject Create/Edit: pick the class, year and medium, then
-// list every subject the class takes with its marks split.
+// list every subject the class takes with its marks split. Legacy Copy
+// (`copyFrom`) starts a new set from another one. Status is changed from
+// the list, as the legacy grid does.
 export function ClassYearSubjectForm({
   institute,
   record,
+  copyFrom,
   singular,
   plural,
   listHref,
 }: {
   institute: Institute
   record?: EditableRecord
+  copyFrom?: EditableRecord
   singular: string
   plural: string
   listHref: string
 }) {
   const existing = record as ClassYearSubject | undefined
+  const source = (record ?? copyFrom) as ClassYearSubject | undefined
   const router = useRouter()
+  const user = useCurrentUser()
   const classes = classStore.useList(institute.id)
   const years = yearStore.useList(institute.id)
   const subjects = subjectStore.useList(institute.id)
   const groups = groupStore.useList(institute.id)
 
   const [medium, setMedium] = React.useState(
-    existing?.medium || (institute.enableMedium ? academicMediums[0] : "")
+    source?.medium || (institute.enableMedium ? academicMediums[0] : "")
   )
-  const [classId, setClassId] = React.useState(existing ? String(existing.classId) : "")
+  const [classId, setClassId] = React.useState(source ? String(source.classId) : "")
   const [yearId, setYearId] = React.useState(() => {
-    if (existing) return String(existing.yearId)
+    if (source) return String(source.yearId)
     const current = years.find((year) => year.isCurrent)
     return current ? String(current.id) : ""
   })
   const [perStudent, setPerStudent] = React.useState(
-    String(existing?.perStudentSubjectCount ?? "")
+    String(source?.perStudentSubjectCount ?? "")
   )
-  const [status, setStatus] = React.useState<RecordStatus>(editableStatus(existing?.status))
   const [rows, setRows] = React.useState<Row[]>(() =>
-    existing?.details.length ? existing.details.map(toRow) : [toRow()]
+    source?.details.length ? source.details.map(toRow) : [toRow()]
   )
   const [errors, setErrors] = React.useState<Errors>({})
 
@@ -225,6 +227,11 @@ export function ClassYearSubjectForm({
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    save(false)
+  }
+
+  // Legacy "Save And New" stays on a blank form.
+  function save(andNew: boolean) {
     const next = validate()
     setErrors(next)
     if (Object.values(next).some(Boolean)) {
@@ -236,7 +243,6 @@ export function ClassYearSubjectForm({
     const yearName = years.find((y) => String(y.id) === yearId)?.name ?? ""
     const input = {
       name: `${className} · ${yearName}`,
-      status,
       medium: institute.enableMedium ? medium : "",
       classId: Number(classId),
       yearId: Number(yearId),
@@ -256,10 +262,17 @@ export function ClassYearSubjectForm({
         ...totals(row),
       })),
     }
-    if (existing) classYearSubjectStore.update(existing.id, input)
-    else classYearSubjectStore.add({ ...input, instituteId: institute.id })
+    if (existing) classYearSubjectStore.update(existing.id, input, user.name)
+    else classYearSubjectStore.add({ ...input, instituteId: institute.id, status: "Active" }, user.name)
     toast.success(`${input.name} ${existing ? "updated" : "added"}`)
-    router.push(listHref)
+    if (andNew) {
+      setClassId("")
+      setPerStudent("")
+      setRows([toRow()])
+      setErrors({})
+    } else {
+      router.push(listHref)
+    }
   }
 
   const classOptions = active(classes, classId).map((c) => ({
@@ -281,7 +294,7 @@ export function ClassYearSubjectForm({
       </Button>
 
       <h3 className="text-xl font-semibold tracking-tight">
-        {existing ? `Edit ${lower}` : `Add ${lower}`}
+        {existing ? `Edit ${lower}` : copyFrom ? `Copy ${copyFrom.name}` : `Add ${lower}`}
       </h3>
 
       <Card className="max-w-3xl">
@@ -334,13 +347,6 @@ export function ClassYearSubjectForm({
             <FieldDescription>How many of these subjects each student takes.</FieldDescription>
             <FieldError>{errors.perStudent}</FieldError>
           </Field>
-          <SelectField
-            name="status"
-            label="Status"
-            options={recordStatuses}
-            value={status}
-            onChange={setStatus}
-          />
         </CardContent>
       </Card>
 
@@ -493,6 +499,11 @@ export function ClassYearSubjectForm({
         <Button asChild variant="outline">
           <Link href={listHref}>Cancel</Link>
         </Button>
+        {!existing && (
+          <Button type="button" variant="secondary" onClick={() => save(true)}>
+            Save and new
+          </Button>
+        )}
         <Button type="submit">{existing ? "Save changes" : `Add ${lower}`}</Button>
       </div>
     </form>
