@@ -190,47 +190,59 @@ export function fineSheet(
 
 // ---- Store ----
 
+const seedUser = "Super Admin"
 
-// A period already fined for institute 1's section with the most absences
-// in the seeded attendance, so the manage page has something to show.
+// Institute 1's fines for the last four ended periods (26th to 25th), every
+// section fined from the seeded attendance, except that the latest period
+// is still to do for Class Nine and Ten, so the entry page has work left.
+// The first day off is forgiven; a longer absence may be excused in full.
 function seedFines(): AttendanceFine[] {
-  const dateFrom = "2026-08-26"
-  const dateTo = "2026-09-25"
+  const config = { dayFrom: 26, dayTo: 25 }
+  const latest = defaultFinePeriod(config)
+  const [year, month] = latest.dateTo.split("-").map(Number)
+  const periods = [3, 2, 1, 0].map((back) => finePeriodEndingIn(config, year, month - 1 - back))
   const records = getStudentAttendance()
-  const absentBySection = new Map<number, number>()
-  for (const r of records) {
-    if (r.instituteId !== 1 || r.isPresent || r.date < dateFrom || r.date > dateTo) continue
-    absentBySection.set(r.sectionId, (absentBySection.get(r.sectionId) ?? 0) + 1)
+  const fines: AttendanceFine[] = []
+
+  for (const { dateFrom, dateTo } of periods) {
+    const isLatest = dateTo === latest.dateTo
+    const [ty, tm, td] = dateTo.split("-").map(Number)
+    const next = new Date(ty, tm - 1, td + 1)
+    const at = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T10:00:00`
+    const sectionIds = [...new Set(records.filter((r) => r.instituteId === 1).map((r) => r.sectionId))]
+    for (const sectionId of sectionIds.sort((a, b) => a - b)) {
+      const absences = countAbsences(records, sectionId, dateFrom, dateTo)
+      for (const student of getStudents()) {
+        const enrolment = student.enrolments.find((e) => e.yearId === 2 && e.sectionId === sectionId)
+        if (student.instituteId !== 1 || student.status !== "Active" || !enrolment) continue
+        if (isLatest && enrolment.classId >= 4) continue
+        const absentDays = absences.get(student.id) ?? 0
+        if (!absentDays) continue
+        const excused = absentDays >= 3 && (student.id + tm) % 4 === 0
+        fines.push({
+          id: fines.length + 1,
+          instituteId: 1,
+          classId: enrolment.classId,
+          sectionId,
+          studentId: student.id,
+          dateFrom,
+          dateTo,
+          absentDays,
+          finedDays: excused ? 0 : Math.max(0, absentDays - 1),
+          remarks: excused
+            ? "Medical certificate submitted"
+            : absentDays >= 4
+              ? "Guardian informed"
+              : "",
+          createdBy: seedUser,
+          createdAt: at,
+          modifiedBy: seedUser,
+          modifiedAt: at,
+        })
+      }
+    }
   }
-  const sectionId = [...absentBySection].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0]
-  if (sectionId == null) return []
-  const absences = countAbsences(records, sectionId, dateFrom, dateTo)
-  const at = "2026-09-26T10:00:00"
-  return getStudents().flatMap<AttendanceFine>((student) => {
-    const enrolment = student.enrolments.find((e) => e.yearId === 2 && e.sectionId === sectionId)
-    if (student.instituteId !== 1 || student.status !== "Active" || !enrolment) return []
-    const absentDays = absences.get(student.id) ?? 0
-    if (!absentDays) return []
-    return [
-      {
-        id: student.id,
-        instituteId: 1,
-        classId: enrolment.classId,
-        sectionId,
-        studentId: student.id,
-        dateFrom,
-        dateTo,
-        absentDays,
-        // Forgive the first day off.
-        finedDays: Math.max(0, absentDays - 1),
-        remarks: absentDays > 3 ? "Guardian informed" : "",
-        createdBy: "Super Admin",
-        createdAt: at,
-        modifiedBy: "Super Admin",
-        modifiedAt: at,
-      },
-    ]
-  })
+  return fines
 }
 
 const seed = seedFines()
@@ -249,6 +261,10 @@ function emit(next: AttendanceFine[]) {
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
+}
+
+export function getAttendanceFines() {
+  return fines
 }
 
 export function useAttendanceFines() {

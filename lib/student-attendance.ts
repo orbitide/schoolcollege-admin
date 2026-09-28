@@ -2,8 +2,10 @@
 
 import * as React from "react"
 
-import type { HolidayEvent, Institute } from "@/lib/institutes"
+import { holidayStore } from "@/lib/academic-store"
+import { seedInstitutes, type HolidayEvent, type Institute } from "@/lib/institutes"
 import { fitsPlace, getStudents, type Enrolment, type EnrolmentPlace, type Student } from "@/lib/students"
+import { getTeachers, type Teacher } from "@/lib/teachers"
 
 // Legacy SchoolCollege StudentAttendance: whether one student of a section
 // was present on a day. One record per student, section and date; taking
@@ -72,9 +74,12 @@ export function dayOffNote(
 }
 
 // ---- Seed ----
-// Made-up but stable attendance for institute 1's current-year students
-// over the school days of September 2026 so far, so the sheet and later
-// reports have something to show.
+// Made-up but stable attendance for institute 1's current-year students on
+// every school day of 2026 up to today — skipping the institute's weekend
+// and holidays — taken by the section's teacher, so the sheets, the
+// teacher's page, fines and reports have data. A few students miss school
+// far more often, so fines have someone to catch. Today only the odd
+// sections are taken yet, leaving Take Attendance something to do.
 
 function hash(...values: number[]) {
   let h = 2166136261
@@ -82,32 +87,66 @@ function hash(...values: number[]) {
     h ^= v
     h = Math.imul(h, 16777619)
   }
+  // Final mix (murmur3 fmix32), so neighbouring days don't give near-equal
+  // values and absences spread out instead of clustering.
+  h ^= h >>> 16
+  h = Math.imul(h, 0x85ebca6b)
+  h ^= h >>> 13
+  h = Math.imul(h, 0xc2b2ae35)
+  h ^= h >>> 16
   return (h >>> 0) / 4294967295
 }
 
 const seedUser = "Super Admin"
 
+// How likely the seeded student is to be absent on a school day.
+function absenceRate(studentId: number) {
+  if (studentId % 7 === 3) return 0.2
+  if (studentId % 5 === 1) return 0.1
+  return 0.04
+}
+
 function seedAttendance(): StudentAttendance[] {
+  const institute = seedInstitutes.find((i) => i.id === 1)
+  if (!institute) return []
+  const holidays = holidayStore.getList(institute.id)
+  const today = todayIso()
+  // The first active teacher taking each section this year.
+  const teacherOf = new Map<number, Teacher>()
+  for (const teacher of getTeachers()) {
+    if (teacher.status !== "Active") continue
+    for (const s of teacher.sections) {
+      if (s.yearId === 2 && !teacherOf.has(s.sectionId)) teacherOf.set(s.sectionId, teacher)
+    }
+  }
+  const pupils = getStudents().flatMap((student) => {
+    const enrolment = student.enrolments.find((e) => e.yearId === 2)
+    return student.instituteId === institute.id && student.status === "Active" && enrolment?.sectionId
+      ? [{ student, sectionId: enrolment.sectionId }]
+      : []
+  })
+
   const records: StudentAttendance[] = []
-  for (let day = 1; day <= 24; day++) {
-    const date = `2026-09-${String(day).padStart(2, "0")}`
-    if (weekdayOf(date) === "Friday") continue
-    for (const student of getStudents()) {
-      if (student.instituteId !== 1 || student.status !== "Active") continue
-      const enrolment = student.enrolments.find((e) => e.yearId === 2)
-      if (!enrolment?.sectionId) continue
-      const at = `${date}T09:${String(10 + (enrolment.sectionId % 40)).padStart(2, "0")}:00`
+  for (let day = new Date(2026, 0, 1), n = 0; ; day.setDate(day.getDate() + 1), n++) {
+    const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`
+    if (date > today) break
+    if (dayOffNote(institute, holidays, date)) continue
+    for (const { student, sectionId } of pupils) {
+      if (date === today && sectionId % 2 === 0) continue
+      const teacher = teacherOf.get(sectionId)
+      const by = teacher?.name ?? seedUser
+      const at = `${date}T09:${String(5 + ((sectionId * 7) % 50)).padStart(2, "0")}:00`
       records.push({
         id: records.length + 1,
-        instituteId: 1,
-        sectionId: enrolment.sectionId,
+        instituteId: institute.id,
+        sectionId,
         studentId: student.id,
-        teacherId: null,
+        teacherId: teacher?.id ?? null,
         date,
-        isPresent: hash(student.id, day) > 0.09,
-        createdBy: seedUser,
+        isPresent: hash(student.id, n) >= absenceRate(student.id),
+        createdBy: by,
         createdAt: at,
-        modifiedBy: seedUser,
+        modifiedBy: by,
         modifiedAt: at,
       })
     }
