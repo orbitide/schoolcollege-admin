@@ -57,6 +57,7 @@ const data = {
         { title: "Take Attendance By Admin", url: "/attendance" },
         { title: "Exam Attendance By Admin", url: "/attendance/exam" },
         { title: "Daily Attendance Report", url: "/reports/daily-attendance", permission: "daily-attendance-report.view" },
+        { title: "Student's Individual Attendance Report", url: "/reports/student-attendance", permission: "student-attendance-report.view" },
         { title: "Manage Monthly Attendance Fine", url: "/attendance/fines" },
         { title: "Absent Fine Date Configuration", url: "/attendance/fines/configuration" },
       ],

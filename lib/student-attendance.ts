@@ -56,11 +56,21 @@ export function dayOffNote(
   medium = ""
 ) {
   const weekday = weekdayOf(date)
-  if ((institute.weekend as string[]).includes(weekday)) {
+  if (isWeekend(institute, date)) {
     return `${weekday} is a weekend for this institute.`
   }
+  const holiday = holidayOn(institute, holidays, date, medium)
+  return holiday ? `${holiday.name} (${holiday.type.toLowerCase()} holiday) falls on this day.` : undefined
+}
+
+export function isWeekend(institute: Institute, date: string) {
+  return (institute.weekend as string[]).includes(weekdayOf(date))
+}
+
+// The institute's active holiday on the date for the medium, if any.
+export function holidayOn(institute: Institute, holidays: HolidayEvent[], date: string, medium = "") {
   const monthDay = date.slice(5)
-  const holiday = holidays.find((h) => {
+  return holidays.find((h) => {
     if (h.instituteId !== institute.id || h.status !== "Active") return false
     if (h.medium && medium && h.medium !== medium) return false
     const end = h.endDate || h.startDate
@@ -70,7 +80,6 @@ export function dayOffNote(
     const to = end.slice(5)
     return from <= to ? from <= monthDay && monthDay <= to : monthDay >= from || monthDay <= to
   })
-  return holiday ? `${holiday.name} (${holiday.type.toLowerCase()} holiday) falls on this day.` : undefined
 }
 
 // ---- Seed ----
