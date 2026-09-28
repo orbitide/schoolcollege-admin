@@ -260,8 +260,11 @@ export type LetterGrade = AcademicRecord & {
   maxGradePoint: number
 }
 
+// Legacy ResultRemarks: for a class (`classId` null on older ones means every
+// class) and optionally one medium.
 export type ResultRemark = AcademicRecord & {
   medium: string
+  classId: number | null
   minGpa: number
   maxGpa: number
   minMarks: number

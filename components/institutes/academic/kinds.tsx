@@ -145,6 +145,10 @@ export type KindConfig = {
   recordFilters?: { key: string; label: string; allLabel: string; store: RecordStore<EditableRecord> }[]
   // More of the record on its Details page, below the fields.
   detailSection?: (record: EditableRecord) => ReactNode
+  // What the name is called (legacy "Remarks"); "Name" by default. With
+  // `nameMultiline` it is typed in a textarea.
+  nameLabel?: string
+  nameMultiline?: boolean
   store: RecordStore<EditableRecord>
 }
 
@@ -841,9 +845,26 @@ export const academicKinds = {
     singular: "Result remark",
     plural: "Result remarks",
     description: "Remarks printed on results for a GPA, marks or fail-count range.",
-    uniqueScope: ["medium"],
+    // Legacy ResultRemarks: per class and optionally medium; names are unique,
+    // and ranked, within that scope.
+    uniqueScope: ["medium", "classId"],
+    softDelete: true,
+    manageDeletes: true,
+    nameLabel: "Remarks",
+    nameMultiline: true,
+    recordFilters: [
+      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+    ],
     fields: [
       mediumField,
+      {
+        key: "classId",
+        label: "Academic class",
+        type: "record",
+        required: true,
+        source: asEditable(classStore),
+        sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
+      },
       { key: "minGpa", label: "Minimum GPA", type: "decimal", required: true, min: 0 },
       { key: "maxGpa", label: "Maximum GPA", type: "decimal", required: true, min: 0 },
       { key: "minMarks", label: "Minimum marks", type: "decimal", required: true, min: 0, max: 100 },
@@ -878,6 +899,11 @@ export const academicKinds = {
       { label: "Marks", render: (r) => range(r.minMarks, r.maxMarks) },
       { label: "Fail count", render: (r) => range(r.minFailCount, r.maxFailCount, 0) },
       mediumColumn,
+      {
+        label: "Class",
+        render: (r) =>
+          r.classId == null ? "All" : <RecordName store={asEditable(classStore)} id={r.classId} />,
+      },
     ],
     validate: (values, { institute }) => {
       const errors: Errors = {}

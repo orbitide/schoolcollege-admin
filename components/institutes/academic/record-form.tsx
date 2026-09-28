@@ -288,12 +288,13 @@ function RecordFormBody({
       (config.uniqueScope ?? []).map((key) => [key, parsed[key]])
     )
     const trimmedName = name.trim()
+    const nameLabel = config.nameLabel ?? "Name"
     if (!trimmedName) {
-      next.name = "Name is required."
+      next.name = `${nameLabel} is required.`
     } else if (
       config.store.isTaken(institute.id, "name", trimmedName, record?.id, scope)
     ) {
-      next.name = `Another ${lower} already uses this name.`
+      next.name = `Another ${lower} already uses this ${nameLabel.toLowerCase()}.`
     }
     for (const field of config.fields) {
       if (
@@ -372,14 +373,26 @@ function RecordFormBody({
           <CardDescription>{config.description}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <Field data-invalid={!!errors.name}>
-            <FieldLabel htmlFor="name">Name</FieldLabel>
-            <Input
-              id="name"
-              value={name}
-              aria-invalid={!!errors.name}
-              onChange={(event) => setName(event.target.value)}
-            />
+          <Field
+            data-invalid={!!errors.name}
+            className={config.nameMultiline ? "sm:col-span-2" : undefined}
+          >
+            <FieldLabel htmlFor="name">{config.nameLabel ?? "Name"}</FieldLabel>
+            {config.nameMultiline ? (
+              <Textarea
+                id="name"
+                value={name}
+                aria-invalid={!!errors.name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            ) : (
+              <Input
+                id="name"
+                value={name}
+                aria-invalid={!!errors.name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            )}
             <FieldError>{errors.name}</FieldError>
           </Field>
           {/* Legacy grids change status from the list, not the form. */}

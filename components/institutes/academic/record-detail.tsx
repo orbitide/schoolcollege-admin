@@ -55,7 +55,7 @@ export function RecordDetail({
   const deleted = record.status === "Deleted"
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString("en-GB") : "—")
   const rows: [string, React.ReactNode][] = [
-    ["Name", record.name],
+    [config.nameLabel ?? "Name", record.name],
     ["Institute", institute.name],
     ...visibleFields(kind, institute).map(
       (field): [string, React.ReactNode] => [

@@ -97,7 +97,7 @@ export function RecordList({
             <TableHeader className="bg-muted">
               <TableRow>
                 {ranked && <TableHead className="w-28">Rank</TableHead>}
-                <TableHead>Name</TableHead>
+                <TableHead>{config.nameLabel ?? "Name"}</TableHead>
                 {columns.map((column) => (
                   <TableHead
                     key={column.label}

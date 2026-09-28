@@ -448,7 +448,7 @@ export const letterGradeStore = createRecordStore<LetterGrade>(
   )
 )
 
-const remarkScale: Omit<ResultRemark, "id" | "instituteId" | "rank" | "status">[] = [
+const remarkScale: Omit<ResultRemark, "id" | "instituteId" | "classId" | "rank" | "status">[] = [
   { name: "Golden A+", minGpa: 5, maxGpa: 5, minMarks: 80, maxMarks: 100, basedOnGrading: true, isGolden: true, minFailCount: 0, maxFailCount: 0, medium: "" },
   { name: "Excellent", minGpa: 4.5, maxGpa: 4.99, minMarks: 70, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
   { name: "Very good", minGpa: 4, maxGpa: 4.49, minMarks: 60, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
@@ -463,10 +463,17 @@ export const resultRemarkStore = createRecordStore<ResultRemark>(
       ...remark,
       id: i * remarkScale.length + index + 1,
       instituteId,
+      classId: null,
       rank: index + 1,
       status: "Active" as const,
     }))
-  )
+  ),
+  {
+    // Legacy ranks remarks within their medium and class, listed in that order.
+    rankWithin: ["medium", "classId"],
+    compare: (a, b) =>
+      a.medium.localeCompare(b.medium) || (a.classId ?? 0) - (b.classId ?? 0) || a.rank - b.rank,
+  }
 )
 
 export const groupStore = createRecordStore<AcademicGroup>(

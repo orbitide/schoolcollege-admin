@@ -253,7 +253,7 @@ export function ManageAdminList({
             <TableRow>
               <TableHead className="w-12">Sl</TableHead>
               <TableHead>Institute</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead>{config.nameLabel ?? "Name"}</TableHead>
               {columns.map((column) => (
                 <TableHead
                   key={column.label}

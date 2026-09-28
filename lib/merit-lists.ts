@@ -79,7 +79,12 @@ export function calculateMeritList(exam: TermExam, institute: Institute): MeritR
   const grades = examLetterGrades(exam)
   const remarks = resultRemarkStore
     .getList(exam.instituteId)
-    .filter((r) => r.status === "Active" && (!r.medium || !exam.medium || r.medium === exam.medium))
+    .filter(
+      (r) =>
+        r.status === "Active" &&
+        (!r.medium || !exam.medium || r.medium === exam.medium) &&
+        (r.classId == null || r.classId === exam.classId)
+    )
   const maxGrade = [...grades].sort((a, b) => b.maxGradePoint - a.maxGradePoint)[0]
 
   // The exam's students with their saved marks (none means absent).
