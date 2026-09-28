@@ -93,6 +93,9 @@ const data = {
       tone: "sky",
       items: [
         { title: "Send SMS", url: "/sms/send", permission: "sms-send.manage" },
+        { title: "Re-send SMS", url: "/sms/resend", permission: "sms-resend.manage" },
+        { title: "SMS Summary", url: "/sms/summary", permission: "sms-summary.view" },
+        { title: "SMS History", url: "/sms/history", permission: "sms-history.view" },
         { title: "Manage SMS Template", url: "/sms/templates", resource: "sms-template" },
       ],
     },

@@ -44,6 +44,10 @@ export type SmsMessage = {
   createdBy: string
   createdAt: string
   sentAt: string | null
+  // What the gateway answered (legacy SmsArchive.ResponseCode / ResponseId);
+  // null until it has been tried.
+  responseCode: string | null
+  responseId: string | null
 }
 
 // "8801XXXXXXXXX" for a Bangladeshi mobile number written with or without
@@ -121,6 +125,8 @@ function seedMessages(): SmsMessage[] {
         createdBy: seedUser,
         createdAt: at,
         sentAt: `${lastDay}T10:31:00`,
+        responseCode: "1900",
+        responseId: String(48120000 + messages.length * 7),
       })
     }
   }
@@ -155,7 +161,47 @@ function seedMessages(): SmsMessage[] {
         createdBy: seedUser,
         createdAt: `${date}T09:00:00`,
         sentAt: failed ? null : `${date}T09:02:00`,
+        // 1900 is the gateway's success; 1908 an unreachable number.
+        responseCode: failed ? "1908" : "1900",
+        responseId: failed ? null : String(47930000 + messages.length * 7),
       })
+    }
+
+    // A notice to Class Seven two days ago that hit a gateway timeout and
+    // used up its tries: it waits on Re-send SMS.
+    const stuck = new Date(y, m - 1, d - 2)
+    const stuckDate = `${stuck.getFullYear()}-${String(stuck.getMonth() + 1).padStart(2, "0")}-${String(stuck.getDate()).padStart(2, "0")}`
+    for (const student of students.values()) {
+      const enrolment = student.enrolments.find((e) => e.yearId === 2)
+      if (student.instituteId !== 1 || enrolment?.classId !== 2) continue
+      for (const [numberType, raw] of [["Father", student.fatherMobile], ["Mother", student.motherMobile]] as const) {
+        const mobile = normalizeMobile(raw)
+        if (!mobile) continue
+        push({
+          instituteId: 1,
+          branchId: null,
+          campaignName: `${stuckDate.replaceAll("-", "")}_163000_000_1`,
+          mobile,
+          message: fillTemplate(noticeTemplate.message, valuesFor(student.id)),
+          studentId: student.id,
+          numberType,
+          smsType: "Notice",
+          resultType: null,
+          attendanceType: null,
+          examId: null,
+          subjectId: null,
+          attendanceDate: null,
+          isTest: false,
+          status: "Pending",
+          tryCount: 1,
+          createdBy: seedUser,
+          createdAt: `${stuckDate}T16:30:00`,
+          sentAt: null,
+          // The gateway timed out.
+          responseCode: "1905",
+          responseId: null,
+        })
+      }
     }
   }
   return messages
@@ -237,6 +283,8 @@ export function queueSms(info: SmsBatchInfo, drafts: SmsDraft[], user: string) {
     createdBy: user,
     createdAt: at,
     sentAt: null,
+    responseCode: null,
+    responseId: null,
   }))
   emit([...all, ...fresh])
   return fresh.reduce((sum, m) => sum + m.parts, 0)
@@ -279,7 +327,87 @@ export function sendTestSms(
       createdBy: user,
       createdAt: at,
       sentAt: at,
+      // No gateway yet, so there is no real answer to record.
+      responseCode: null,
+      responseId: null,
     },
   ])
   return mobile
+}
+
+// ---- Gateway ----
+// A stand-in for the SMS gateway until one is connected: an SMS goes out
+// when the institute's balance pays for it, and fails with "insufficient
+// balance" (1907) otherwise. Each attempt counts as a try.
+
+export const RESPONSE_TEXT: Record<string, string> = {
+  "1900": "Sent",
+  "1905": "Gateway timeout",
+  "1907": "Insufficient balance",
+  "1908": "Unreachable number",
+}
+
+let nextResponseId = 49000000
+
+// Legacy SendPendingSms / Re-send: tries the pending SMS given, charging
+// each sent one to its institute. Failed ones stay pending with one more
+// try. `rateOf` is the institute's price per SMS part.
+export function sendPendingSms(ids: number[], rateOf: (instituteId: number) => number) {
+  const wanted = new Set(ids)
+  const at = new Date().toISOString()
+  let sent = 0
+  let failed = 0
+  let nextBalances = { ...balances }
+  const next = getSmsMessages().map((m) => {
+    if (!wanted.has(m.id) || m.status !== "Pending") return m
+    const cost = m.parts * rateOf(m.instituteId)
+    const balance = nextBalances[m.instituteId] ?? 0
+    if (cost > balance) {
+      failed++
+      return { ...m, tryCount: m.tryCount + 1, responseCode: "1907", responseId: null }
+    }
+    sent++
+    nextBalances = { ...nextBalances, [m.instituteId]: Math.round((balance - cost) * 100) / 100 }
+    return {
+      ...m,
+      status: "Sent" as const,
+      tryCount: m.tryCount + 1,
+      sentAt: at,
+      responseCode: "1900",
+      responseId: String(nextResponseId++),
+    }
+  })
+  balances = nextBalances
+  emit(next)
+  return { sent, failed }
+}
+
+// Legacy Re-send's "Archive As Success" / "Archive As Failed": closes the
+// pending SMS without trying them again. Returns how many were closed.
+export function archivePendingSms(ids: number[], status: "Sent" | "Failed") {
+  const wanted = new Set(ids)
+  const at = new Date().toISOString()
+  let count = 0
+  emit(
+    getSmsMessages().map((m) => {
+      if (!wanted.has(m.id) || m.status !== "Pending") return m
+      count++
+      return { ...m, status, sentAt: status === "Sent" ? at : m.sentAt }
+    })
+  )
+  return count
+}
+
+// Downloads the rows as a CSV file. The byte-order mark lets Excel read
+// Bangla messages as UTF-8.
+export function downloadCsv(fileName: string, header: string[], rows: (string | number)[][]) {
+  const cell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
+  const lines = [header, ...rows].map((row) => row.map(cell).join(","))
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
 }
