@@ -70,3 +70,15 @@ export function examineeYears(
 export function testimonialTypes(academicClass?: AcademicClass) {
   return (academicClass?.testimonialExams ?? []) as PublicExam[]
 }
+
+// Legacy perSlotStudentCount: testimonials printed per batch.
+export const TESTIMONIAL_BATCH = 100
+
+// The batches a list of `count` examinees prints in (legacy
+// LoadPassedStudentPaginatedCount): "1 - 100", "101 - 150", …
+export function testimonialBatches(count: number) {
+  const batches: { from: number; label: string }[] = []
+  for (let from = 1; from <= count; from += TESTIMONIAL_BATCH)
+    batches.push({ from, label: `${from} - ${Math.min(from + TESTIMONIAL_BATCH - 1, count)}` })
+  return batches
+}

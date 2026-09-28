@@ -15,12 +15,14 @@ import {
   useStudents,
   type PublicExam,
 } from "@/lib/students"
-import { testimonialRows, type TestimonialRow } from "@/lib/testimonials"
+import { TESTIMONIAL_BATCH, testimonialRows, type TestimonialRow } from "@/lib/testimonials"
 
 // Legacy RptResult/Testimonial (Partial/_testimonial*.cshtml): one A4
 // certificate per examinee, for printing on the institute's letterhead.
 // Opened with the Manage Testimonial filters (every examinee) or with
-// ?student= (one).
+// ?student= (one). The Testimonial report adds ?roll= (one board roll),
+// ?from= (a batch of TESTIMONIAL_BATCH from that examinee, 1-based) and
+// ?issued= (the issue date, YYYY-MM-DD; today by default).
 export function TestimonialPrint() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -50,6 +52,10 @@ export function TestimonialPrint() {
       version: param("version"),
     })
     if (studentId) rows = rows.filter((row) => row.student.id === studentId)
+    const roll = param("roll").trim()
+    if (roll) rows = rows.filter((row) => row.result.roll.trim() === roll)
+    const from = Number.parseInt(param("from"), 10)
+    if (from > 0) rows = rows.slice(from - 1, from - 1 + TESTIMONIAL_BATCH)
   } else if (institute && exam && single) {
     const enrolment = testimonialEnrolment(single, exam, classes)
     const result = single.board[exam]
@@ -57,7 +63,8 @@ export function TestimonialPrint() {
   }
 
   // Serial is the class roll and the issue month, e.g. 1001-09-26.
-  const issued = new Date()
+  const issuedParam = /^\d{4}-\d{2}-\d{2}$/.test(param("issued")) ? param("issued") : ""
+  const issued = issuedParam ? new Date(`${issuedParam}T00:00:00`) : new Date()
   const monthYear = `${String(issued.getMonth() + 1).padStart(2, "0")}-${String(issued.getFullYear()).slice(2)}`
 
   return (
