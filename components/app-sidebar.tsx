@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -163,6 +163,15 @@ const data = {
       items: [
         { title: "Manage Exam Seat Plan", url: "/seat-plans", permission: "exam-seat-plan.manage" },
         { title: "Manage Building Room", url: "/seat-plans/buildings", resource: "building" },
+      ],
+    },
+    {
+      title: "Online Admission",
+      icon: <SchoolIcon />,
+      tone: "blue",
+      items: [
+        { title: "Student Import", url: "/online-admission/student-import", permission: "board-student-import.manage" },
+        { title: "Education Board", url: "/online-admission/education-boards", permission: "education-board.manage" },
       ],
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },

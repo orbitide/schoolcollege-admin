@@ -96,8 +96,11 @@ export type SheetRows = Cell[][]
 const clean = (value: string) => value.trim().toLowerCase().replace(/[\s_]+/g, " ")
 
 // Maps each field to the first column whose header matches its label or an alias.
-export function autoMap(headers: Cell[], fields: ImportField[]): Mapping {
-  const mapping: Mapping = {}
+export function autoMap<K extends string>(
+  headers: Cell[],
+  fields: { key: K; label: string; aliases: string[] }[]
+): Partial<Record<K, number>> {
+  const mapping: Partial<Record<K, number>> = {}
   const used = new Set<number>()
   for (const field of fields) {
     const names = [clean(field.label), ...field.aliases]
