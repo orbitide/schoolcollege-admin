@@ -271,8 +271,6 @@ export function ManageAdminList({
                         status === ALL &&
                         medium === ALL
                       }
-                      first={index === 0}
-                      last={index === rows.length - 1}
                     />
                   </TableCell>
                   <TableCell>
@@ -313,14 +311,10 @@ function RankCell({
   kind,
   record,
   movable,
-  first,
-  last,
 }: {
   kind: AcademicKind
   record: EditableRecord
   movable: boolean
-  first: boolean
-  last: boolean
 }) {
   const { store, ranked } = kindConfig(kind)
   if (ranked === false) return <span className="text-muted-foreground">—</span>
@@ -332,7 +326,7 @@ function RankCell({
         variant="ghost"
         size="icon"
         className="size-7"
-        disabled={first}
+        disabled={!store.canMove(record.id, "up")}
         onClick={() => store.move(record.id, "up")}
       >
         <ArrowUpIcon />
@@ -342,7 +336,7 @@ function RankCell({
         variant="ghost"
         size="icon"
         className="size-7"
-        disabled={last}
+        disabled={!store.canMove(record.id, "down")}
         onClick={() => store.move(record.id, "down")}
       >
         <ArrowDownIcon />

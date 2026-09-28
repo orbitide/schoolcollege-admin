@@ -501,19 +501,22 @@ function NumberField({
   )
 }
 
-function ColorField({
+// A colour as text (hex, name or blank) with a swatch picker beside it.
+export function ColorField({
   label,
   value,
   input,
   onPick,
+  error,
 }: {
   label: string
   value: string
   input: React.ComponentProps<typeof Input> & { id: string }
   onPick: (value: string) => void
+  error?: string
 }) {
   return (
-    <Field>
+    <Field data-invalid={!!error}>
       <FieldLabel htmlFor={input.id}>{label}</FieldLabel>
       <div className="flex items-center gap-2">
         <input
@@ -523,8 +526,9 @@ function ColorField({
           onChange={(event) => onPick(event.target.value)}
           className="size-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
         />
-        <Input placeholder="#1e3a8a or blank" {...input} />
+        <Input placeholder="#1e3a8a or blank" aria-invalid={!!error} {...input} />
       </div>
+      <FieldError>{error}</FieldError>
     </Field>
   )
 }

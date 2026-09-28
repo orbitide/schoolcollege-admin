@@ -97,6 +97,20 @@ export type StudentCategory = AcademicRecord
 // A titled box of quick-link buttons on the institute dashboard (legacy
 // DashboardMenuGroup); its buttons are the dashboard menus.
 export type DashboardMenuGroup = AcademicRecord
+// A quick-link button in a dashboard menu group (legacy DashboardMenu).
+// Colours are CSS colours; blank ones keep the button's own. `icon` is a
+// key of the dashboard menu icon set, blank for none.
+export type DashboardMenu = AcademicRecord & {
+  groupId: number
+  link: string
+  icon: string
+  fontColor: string
+  backgroundColor: string
+  borderColor: string
+  hoverFontColor: string
+  hoverBackgroundColor: string
+  hoverBorderColor: string
+}
 
 export type Branch = AcademicRecord & {
   code: string

@@ -12,6 +12,7 @@ import type {
   Building,
   ClassYearSubject,
   ClassYearSubjectDetail,
+  DashboardMenu,
   DashboardMenuGroup,
   HolidayEvent,
   LetterGrade,
@@ -26,10 +27,16 @@ import type {
 
 // In-memory dummy stores for per-institute ranked records (branches, shifts, …).
 // Replace with API calls once the backend endpoints exist.
-// Records are listed by rank unless a `sortKey` is given (e.g. a start date).
+// Records are listed by rank unless a `sortKey` is given (e.g. a start date)
+// or a `compare` of their own. With `rankWithin`, records are reordered only
+// among those sharing that key (a dashboard menu within its group).
 export function createRecordStore<T extends AcademicRecord>(
   seed: T[],
-  { sortKey }: { sortKey?: keyof T } = {}
+  {
+    sortKey,
+    compare,
+    rankWithin,
+  }: { sortKey?: keyof T; compare?: (a: T, b: T) => number; rankWithin?: keyof T } = {}
 ) {
   let records = seed
   const listeners = new Set<() => void>()
@@ -56,11 +63,25 @@ export function createRecordStore<T extends AcademicRecord>(
     return all
       .filter((record) => record.instituteId === instituteId)
       .sort((a, b) =>
-        sortKey
-          ? String(a[sortKey]).localeCompare(String(b[sortKey])) ||
-            a.rank - b.rank
-          : a.rank - b.rank
+        compare
+          ? compare(a, b)
+          : sortKey
+            ? String(a[sortKey]).localeCompare(String(b[sortKey])) ||
+              a.rank - b.rank
+            : a.rank - b.rank
       )
+  }
+
+  // The record a move swaps rank with: its neighbour in the institute's
+  // order, as long as both share the `rankWithin` key.
+  function neighbourOf(id: number, direction: "up" | "down") {
+    const record = records.find((r) => r.id === id)
+    if (!record) return undefined
+    const siblings = forInstitute(records, record.instituteId)
+    const index = siblings.findIndex((r) => r.id === id)
+    const neighbour = siblings[direction === "up" ? index - 1 : index + 1]
+    if (!neighbour || (rankWithin && neighbour[rankWithin] !== record[rankWithin])) return undefined
+    return { record, neighbour }
   }
 
   return {
@@ -102,14 +123,14 @@ export function createRecordStore<T extends AcademicRecord>(
     removeForInstitute(instituteId: number) {
       emit(records.filter((r) => r.instituteId !== instituteId))
     },
+    canMove(id: number, direction: "up" | "down") {
+      return neighbourOf(id, direction) !== undefined
+    },
     // Swap rank with the neighbouring record in the same institute.
     move(id: number, direction: "up" | "down") {
-      const record = records.find((r) => r.id === id)
-      if (!record) return
-      const siblings = forInstitute(records, record.instituteId)
-      const index = siblings.findIndex((r) => r.id === id)
-      const neighbour = siblings[direction === "up" ? index - 1 : index + 1]
-      if (!neighbour) return
+      const pair = neighbourOf(id, direction)
+      if (!pair) return
+      const { record, neighbour } = pair
       emit(
         records.map((r) =>
           r.id === record.id
@@ -511,8 +532,56 @@ export const dashboardMenuGroupStore = createRecordStore<DashboardMenuGroup>([
   { id: 4, instituteId: 1, name: "SMS", rank: 4, status: "Inactive" },
 ])
 
+const menu = (
+  id: number,
+  groupId: number,
+  name: string,
+  link: string,
+  icon: string,
+  backgroundColor: string,
+  rank: number
+): DashboardMenu => ({
+  id,
+  instituteId: 1,
+  groupId,
+  name,
+  link,
+  icon,
+  fontColor: "#ffffff",
+  backgroundColor,
+  borderColor: backgroundColor,
+  hoverFontColor: "#000000",
+  hoverBackgroundColor: "#ffffff",
+  hoverBorderColor: backgroundColor,
+  rank,
+  status: "Active",
+})
+
+// Ranked within their group (legacy ranks per institute and group), listed
+// group by group in the groups' order.
+export const dashboardMenuStore = createRecordStore<DashboardMenu>(
+  [
+    menu(1, 1, "Manage Students", "/students", "users", "#2563eb", 1),
+    menu(2, 1, "Student Import", "/students/import", "upload", "#0891b2", 2),
+    menu(3, 2, "Take Attendance", "/attendance", "calendar-check", "#16a34a", 3),
+    menu(4, 2, "Daily Attendance Report", "/reports/daily-attendance", "file-text", "#65a30d", 4),
+    menu(5, 3, "Student Marks Manage", "/term-exam-marks", "pencil", "#9333ea", 5),
+    menu(6, 3, "Tabulation", "/reports/tabulation", "table", "#c026d3", 6),
+    menu(7, 4, "Send SMS", "/sms/send", "message", "#ea580c", 7),
+  ],
+  {
+    rankWithin: "groupId",
+    compare: (a, b) => {
+      const groups = dashboardMenuGroupStore.getList(a.instituteId)
+      const order = (groupId: number) => groups.findIndex((g) => g.id === groupId)
+      return order(a.groupId) - order(b.groupId) || a.rank - b.rank
+    },
+  }
+)
+
 export function removeInstituteRecords(instituteId: number) {
   for (const store of [
+    dashboardMenuStore,
     dashboardMenuGroupStore,
     classYearSubjectStore,
     buildingStore,

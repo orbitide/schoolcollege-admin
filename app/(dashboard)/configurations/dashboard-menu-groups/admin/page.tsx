@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { DashboardMenuGroupSurface } from "@/components/configurations/dashboard-menu-group-surface"
+import { ConfigurationSurface } from "@/components/configurations/configuration-surface"
 
 export const metadata: Metadata = {
   title: "Dashboard Menu Groups (Admin) · SMS Admin",
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <Suspense>
-      <DashboardMenuGroupSurface surface="Admin" />
+      <ConfigurationSurface kind="dashboardMenuGroups" surface="Admin" />
     </Suspense>
   )
 }

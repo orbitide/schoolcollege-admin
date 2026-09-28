@@ -154,6 +154,7 @@ const data = {
         { title: "Institute Configurations", url: "/configurations/institute", permission: "institute-configuration.manage" },
         { title: "Menu View Configurations", url: "/configurations/menu-view", permission: "menu-view-configuration.manage" },
         { title: "Dashboard Menu Group Manage", url: "/configurations/dashboard-menu-groups", resource: "dashboard-menu-group" },
+        { title: "Dashboard Menu Manage", url: "/configurations/dashboard-menus", resource: "dashboard-menu" },
       ],
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },

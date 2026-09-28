@@ -4,14 +4,14 @@ import { Suspense } from "react"
 import { ConfigurationSurface } from "@/components/configurations/configuration-surface"
 
 export const metadata: Metadata = {
-  title: "Dashboard Menu Groups (View) · SMS Admin",
+  title: "Dashboard Menus (Admin) · SMS Admin",
 }
 
-// Legacy DashboardMenuGroup/ManageView: the View surface.
+// Legacy DashboardMenu/ManageAdmin: the Admin surface.
 export default function Page() {
   return (
     <Suspense>
-      <ConfigurationSurface kind="dashboardMenuGroups" surface="View" />
+      <ConfigurationSurface kind="dashboardMenus" surface="Admin" />
     </Suspense>
   )
 }

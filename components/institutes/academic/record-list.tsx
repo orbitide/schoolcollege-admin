@@ -124,7 +124,7 @@ export function RecordList({
                           variant="ghost"
                           size="icon"
                           className="size-7"
-                          disabled={index === 0}
+                          disabled={!config.store.canMove(record.id, "up")}
                           onClick={() => config.store.move(record.id, "up")}
                         >
                           <ArrowUpIcon />
@@ -134,7 +134,7 @@ export function RecordList({
                           variant="ghost"
                           size="icon"
                           className="size-7"
-                          disabled={index === records.length - 1}
+                          disabled={!config.store.canMove(record.id, "down")}
                           onClick={() => config.store.move(record.id, "down")}
                         >
                           <ArrowDownIcon />

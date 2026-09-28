@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import { DashboardMenuButton } from "@/components/configurations/dashboard-menu-button"
 import { Badge } from "@/components/ui/badge"
 import {
   branchStore,
@@ -8,6 +9,7 @@ import {
   classStore,
   classYearSubjectStore,
   dashboardMenuGroupStore,
+  dashboardMenuStore,
   groupStore,
   holidayStore,
   houseStore,
@@ -30,6 +32,7 @@ import {
   sectionGenders,
   type AcademicRecord,
   type BuildingRoom,
+  type DashboardMenu,
   type Institute,
   type InstituteSettings,
 } from "@/lib/institutes"
@@ -970,7 +973,37 @@ export const academicKinds = {
     description: "Titled boxes of quick-link buttons on the institute dashboard, shown in rank order.",
     fields: [],
     columns: [],
+    inUse: (record) =>
+      usedBy(asEditable(dashboardMenuStore), "groupId", record, "dashboard menu", "dashboard menus"),
     store: asEditable(dashboardMenuGroupStore),
+  },
+  // Legacy DashboardMenu: ranked within its group, and listed group by group.
+  dashboardMenus: {
+    segment: "dashboard-menus",
+    singular: "Dashboard Menu",
+    plural: "Dashboard Menus",
+    description: "Quick-link buttons on the institute dashboard, in their menu groups, with their own colours.",
+    customForm: true,
+    fields: [],
+    columns: [
+      {
+        label: "Group",
+        render: (r) => <RecordName store={asEditable(dashboardMenuGroupStore)} id={r.groupId} />,
+      },
+      {
+        label: "Link",
+        render: (r) => (
+          <span className="block max-w-56 truncate font-mono text-xs text-muted-foreground">
+            {String(r.link)}
+          </span>
+        ),
+      },
+      {
+        label: "Button",
+        render: (r) => <DashboardMenuButton menu={r as unknown as DashboardMenu} size="sm" />,
+      },
+    ],
+    store: asEditable(dashboardMenuStore),
   },
 } satisfies Record<string, KindConfig>
 

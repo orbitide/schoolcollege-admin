@@ -21,6 +21,7 @@ import {
 } from "@/components/institutes/academic/kinds"
 import { BuildingForm } from "@/components/institutes/academic/building-form"
 import { ClassYearSubjectForm } from "@/components/institutes/academic/class-year-subject-form"
+import { DashboardMenuForm } from "@/components/configurations/dashboard-menu-form"
 import { NotFound } from "@/components/institutes/academic/record-list"
 import { SelectField } from "@/components/institutes/institute-form"
 import { Button } from "@/components/ui/button"
@@ -107,7 +108,12 @@ export function RecordForm({
   }
 
   if (config.customForm) {
-    const CustomForm = kind === "buildings" ? BuildingForm : ClassYearSubjectForm
+    const CustomForm =
+      kind === "buildings"
+        ? BuildingForm
+        : kind === "dashboardMenus"
+          ? DashboardMenuForm
+          : ClassYearSubjectForm
     return (
       <CustomForm
         key={recordId ?? "new"}
