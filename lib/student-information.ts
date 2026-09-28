@@ -23,7 +23,10 @@ export type StudentInformation = {
 
 // The class's subjects in the year, with the latest type each is listed
 // with (legacy MAX(SubjectType)); a group's own subjects only for that group.
-export function classSubjects(sets: ClassYearSubject[], e: Enrolment) {
+export function classSubjects(
+  sets: ClassYearSubject[],
+  e: Pick<Enrolment, "classId" | "yearId" | "medium" | "groupId">
+) {
   const types = new Map<number, number>()
   for (const set of sets) {
     if (set.status !== "Active" || set.classId !== e.classId || set.yearId !== e.yearId) continue

@@ -111,8 +111,10 @@ const data = {
         { title: "Pass/Fail Report", url: "/reports/pass-fail", permission: "pass-fail-report.view" },
         { title: "Tabulation", url: "/reports/tabulation", permission: "tabulation.view" },
         { title: "Number Sheet", url: "/reports/number-sheet", permission: "number-sheet.view" },
+        { title: "Performance Report", url: "/reports/performance", permission: "performance-report.view" },
         { title: "Student Information", url: "/reports/student-information", permission: "student-information.view" },
         { title: "Student Statistics", url: "/reports/student-statistics", permission: "student-statistics.view" },
+        { title: "Subject Student List", url: "/reports/subject-students", permission: "subject-student-list.view" },
       ],
     },
     {
