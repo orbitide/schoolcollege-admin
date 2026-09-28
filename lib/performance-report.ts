@@ -36,19 +36,21 @@ export function performanceProblem(roll: string) {
   return null
 }
 
+export type PerformanceData = {
+  students: Student[]
+  exams: TermExam[]
+  meritLists: MeritList[]
+  marks: TermExamStudentMark[]
+  classYearSubjects: ClassYearSubject[]
+  subjectRank: (id: number) => number
+}
+
 export function performanceReport(
   institute: Institute,
   academicClass: AcademicClass,
   yearId: number,
   roll: string,
-  data: {
-    students: Student[]
-    exams: TermExam[]
-    meritLists: MeritList[]
-    marks: TermExamStudentMark[]
-    classYearSubjects: ClassYearSubject[]
-    subjectRank: (id: number) => number
-  }
+  data: PerformanceData
 ): PerformanceReport | null {
   let found: { student: Student; enrolment: Enrolment } | undefined
   for (const student of data.students) {
@@ -58,9 +60,44 @@ export function performanceReport(
     )
     if (enrolment) found = { student, enrolment }
   }
-  if (!found) return null
-  const { student, enrolment } = found
+  return found ? studentPerformance(institute, academicClass, found.student, found.enrolment, data) : null
+}
 
+// Legacy RptResult/YearBook (TermExamStudentService.LoadYearBookRpt): the
+// performance of every student of a section (or the one with `roll`), in
+// roll order — those with at least one exam, as the legacy joins on them.
+export function yearBook(
+  institute: Institute,
+  academicClass: AcademicClass,
+  yearId: number,
+  sectionId: number,
+  roll: string,
+  data: PerformanceData
+): PerformanceReport[] {
+  return data.students
+    .flatMap((student) => {
+      if (student.instituteId !== institute.id || student.status !== "Active") return []
+      const enrolment = student.enrolments.find(
+        (e) =>
+          e.classId === academicClass.id &&
+          e.yearId === yearId &&
+          e.sectionId === sectionId &&
+          (!roll || e.classRoll.trim() === roll)
+      )
+      if (!enrolment) return []
+      const report = studentPerformance(institute, academicClass, student, enrolment, data)
+      return report.exams.length ? [report] : []
+    })
+    .sort((a, b) => a.enrolment.classRoll.localeCompare(b.enrolment.classRoll, undefined, { numeric: true }))
+}
+
+function studentPerformance(
+  institute: Institute,
+  academicClass: AcademicClass,
+  student: Student,
+  enrolment: Enrolment,
+  data: PerformanceData
+): PerformanceReport {
   const classIds = new Set([academicClass.id, ...(academicClass.previousClassId != null ? [academicClass.previousClassId] : [])])
   const listOf = new Map(data.meritLists.map((l) => [l.termExamId, l]))
   const exams = data.exams
