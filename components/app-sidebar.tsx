@@ -105,6 +105,11 @@ const data = {
       tone: "violet",
       items: [
         { title: "Result at a glance", url: "/reports/result-summary", permission: "result-summary.view" },
+        { title: "Failed Summary", url: "/reports/failed-summary", permission: "failed-summary.view" },
+        { title: "Subject Result Analysis", url: "/reports/result-analysis", permission: "result-analysis.view" },
+        { title: "Absent Summary", url: "/reports/absent-summary", permission: "absent-summary.view" },
+        { title: "Pass/Fail Report", url: "/reports/pass-fail", permission: "pass-fail-report.view" },
+        { title: "Tabulation", url: "/reports/tabulation", permission: "tabulation.view" },
       ],
     },
     {

@@ -6,18 +6,77 @@ import type { TermExam } from "@/lib/term-exams"
 import { cn, parseInlineStyle } from "@/lib/utils"
 
 // "Jun-2026", as the legacy ExamStart.ToString("MMM-yyyy").
-const monthYear = (iso: string) => {
+export const monthYear = (iso: string) => {
   const [y, m] = iso.split("-").map(Number)
   return `${new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short" })}-${y}`
 }
 
 // How many rows from `index` share its key, or 0 when the row above already
 // spans it (a rowSpan cell is drawn once, on the first row).
-function spanAt<T>(rows: T[], index: number, key: (row: T) => string) {
+export function spanAt<T>(rows: T[], index: number, key: (row: T) => string) {
   if (index > 0 && key(rows[index - 1]) === key(rows[index])) return 0
   let span = 1
   while (index + span < rows.length && key(rows[index + span]) === key(rows[index])) span++
   return span
+}
+
+// The institute heading every exam report opens with: logo, name and
+// address, the report title, then the exam, class and exam month — or the
+// report's own `details`.
+export function ReportHeading({
+  institute,
+  branch,
+  academicClass,
+  exam,
+  title,
+  details,
+}: {
+  institute: Institute
+  branch?: Branch
+  academicClass?: AcademicClass
+  exam: TermExam
+  title: string
+  details?: [label: string, value: string][]
+}) {
+  const config = institute.configuration
+  const highlight = config.reportHighlightColor.trim() || undefined
+  const logoWidth = config.reportLogoWidth.trim() || "70px"
+  return (
+    <>
+      <header className="flex items-center justify-center gap-5">
+        <div style={{ width: logoWidth }} className="shrink-0">
+          {institute.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={institute.logoUrl} alt="" className="h-auto w-full" />
+          )}
+        </div>
+        <div className="flex flex-col items-center text-center">
+          <h1 style={parseInlineStyle(config.reportHeaderStyle)}>{institute.name}</h1>
+          <p className="text-sm">{branch?.address || institute.address}</p>
+          <h2 style={parseInlineStyle(config.reportNameStyle)}>{title}</h2>
+        </div>
+        {/* Balances the logo so the heading stays centred. */}
+        <div style={{ width: logoWidth }} className="shrink-0" />
+      </header>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[15px]">
+        {(
+          details ?? [
+            ["Exam Name", exam.fullName],
+            ["Class", academicClass?.name ?? "—"],
+            ["Exam Date", monthYear(exam.examStart)],
+          ]
+        ).map(([label, value]) => (
+          <span key={label} className="flex items-center gap-2">
+            {label}:
+            <strong className="border border-black px-3 py-0.5" style={{ color: highlight }}>
+              {value}
+            </strong>
+          </span>
+        ))}
+      </div>
+    </>
+  )
 }
 
 // Legacy Partial/_resultSummary ("Result Statistics at a glance"): the
@@ -42,9 +101,7 @@ export function ResultSummarySheet({
   name: (kind: "section" | "group", id: number | null) => string
   className?: string
 }) {
-  const config = institute.configuration
-  const highlight = config.reportHighlightColor.trim() || undefined
-  const logoWidth = config.reportLogoWidth.trim() || "70px"
+  const highlight = institute.configuration.reportHighlightColor.trim() || undefined
   const showGroup = institute.enableGroup && !!academicClass?.hasSubjectGroup
   const showGrades = exam.calculateGpa && summary.grades.length > 0
   const { rows, total } = summary
@@ -83,36 +140,13 @@ export function ResultSummarySheet({
 
   return (
     <div className={cn("bg-white font-serif text-black", className)}>
-      <header className="flex items-center justify-center gap-5">
-        <div style={{ width: logoWidth }} className="shrink-0">
-          {institute.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={institute.logoUrl} alt="" className="h-auto w-full" />
-          )}
-        </div>
-        <div className="flex flex-col items-center text-center">
-          <h1 style={parseInlineStyle(config.reportHeaderStyle)}>{institute.name}</h1>
-          <p className="text-sm">{branch?.address || institute.address}</p>
-          <h2 style={parseInlineStyle(config.reportNameStyle)}>Result Statistics at a glance</h2>
-        </div>
-        {/* Balances the logo so the heading stays centred. */}
-        <div style={{ width: logoWidth }} className="shrink-0" />
-      </header>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[15px]">
-        {[
-          ["Exam Name", exam.fullName],
-          ["Class", academicClass?.name ?? "—"],
-          ["Exam Date", monthYear(exam.examStart)],
-        ].map(([label, value]) => (
-          <span key={label} className="flex items-center gap-2">
-            {label}:
-            <strong className="border border-black px-3 py-0.5" style={{ color: highlight }}>
-              {value}
-            </strong>
-          </span>
-        ))}
-      </div>
+      <ReportHeading
+        institute={institute}
+        branch={branch}
+        academicClass={academicClass}
+        exam={exam}
+        title="Result Statistics at a glance"
+      />
 
       <table className="mt-3 w-full border-collapse text-sm leading-tight">
         <thead>
