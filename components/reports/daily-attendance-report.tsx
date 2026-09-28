@@ -29,25 +29,15 @@ import { useAccessibleInstitutes } from "@/lib/current-user"
 import {
   attendanceStatuses,
   dailyAttendanceReport,
-  FONT_SIZE,
-  ROWS_PER_PAGE,
   type AttendanceStatusFilter,
   type DailyAttendanceRow,
 } from "@/lib/daily-attendance-report"
 import { academicMediums, academicVersions, type Institute } from "@/lib/institutes"
+import { FONT_SIZE, orientations, pageSizeFor, paperSizes, ROWS_PER_PAGE } from "@/lib/report-paper"
 import { downloadCsv, useSmsMessages } from "@/lib/sms-messages"
 import { todayIso, useStudentAttendance } from "@/lib/student-attendance"
 import { useStudents } from "@/lib/students"
 import { cn, parseInlineStyle } from "@/lib/utils"
-
-const paperSizes = [
-  { value: "legal", label: "Legal", size: ["216mm", "356mm"] },
-  { value: "a4", label: "A4", size: ["210mm", "297mm"] },
-] as const
-const orientations = [
-  { value: "portrait", label: "Portrait" },
-  { value: "landscape", label: "Landscape" },
-] as const
 
 const statusText = (r: DailyAttendanceRow) => (r.isPresent == null ? "N/A" : r.isPresent ? "Present" : "Absent")
 
@@ -221,8 +211,7 @@ export function DailyAttendanceReportPage() {
   const fontSize = clamp("font", FONT_SIZE)
   const paper = paperSizes.find((p) => p.value === param("paper")) ?? paperSizes[0]
   const orientation = orientations.find((o) => o.value === param("orientation")) ?? orientations[0]
-  const [w, h] = paper.size
-  const pageSize = orientation.value === "landscape" ? `${h} ${w}` : `${w} ${h}`
+  const pageSize = pageSizeFor(paper, orientation)
 
   function setParam(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams)

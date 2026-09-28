@@ -16,10 +16,6 @@ export const attendanceStatuses = [
 ] as const
 export type AttendanceStatusFilter = (typeof attendanceStatuses)[number]["value"]
 
-// Legacy ConstantHelper.Report* limits and defaults.
-export const ROWS_PER_PAGE = { min: 10, max: 35, default: 30 }
-export const FONT_SIZE = { min: 12, max: 35, default: 14 }
-
 export type DailyAttendanceRow = {
   student: Student
   enrolment: Enrolment
