@@ -33,8 +33,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { buildingStore, subjectStore } from "@/lib/academic-store"
+import { FilterField } from "@/components/term-exams/term-exam-fields"
+import { buildingStore, groupStore, subjectStore } from "@/lib/academic-store"
 import { deleteExamSeatPlan, useExamSeatPlans, type ExamSeatPlan } from "@/lib/exam-seat-plans"
+import { academicVersions } from "@/lib/institutes"
 import { useTermExams } from "@/lib/term-exams"
 
 export const formatExamDate = (iso: string) =>
@@ -59,6 +61,7 @@ export function SeatPlanList() {
   const iid = institute?.id ?? -1
   const subjects = subjectStore.useList(iid)
   const buildings = buildingStore.useList(iid)
+  const groups = groupStore.useList(iid)
   const [deleting, setDeleting] = React.useState<ExamSeatPlan | null>(null)
 
   const examOf = new Map(exams.map((e) => [e.id, e]))
@@ -73,23 +76,35 @@ export function SeatPlanList() {
     return room ? `${building!.name} ${room.name}` : "—"
   }
 
-  const rows = institute
-    ? plans
-        .filter((p) => {
-          const exam = examOf.get(p.termExamId)
-          if (p.instituteId !== institute.id || !exam) return false
-          if (chosen) return p.termExamId === chosen.id
-          return (
-            (!filter.class || String(exam.classId) === filter.class) &&
-            (!filter.year || String(exam.yearId) === filter.year) &&
-            (!filter.branch || String(exam.branchId) === filter.branch) &&
-            (!filter.medium || exam.medium === filter.medium)
-          )
-        })
-        .sort((a, b) => a.examDate.localeCompare(b.examDate) || a.startTime.localeCompare(b.startTime))
+  const ofExams = institute
+    ? plans.filter((p) => {
+        const exam = examOf.get(p.termExamId)
+        if (p.instituteId !== institute.id || !exam) return false
+        if (chosen) return p.termExamId === chosen.id
+        return (
+          (!filter.class || String(exam.classId) === filter.class) &&
+          (!filter.year || String(exam.yearId) === filter.year) &&
+          (!filter.branch || String(exam.branchId) === filter.branch) &&
+          (!filter.medium || exam.medium === filter.medium)
+        )
+      })
     : []
+  // Legacy's group and version filters keep the plans made for all groups
+  // (or versions) too, since they seat that group's students as well.
+  const subjectOptions = [...new Set(ofExams.map((p) => p.subjectId))].map((id) => ({ value: String(id), label: subjectLabel(id) }))
+  const subject = f.param("subject")
+  const group = f.param("group")
+  const version = f.param("version")
+  const rows = ofExams
+    .filter(
+      (p) =>
+        (!subject || String(p.subjectId) === subject) &&
+        (!group || p.groupId == null || String(p.groupId) === group) &&
+        (!version || !p.version || p.version === version)
+    )
+    .sort((a, b) => a.examDate.localeCompare(b.examDate) || a.startTime.localeCompare(b.startTime))
 
-  const newHref = `/term-exam/seat-plans/new${chosen ? `?exam=${chosen.id}` : ""}`
+  const newHref = `/seat-plans/new${chosen ? `?exam=${chosen.id}` : ""}`
 
   function remove() {
     if (!deleting) return
@@ -117,6 +132,32 @@ export function SeatPlanList() {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ExamReportFilterFields filter={f} />
+          <FilterField
+            label="Subject"
+            value={subjectOptions.some((o) => o.value === subject) ? subject : ""}
+            onChange={(v) => f.setParam({ subject: v })}
+            options={subjectOptions}
+            allLabel="All subjects"
+            disabled={!subjectOptions.length}
+          />
+          {institute?.enableGroup && (
+            <FilterField
+              label="Group"
+              value={group}
+              onChange={(v) => f.setParam({ group: v })}
+              options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
+              allLabel="All groups"
+            />
+          )}
+          {institute?.enableVersion && (
+            <FilterField
+              label="Version"
+              value={version}
+              onChange={(v) => f.setParam({ version: v })}
+              options={academicVersions.map((v) => ({ value: v, label: v }))}
+              allLabel="All versions"
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -134,6 +175,8 @@ export function SeatPlanList() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12">Sl</TableHead>
+                  {institute?.enableBranch && <TableHead>Branch</TableHead>}
+                  {institute?.enableMedium && <TableHead>Medium</TableHead>}
                   <TableHead>Class</TableHead>
                   <TableHead>Exam</TableHead>
                   <TableHead>Subject</TableHead>
@@ -154,6 +197,10 @@ export function SeatPlanList() {
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="tabular-nums text-muted-foreground">{i + 1}</TableCell>
+                        {institute?.enableBranch && (
+                          <TableCell className="whitespace-nowrap">{exam.branchId != null ? name("branch", exam.branchId) : "All"}</TableCell>
+                        )}
+                        {institute?.enableMedium && <TableCell>{exam.medium || "All"}</TableCell>}
                         <TableCell>{name("class", exam.classId)}</TableCell>
                         <TableCell className="whitespace-nowrap">{exam.fullName}</TableCell>
                         <TableCell className="whitespace-nowrap">{subjectLabel(p.subjectId)}</TableCell>
@@ -175,7 +222,7 @@ export function SeatPlanList() {
                         <TableCell>
                           <div className="flex gap-1">
                             <Button asChild variant="outline" size="sm">
-                              <Link href={`/term-exam/seat-plans/${p.id}/edit`}>
+                              <Link href={`/seat-plans/${p.id}/edit`}>
                                 <PencilIcon data-icon="inline-start" />
                                 Edit
                               </Link>
@@ -191,7 +238,7 @@ export function SeatPlanList() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">
                       {institute ? "No seat plan yet." : "Select an institute."}
                     </TableCell>
                   </TableRow>

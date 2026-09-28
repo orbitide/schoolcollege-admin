@@ -7,6 +7,7 @@ import { CheckIcon, MinusIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { useStudentLookups } from "@/components/students/student-lookups"
+import { SurfaceTabs } from "@/components/surface-tabs"
 import { FilterField, examDate, stamp } from "@/components/term-exams/term-exam-fields"
 import { TermExamActions } from "@/components/term-exams/term-exam-actions"
 import { Button } from "@/components/ui/button"
@@ -33,6 +34,7 @@ import {
   shiftStore,
   yearStore,
 } from "@/lib/academic-store"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { academicMediums, academicVersions } from "@/lib/institutes"
 import { useTermExams, type TermExam } from "@/lib/term-exams"
@@ -47,10 +49,19 @@ const flagColumns = [
   { label: "Parent w/o optional", key: "parentExamWithoutOptional" },
 ] as const
 
-// Legacy "Manage Term Exam (Admin)" (TermExam/ManageAdmin): every institute's
-// term exams, narrowed by institute and academic structure, with the
-// publish, status and (soft) delete actions.
-export function TermExamList() {
+const titles: Record<AccessSurface, string> = {
+  Admin: "Manage Term Exam (Admin)",
+  Manage: "Manage Term Exam",
+  View: "View Term Exam",
+}
+
+// Legacy TermExam/ManageAdmin, Manage and ManageView: every institute's term
+// exams, narrowed by institute and academic structure. The surface decides
+// the actions: Manage adds, copies, publishes, (in)activates and edits
+// exams left "Edit enable"; Admin edits any exam, deletes, sees deleted
+// exams and retrieves them; View only reads.
+export function TermExamList({ surface }: { surface: AccessSurface }) {
+  const can = capabilitiesFor(surface)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -76,7 +87,7 @@ export function TermExamList() {
     institute?.enableGroup && selectedClass?.hasSubjectGroup
       ? groups.filter((g) => selectedClass.groupIds.includes(g.id))
       : []
-  const withDeleted = param("deleted") === "1"
+  const withDeleted = can.restore && param("deleted") === "1"
 
   const [query, setQuery] = React.useState("")
   const needle = query.trim().toLowerCase()
@@ -138,18 +149,23 @@ export function TermExamList() {
       <Card>
         <CardHeader className="flex flex-wrap items-start justify-between gap-2 border-b">
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-lg">Manage Term Exam (Admin)</CardTitle>
+            <CardTitle className="text-lg">{titles[surface]}</CardTitle>
             <CardDescription>
               The exams each class sits in an academic year, with their subjects and result
               settings.
             </CardDescription>
           </div>
-          <Button asChild size="sm">
-            <Link href={newHref}>
-              <PlusIcon data-icon="inline-start" />
-              Add term exam
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SurfaceTabs resource="term-exam" baseUrl="/term-exam" current={surface} />
+            {can.create && (
+              <Button asChild size="sm">
+                <Link href={newHref}>
+                  <PlusIcon data-icon="inline-start" />
+                  Add term exam
+                </Link>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {canPick && (
@@ -226,15 +242,17 @@ export function TermExamList() {
               allLabel="All shifts"
             />
           )}
-          <FilterField
-            label="Deleted exams"
-            value={withDeleted ? "1" : "0"}
-            onChange={(v) => setParam({ deleted: v === "1" ? "1" : "" })}
-            options={[
-              { value: "0", label: "Without deleted" },
-              { value: "1", label: "With deleted" },
-            ]}
-          />
+          {can.restore && (
+            <FilterField
+              label="Deleted exams"
+              value={withDeleted ? "1" : "0"}
+              onChange={(v) => setParam({ deleted: v === "1" ? "1" : "" })}
+              options={[
+                { value: "0", label: "Without deleted" },
+                { value: "1", label: "With deleted" },
+              ]}
+            />
+          )}
           <div className="flex flex-col justify-end">
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -357,7 +375,7 @@ export function TermExamList() {
                       <StatusBadge status={exam.status} />
                     </TableCell>
                     <TableCell>
-                      <TermExamActions exam={exam} returnTo={returnTo} />
+                      <TermExamActions exam={exam} returnTo={returnTo} surface={surface} />
                     </TableCell>
                   </TableRow>
                 )

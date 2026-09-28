@@ -7,7 +7,7 @@ import { ExamReportEmpty, ExamReportFilterFields, useExamReportFilter } from "@/
 import { PrintArea } from "@/components/reports/print-area"
 import { spanAt } from "@/components/reports/result-summary-sheet"
 import { useStudentLookups } from "@/components/students/student-lookups"
-import { formatExamDate, formatTime } from "@/components/term-exams/seat-plan-list"
+import { formatExamDate, formatTime } from "@/components/seat-plans/seat-plan-list"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
 import {
@@ -296,7 +296,7 @@ export function SeatPlanAtAGlance() {
             <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
               <p>No seat plan for {subjectName(subject.subjectId)} of {chosen.fullName} yet.</p>
               <Button asChild size="sm" variant="outline">
-                <Link href={`/term-exam/seat-plans/new?exam=${chosen.id}&subject=${subject.subjectId}`}>Generate seat plan</Link>
+                <Link href={`/seat-plans/new?exam=${chosen.id}&subject=${subject.subjectId}`}>Generate seat plan</Link>
               </Button>
             </div>
           ) : (

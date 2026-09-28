@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { classYearSubjectStore } from "@/lib/academic-store"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import type { ClassYearSubjectDetail } from "@/lib/institutes"
 
 // Legacy SchoolCollege TermExam (+ TermExamSubject, TermExamDependent): an
@@ -75,6 +76,12 @@ export type TermExam = {
   createdAt: string
   modifiedBy: string
   modifiedAt: string
+}
+
+// Admin may always edit an exam; Manage only while its "Edit enable" is on
+// (legacy ManageAjax); View never.
+export function canEditExam(exam: TermExam, surface: AccessSurface) {
+  return capabilitiesFor(surface).edit && (surface === "Admin" || exam.editEnable)
 }
 
 export type TermExamInput = Omit<

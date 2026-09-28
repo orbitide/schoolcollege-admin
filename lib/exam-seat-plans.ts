@@ -19,6 +19,12 @@ import type { TermExam } from "@/lib/term-exams"
 export type SeatPlanRoom = {
   buildingId: number
   roomId: number
+  // The room's benches for this exam (legacy ExamSeatPlanDetail keeps its
+  // own copy): the room's own layout unless changed on the plan, so later
+  // edits to the room don't reshape plans already made.
+  totalColumns: number
+  benchesPerColumn: number
+  studentsPerBench: number
   // How many students the room seats (at most its capacity).
   students: number
   // The group and version whose students it seats; null / "" when the
@@ -54,6 +60,11 @@ export type SeatPlanInput = Omit<ExamSeatPlan, "id" | "createdBy" | "createdAt" 
 // ---- Store ----
 
 const seedStamp = "2026-05-25T10:00:00.000Z"
+const layout = (totalColumns: number, benchesPerColumn: number, studentsPerBench: number) => ({
+  totalColumns,
+  benchesPerColumn,
+  studentsPerBench,
+})
 // Half Yearly (exam 1), Bangla: Class Nine's six examinees, a group to a room.
 const seed: ExamSeatPlan[] = [
   {
@@ -68,9 +79,9 @@ const seed: ExamSeatPlan[] = [
     startTime: "10:00",
     endTime: "13:00",
     rooms: [
-      { buildingId: 1, roomId: 1, students: 2, groupId: 1, version: "", rollFrom: "901", rollTo: "904" },
-      { buildingId: 1, roomId: 2, students: 2, groupId: 2, version: "", rollFrom: "902", rollTo: "905" },
-      { buildingId: 1, roomId: 3, students: 2, groupId: 3, version: "", rollFrom: "903", rollTo: "906" },
+      { buildingId: 1, roomId: 1, ...layout(4, 5, 2), students: 2, groupId: 1, version: "", rollFrom: "901", rollTo: "904" },
+      { buildingId: 1, roomId: 2, ...layout(4, 5, 2), students: 2, groupId: 2, version: "", rollFrom: "902", rollTo: "905" },
+      { buildingId: 1, roomId: 3, ...layout(3, 5, 2), students: 2, groupId: 3, version: "", rollFrom: "903", rollTo: "906" },
     ],
     createdBy: "Super Admin",
     createdAt: seedStamp,
@@ -116,6 +127,44 @@ export function deleteExamSeatPlan(id: number) {
 // The seat plans that seat students in the room (or any room of the building).
 export function plansUsingRoom(buildingId: number, roomId?: number) {
   return plans.filter((p) => p.rooms.some((r) => r.buildingId === buildingId && (roomId == null || r.roomId === roomId)))
+}
+
+// Legacy ValidateAcademicGroup / ValidateAcademicVersion: another plan of
+// the exam's subject whose part overlaps this one — "All" groups (or
+// versions) overlaps every group — so it would seat the same students
+// twice. Null when there is none.
+export function overlappingPlan(
+  all: ExamSeatPlan[],
+  part: Pick<ExamSeatPlan, "termExamId" | "subjectId" | "groupId" | "version">,
+  id?: number
+) {
+  return (
+    all.find(
+      (p) =>
+        p.id !== id &&
+        p.termExamId === part.termExamId &&
+        p.subjectId === part.subjectId &&
+        (p.groupId == null || part.groupId == null || p.groupId === part.groupId) &&
+        (!p.version || !part.version || p.version === part.version)
+    ) ?? null
+  )
+}
+
+// Why an overlapping plan blocks this part, in the legacy's words; "" when
+// it covers the very same part (open that plan instead).
+export function overlapReason(
+  part: Pick<ExamSeatPlan, "groupId" | "version">,
+  other: Pick<ExamSeatPlan, "groupId" | "version">
+) {
+  if (part.groupId != null && other.groupId == null)
+    return "You already created seat plan of this subject using All group. Now you can not create using a specific group."
+  if (part.groupId == null && other.groupId != null)
+    return "You already created seat plan of this subject using a specific group. Now you can not create using All group."
+  if (part.version && !other.version)
+    return "You already created seat plan of this subject using All version. Now you can not create using a specific version."
+  if (!part.version && other.version)
+    return "You already created seat plan of this subject using a specific version. Now you can not create using All version."
+  return ""
 }
 
 // ---- Students and rolls ----
@@ -208,7 +257,6 @@ export function seatPlanProblems(
     id?: number
     total: number
     assignments: RoomAssignment[]
-    capacityOf: (room: SeatPlanRoom) => number
     roomLabel: (room: SeatPlanRoom) => string
     split: { useGroup: boolean; useVersion: boolean }
     others: ExamSeatPlan[]
@@ -224,10 +272,13 @@ export function seatPlanProblems(
   if (!input.rooms.length) problems.push("Please select at least one room")
   input.rooms.forEach((room, i) => {
     const label = context.roomLabel(room)
+    if (room.totalColumns < 1) problems.push(`Insert total column for ${label}`)
+    if (room.benchesPerColumn < 1) problems.push(`Insert bench per column for ${label}`)
+    if (room.studentsPerBench < 1) problems.push(`Insert student per bench for ${label}`)
     if (context.split.useGroup && room.groupId == null) problems.push(`Select group for ${label}`)
     if (context.split.useVersion && !room.version) problems.push(`Select version for ${label}`)
     if (room.students < 1) problems.push(`Invalid total student found for ${label}`)
-    else if (room.students > context.capacityOf(room)) problems.push(`Student Capacity Limit Exceded for ${label}`)
+    else if (room.students > roomCapacity(room)) problems.push(`Student Capacity Limit Exceded for ${label}`)
     else if (context.assignments[i] && context.assignments[i].found < room.students)
       problems.push(
         context.assignments[i].found

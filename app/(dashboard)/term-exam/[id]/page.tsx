@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 
+import { RequireSurface } from "@/components/require-surface"
 import { TermExamDetail } from "@/components/term-exams/term-exam-detail"
 
 export const metadata: Metadata = {
@@ -14,9 +15,11 @@ export default async function TermExamPage({
   const { returnTo } = await searchParams
 
   return (
-    <TermExamDetail
-      id={Number(id)}
-      returnTo={Array.isArray(returnTo) ? returnTo[0] : returnTo}
-    />
+    <RequireSurface resource="term-exam" surface={["Admin", "Manage", "View"]}>
+      <TermExamDetail
+        id={Number(id)}
+        returnTo={Array.isArray(returnTo) ? returnTo[0] : returnTo}
+      />
+    </RequireSurface>
   )
 }

@@ -26,8 +26,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { subjectStore } from "@/lib/academic-store"
+import { surfaceHref, useSurfaces } from "@/lib/access"
 import { useInstitute } from "@/lib/institutes-store"
-import { examMarkParts, useTermExam, useTermExams } from "@/lib/term-exams"
+import { canEditExam, examMarkParts, useTermExam, useTermExams } from "@/lib/term-exams"
 
 // Legacy TermExam Details: everything set on the exam and its subjects.
 export function TermExamDetail({ id, returnTo }: { id: number; returnTo?: string }) {
@@ -36,7 +37,11 @@ export function TermExamDetail({ id, returnTo }: { id: number; returnTo?: string
   const institute = useInstitute(exam?.instituteId ?? -1)
   const subjects = subjectStore.useAll()
   const name = useStudentLookups()
-  const listHref = returnTo?.startsWith("/") ? returnTo : "/term-exam"
+  // Back to the list the user came from, else the first one they may open.
+  const surfaces = useSurfaces("term-exam")
+  const listHref = returnTo?.startsWith("/")
+    ? returnTo
+    : surfaceHref("/term-exam", surfaces[0] ?? "View")
 
   if (!exam || !institute) {
     return (
@@ -56,6 +61,8 @@ export function TermExamDetail({ id, returnTo }: { id: number; returnTo?: string
   const yesNo = (value: boolean) => (value ? "Yes" : "No")
   const back = `returnTo=${encodeURIComponent(listHref)}`
   const deleted = exam.status === "Deleted"
+  const canCopy = !deleted && surfaces.some((surface) => surface !== "View")
+  const canEdit = !deleted && surfaces.some((surface) => canEditExam(exam, surface))
 
   const rows: [string, React.ReactNode][] = [
     ["Institute", institute.name],
@@ -107,20 +114,24 @@ export function TermExamDetail({ id, returnTo }: { id: number; returnTo?: string
             Term exams
           </Link>
         </Button>
-        {!deleted && (
+        {(canCopy || canEdit) && (
           <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/term-exam/new?copy=${exam.id}&${back}`}>
-                <CopyIcon data-icon="inline-start" />
-                Copy
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/term-exam/${exam.id}/edit?${back}`}>
-                <PencilIcon data-icon="inline-start" />
-                Edit
-              </Link>
-            </Button>
+            {canCopy && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/term-exam/new?copy=${exam.id}&${back}`}>
+                  <CopyIcon data-icon="inline-start" />
+                  Copy
+                </Link>
+              </Button>
+            )}
+            {canEdit && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/term-exam/${exam.id}/edit?${back}`}>
+                  <PencilIcon data-icon="inline-start" />
+                  Edit
+                </Link>
+              </Button>
+            )}
           </div>
         )}
       </div>

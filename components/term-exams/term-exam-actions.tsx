@@ -34,8 +34,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { useCurrentUser } from "@/lib/current-user"
 import {
+  canEditExam,
   deleteTermExam,
   deleteTermExamPermanently,
   retrieveTermExam,
@@ -46,15 +48,19 @@ import {
 
 type Confirm = "publish" | "delete" | "retrieve" | "permanent"
 
-// Row menu of the legacy ManageAdmin grid. What it offers depends on the
-// status: deleted exams can only be viewed, retrieved or deleted for good.
+// Row menu of the legacy ManageAdmin / Manage / ManageView grids. What it
+// offers depends on the surface and the status: deleted exams can only be
+// viewed, retrieved or deleted for good.
 export function TermExamActions({
   exam,
   returnTo,
+  surface,
 }: {
   exam: TermExam
   returnTo: string
+  surface: AccessSurface
 }) {
+  const can = capabilitiesFor(surface)
   const user = useCurrentUser()
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const back = `returnTo=${encodeURIComponent(returnTo)}`
@@ -133,48 +139,52 @@ export function TermExamActions({
               Details
             </Link>
           </DropdownMenuItem>
-          {!deleted && (
-            <>
-              <DropdownMenuItem asChild>
-                <Link href={`/term-exam/new?copy=${exam.id}&${back}`}>
-                  <CopyIcon />
-                  Copy
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/term-exam/${exam.id}/edit?${back}`}>
-                  <PencilIcon />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-            </>
+          {!deleted && can.create && (
+            <DropdownMenuItem asChild>
+              <Link href={`/term-exam/new?copy=${exam.id}&${back}`}>
+                <CopyIcon />
+                Copy
+              </Link>
+            </DropdownMenuItem>
           )}
-          {exam.status === "Active" && (
+          {!deleted && canEditExam(exam, surface) && (
+            <DropdownMenuItem asChild>
+              <Link href={`/term-exam/${exam.id}/edit?${back}`}>
+                <PencilIcon />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {exam.status === "Active" && can.status && (
             <DropdownMenuItem onSelect={() => setConfirm("publish")}>
               {exam.onlinePublished ? <GlobeLockIcon /> : <GlobeIcon />}
               {exam.onlinePublished ? "Disable online publish" : "Enable online publish"}
             </DropdownMenuItem>
           )}
-          {!deleted && (
+          {!deleted && can.status && (
             <DropdownMenuItem onSelect={toggleStatus}>
               {exam.status === "Active" ? <CircleMinusIcon /> : <CircleCheckIcon />}
               {exam.status === "Active" ? "Inactivate" : "Activate"}
             </DropdownMenuItem>
           )}
-          {deleted && (
+          {deleted && can.restore && (
             <DropdownMenuItem onSelect={() => setConfirm("retrieve")}>
               <ArchiveRestoreIcon />
               Retrieve
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setConfirm(deleted ? "permanent" : "delete")}
-          >
-            <Trash2Icon />
-            {deleted ? "Delete permanently" : "Delete"}
-          </DropdownMenuItem>
+          {can.delete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setConfirm(deleted ? "permanent" : "delete")}
+              >
+                <Trash2Icon />
+                {deleted ? "Delete permanently" : "Delete"}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

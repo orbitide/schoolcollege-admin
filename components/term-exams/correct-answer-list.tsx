@@ -7,6 +7,7 @@ import { EllipsisVerticalIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } fr
 import { toast } from "sonner"
 
 import { useStudentLookups } from "@/components/students/student-lookups"
+import { SurfaceTabs } from "@/components/surface-tabs"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { classStore, groupStore } from "@/lib/academic-store"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import {
   deleteAnswerKey,
@@ -55,10 +57,16 @@ import { cn } from "@/lib/utils"
 
 export const correctAnswersHref = "/term-exam/correct-answers"
 
-// Legacy "Correct Answer Manage for Term Exam (Admin)"
-// (TermExamSubjectCorrectAnswer/ManageAdmin): the MCQ answer keys of every
-// institute's term exams, narrowed by class, exam and subject.
-export function CorrectAnswerList() {
+const titles: Record<"Admin" | "Manage", string> = {
+  Admin: "Correct Answer Manage for Term Exam (Admin)",
+  Manage: "Correct Answer Manage for Term Exam",
+}
+
+// Legacy TermExamSubjectCorrectAnswer/ManageAdmin and Manage (there is no
+// ManageView): the MCQ answer keys of every institute's term exams, narrowed
+// by class, exam and subject. Both add and edit keys; only Admin deletes.
+export function CorrectAnswerList({ surface }: { surface: Exclude<AccessSurface, "View"> }) {
+  const can = capabilitiesFor(surface)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -141,18 +149,23 @@ export function CorrectAnswerList() {
       <Card>
         <CardHeader className="flex flex-wrap items-start justify-between gap-2 border-b">
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-lg">Correct Answer Manage for Term Exam (Admin)</CardTitle>
+            <CardTitle className="text-lg">{titles[surface]}</CardTitle>
             <CardDescription>
               The MCQ answer key of each term exam subject and question set, used to mark OMR
               sheets.
             </CardDescription>
           </div>
-          <Button asChild size="sm">
-            <Link href={newHref}>
-              <PlusIcon data-icon="inline-start" />
-              Add correct answer
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SurfaceTabs resource="correct-answer" baseUrl={correctAnswersHref} current={surface} />
+            {can.create && (
+              <Button asChild size="sm">
+                <Link href={newHref}>
+                  <PlusIcon data-icon="inline-start" />
+                  Add correct answer
+                </Link>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {canPick && (
@@ -269,6 +282,7 @@ export function CorrectAnswerList() {
                       answer={answer}
                       label={`${name("subject", answer.subjectId)} set ${answer.setCode}`}
                       returnTo={returnTo}
+                      canDelete={can.delete}
                     />
                   </TableCell>
                 </TableRow>
@@ -328,10 +342,12 @@ function AnswerActions({
   answer,
   label,
   returnTo,
+  canDelete,
 }: {
   answer: TermExamAnswer
   label: string
   returnTo: string
+  canDelete: boolean
 }) {
   const [confirming, setConfirming] = React.useState(false)
   return (
@@ -354,11 +370,15 @@ function AnswerActions({
               Edit
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
-            <Trash2Icon />
-            Delete
-          </DropdownMenuItem>
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
+                <Trash2Icon />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -32,6 +32,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -41,6 +42,8 @@ import { useCurrentUser } from "@/lib/current-user"
 import {
   assignRolls,
   bucketOf,
+  overlappingPlan,
+  overlapReason,
   saveExamSeatPlan,
   seatPlanProblems,
   seatPlanRooms,
@@ -56,9 +59,46 @@ import { useTermExams, type TermExam } from "@/lib/term-exams"
 import { cn } from "@/lib/utils"
 
 type Scope = { groupId: number | null; version: string }
-type RoomRow = { checked: boolean; students: string; groupId: string; version: string }
+type RoomRow = {
+  checked: boolean
+  students: string
+  groupId: string
+  version: string
+  columns: string
+  benches: string
+  perBench: string
+}
 
 const roomKey = (buildingId: number, roomId: number) => `${buildingId}-${roomId}`
+const count = (value: string) => Number(value) || 0
+const rowCapacity = (row: RoomRow) => count(row.columns) * count(row.benches) * count(row.perBench)
+
+// A whole-number input inside a table cell, named for screen readers by `label`.
+function CellNumber({
+  label,
+  value,
+  onChange,
+  disabled,
+  invalid,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+  invalid?: boolean
+}) {
+  return (
+    <Input
+      inputMode="numeric"
+      className="w-16 text-center tabular-nums"
+      value={value}
+      disabled={disabled}
+      aria-label={label}
+      aria-invalid={invalid}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+    />
+  )
+}
 
 // A select inside a table cell, named for screen readers by `label`.
 function CellSelect({
@@ -96,8 +136,9 @@ function CellSelect({
 
 // The room table and exam details of one seat plan (legacy
 // Partial/_GenerateSeatPlan): the rooms of the exam's buildings, each one
-// ticked seating so many students of a group and version, the rolls handed
-// out in order and shown as they change.
+// ticked seating so many students of a group and version on its benches
+// (the room's own layout, changeable for this exam), the rolls handed out
+// in order and shown as they change.
 function SeatPlanEditor({
   institute,
   exam,
@@ -141,13 +182,37 @@ function SeatPlanEditor({
     Object.fromEntries(
       (plan?.rooms ?? []).map((r) => [
         roomKey(r.buildingId, r.roomId),
-        { checked: true, students: String(r.students), groupId: r.groupId != null ? String(r.groupId) : "", version: r.version },
+        {
+          checked: true,
+          students: String(r.students),
+          groupId: r.groupId != null ? String(r.groupId) : "",
+          version: r.version,
+          columns: String(r.totalColumns),
+          benches: String(r.benchesPerColumn),
+          perBench: String(r.studentsPerBench),
+        },
       ])
     )
   )
   const [showProblems, setShowProblems] = React.useState(false)
+  // Legacy opens a saved plan with its unused rooms hidden, a new one with all.
+  const [showAll, setShowAll] = React.useState(!plan)
 
-  const rowOf = (key: string): RoomRow => rows[key] ?? { checked: false, students: "", groupId: "", version: "" }
+  const roomOf = new Map(options.map((o) => [roomKey(o.building.id, o.room.id), o.room]))
+  const rowOf = (key: string): RoomRow => {
+    const room = roomOf.get(key)
+    return (
+      rows[key] ?? {
+        checked: false,
+        students: "",
+        groupId: "",
+        version: "",
+        columns: String(room?.totalColumns ?? ""),
+        benches: String(room?.benchesPerColumn ?? ""),
+        perBench: String(room?.studentsPerBench ?? ""),
+      }
+    )
+  }
   const setRow = (key: string, patch: Partial<RoomRow>) => setRows((current) => ({ ...current, [key]: { ...rowOf(key), ...patch } }))
 
   // The ticked rooms, in building and room order, as the plan stores them.
@@ -157,7 +222,10 @@ function SeatPlanEditor({
     return {
       buildingId: o.building.id,
       roomId: o.room.id,
-      students: Number(row.students) || 0,
+      totalColumns: count(row.columns),
+      benchesPerColumn: count(row.benches),
+      studentsPerBench: count(row.perBench),
+      students: count(row.students),
       groupId: split.useGroup ? (row.groupId ? Number(row.groupId) : null) : scope.groupId,
       version: split.useVersion ? row.version : scope.version,
       rollFrom: "",
@@ -207,7 +275,6 @@ function SeatPlanEditor({
     id: plan?.id,
     total: seated.length,
     assignments,
-    capacityOf: (room) => options.find((o) => o.building.id === room.buildingId && o.room.id === room.roomId)?.capacity ?? 0,
     roomLabel,
     split,
     others: plans.filter((p) => p.instituteId === institute.id),
@@ -217,15 +284,31 @@ function SeatPlanEditor({
     },
   })
 
-  // Ticking a room seats as many of its group and version as are left, up to its capacity.
-  function toggle(key: string, capacity: number, checked: boolean) {
-    if (!checked) return setRow(key, { checked: false })
-    const groupId = split.useGroup ? rowOf(key).groupId || String(classGroups[0]?.id ?? "") : ""
-    const version = split.useVersion ? rowOf(key).version || academicVersions[0] : ""
-    const b = buckets.get(bucketOf(groupId ? Number(groupId) : null, version, split.useGroup, split.useVersion))
-    const left = b ? b.total - b.seated : 0
-    setRow(key, { checked: true, groupId, version, students: String(Math.max(0, Math.min(capacity, left))) })
+  // Ticking rooms seats in each, in room order, as many of its group and
+  // version as are left, up to its capacity.
+  function tick(keys: string[]) {
+    const seatedIn = new Map([...buckets].map(([k, b]) => [k, b.seated]))
+    const patch: Record<string, RoomRow> = {}
+    for (const key of keys) {
+      const row = rowOf(key)
+      const groupId = split.useGroup ? row.groupId || String(classGroups[0]?.id ?? "") : ""
+      const version = split.useVersion ? row.version || academicVersions[0] : ""
+      const bucket = bucketOf(groupId ? Number(groupId) : null, version, split.useGroup, split.useVersion)
+      const left = (buckets.get(bucket)?.total ?? 0) - (seatedIn.get(bucket) ?? 0)
+      const students = Math.max(0, Math.min(rowCapacity(row), left))
+      seatedIn.set(bucket, (seatedIn.get(bucket) ?? 0) + students)
+      patch[key] = { ...row, checked: true, groupId, version, students: String(students) }
+    }
+    setRows((current) => ({ ...current, ...patch }))
   }
+  const keys = options.map((o) => roomKey(o.building.id, o.room.id))
+  const allTicked = keys.length > 0 && picked.length === keys.length
+  function tickAll(checked: boolean) {
+    if (checked) return tick(keys.filter((k) => !rowOf(k).checked))
+    setRows((current) => Object.fromEntries(keys.map((k) => [k, { ...(current[k] ?? rowOf(k)), checked: false }])))
+  }
+  const shown = options.filter((o) => showAll || rowOf(roomKey(o.building.id, o.room.id)).checked)
+  const inputTotal = pickedRooms.reduce((sum, r) => sum + r.students, 0)
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -236,7 +319,7 @@ function SeatPlanEditor({
     }
     saveExamSeatPlan(input, user.name, plan?.id)
     toast.success(plan ? "Seat plan updated" : "Seat Plan Added Successfully")
-    router.push(`/term-exam/seat-plans?exam=${exam.id}`)
+    router.push(`/seat-plans?exam=${exam.id}`)
   }
 
   return (
@@ -286,7 +369,12 @@ function SeatPlanEditor({
               room order.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {options.length > picked.length && picked.length > 0 && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? "Hide unused rooms" : `Show all rooms (${options.length - picked.length} more)`}
+              </Button>
+            )}
             {[...buckets.values()].map((b) => (
               <span
                 key={b.label}
@@ -306,9 +394,18 @@ function SeatPlanEditor({
               <Table>
                 <TableHeader className="bg-muted">
                   <TableRow>
-                    <TableHead className="w-10" />
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allTicked ? true : picked.length ? "indeterminate" : false}
+                        onCheckedChange={(checked) => tickAll(checked === true)}
+                        aria-label="Use every room"
+                      />
+                    </TableHead>
                     <TableHead>Building</TableHead>
                     <TableHead>Room</TableHead>
+                    <TableHead className="text-center">Columns</TableHead>
+                    <TableHead className="text-center">Benches / column</TableHead>
+                    <TableHead className="text-center">Students / bench</TableHead>
                     <TableHead className="text-right">Capacity</TableHead>
                     {split.useGroup && <TableHead>Group</TableHead>}
                     {split.useVersion && <TableHead>Version</TableHead>}
@@ -317,27 +414,56 @@ function SeatPlanEditor({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {options.map(({ building, room, capacity }) => {
+                  {shown.map(({ building, room }) => {
                     const key = roomKey(building.id, room.id)
                     const row = rowOf(key)
+                    const capacity = rowCapacity(row)
                     const a = assignedBy.get(key)
-                    const short = row.checked && a && a.found < (Number(row.students) || 0)
+                    const short = row.checked && a && a.found < count(row.students)
+                    const where = `${building.name} ${room.name}`
                     return (
                       <TableRow key={key} className={cn(!row.checked && "text-muted-foreground")}>
                         <TableCell>
                           <Checkbox
                             checked={row.checked}
-                            onCheckedChange={(checked) => toggle(key, capacity, checked === true)}
-                            aria-label={`Use ${building.name} ${room.name}`}
+                            onCheckedChange={(checked) => (checked === true ? tick([key]) : setRow(key, { checked: false }))}
+                            aria-label={`Use ${where}`}
                           />
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{building.name}</TableCell>
                         <TableCell className="font-medium">{room.name}</TableCell>
+                        <TableCell>
+                          <CellNumber
+                            label={`Columns in ${where}`}
+                            value={row.columns}
+                            onChange={(v) => setRow(key, { columns: v })}
+                            disabled={!row.checked}
+                            invalid={row.checked && count(row.columns) < 1}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <CellNumber
+                            label={`Benches per column in ${where}`}
+                            value={row.benches}
+                            onChange={(v) => setRow(key, { benches: v })}
+                            disabled={!row.checked}
+                            invalid={row.checked && count(row.benches) < 1}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <CellNumber
+                            label={`Students per bench in ${where}`}
+                            value={row.perBench}
+                            onChange={(v) => setRow(key, { perBench: v })}
+                            disabled={!row.checked}
+                            invalid={row.checked && count(row.perBench) < 1}
+                          />
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{capacity}</TableCell>
                         {split.useGroup && (
                           <TableCell className="min-w-36">
                             <CellSelect
-                              label={`Group of ${building.name} ${room.name}`}
+                              label={`Group of ${where}`}
                               value={row.groupId}
                               onChange={(v) => setRow(key, { groupId: v })}
                               options={classGroups.map((g) => ({ value: String(g.id), label: g.name }))}
@@ -349,7 +475,7 @@ function SeatPlanEditor({
                         {split.useVersion && (
                           <TableCell className="min-w-36">
                             <CellSelect
-                              label={`Version of ${building.name} ${room.name}`}
+                              label={`Version of ${where}`}
                               value={row.version}
                               onChange={(v) => setRow(key, { version: v })}
                               options={academicVersions.map((v) => ({ value: v, label: v }))}
@@ -366,10 +492,13 @@ function SeatPlanEditor({
                             inputMode="numeric"
                             value={row.students}
                             disabled={!row.checked}
-                            aria-label={`Students in ${building.name} ${room.name}`}
-                            aria-invalid={row.checked && ((Number(row.students) || 0) > capacity || !!short)}
+                            aria-label={`Students in ${where}`}
+                            aria-invalid={row.checked && (count(row.students) > capacity || !!short)}
                             onChange={(e) => setRow(key, { students: e.target.value.replace(/\D/g, "") })}
                           />
+                          {row.checked && count(row.students) > capacity && (
+                            <p className="mt-1 text-xs text-destructive">Exceeded</p>
+                          )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap tabular-nums">
                           {row.checked && a?.found ? (
@@ -389,6 +518,17 @@ function SeatPlanEditor({
                     )
                   })}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={7 + (split.useGroup ? 1 : 0) + (split.useVersion ? 1 : 0)} className="text-right">
+                      Total
+                    </TableCell>
+                    <TableCell className="tabular-nums">{inputTotal}</TableCell>
+                    <TableCell className={cn("tabular-nums", seatedCount !== seated.length && "text-destructive")}>
+                      {seatedCount} seated of {seated.length} examinee{seated.length === 1 ? "" : "s"}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
           ) : (
@@ -403,11 +543,11 @@ function SeatPlanEditor({
               first.
             </p>
           )}
-          <p className="mt-3 text-sm">
-            Seated <strong className="tabular-nums">{seatedCount}</strong> of{" "}
-            <strong className="tabular-nums">{seated.length}</strong> students
-            {seatedCount < seated.length ? ` · ${seated.length - seatedCount} still to seat` : ""}.
-          </p>
+          {seatedCount < seated.length && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {seated.length - seatedCount} student{seated.length - seatedCount === 1 ? "" : "s"} still to seat.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -427,7 +567,7 @@ function SeatPlanEditor({
           {plan ? "Save seat plan" : "Generate seat plan"}
         </Button>
         <Button asChild type="button" variant="outline">
-          <Link href={`/term-exam/seat-plans?exam=${exam.id}`}>Cancel</Link>
+          <Link href={`/seat-plans?exam=${exam.id}`}>Cancel</Link>
         </Button>
       </div>
     </form>
@@ -456,7 +596,7 @@ export function SeatPlanForm({ planId }: { planId?: number }) {
       <div className="flex flex-col items-start gap-3 px-4 py-6 lg:px-6">
         <p className="text-sm text-muted-foreground">No exam seat plan found.</p>
         <Button asChild variant="outline" size="sm">
-          <Link href="/term-exam/seat-plans">Back to seat plans</Link>
+          <Link href="/seat-plans">Back to seat plans</Link>
         </Button>
       </div>
     )
@@ -475,17 +615,11 @@ export function SeatPlanForm({ planId }: { planId?: number }) {
         groupId: classGroups.find((g) => String(g.id) === f.param("group"))?.id ?? null,
         version: institute?.enableVersion && !exam?.version ? f.param("version") : "",
       }
-  // A plan for the same exam, subject and part already exists: open it instead.
+  // A plan already seats some of these students: the same part (open it
+  // instead), or an overlapping one — all groups against one group, say.
   const existing =
-    !plan && exam && subjectId != null
-      ? plans.find(
-          (p) =>
-            p.termExamId === exam.id &&
-            p.subjectId === subjectId &&
-            p.groupId === scope.groupId &&
-            p.version === scope.version
-        )
-      : undefined
+    !plan && exam && subjectId != null ? overlappingPlan(plans, { termExamId: exam.id, subjectId, ...scope }) : null
+  const blockedBy = existing ? overlapReason(scope, existing) : ""
   const subjectLabel = (id: number) => {
     const s = subjects.find((x) => x.id === id)
     return s ? (s.code.trim() ? `${s.name} (${s.code.trim()})` : s.name) : name("subject", id)
@@ -494,7 +628,7 @@ export function SeatPlanForm({ planId }: { planId?: number }) {
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
       <Button asChild variant="ghost" size="sm" className="w-fit">
-        <Link href={`/term-exam/seat-plans${exam ? `?exam=${exam.id}` : ""}`}>
+        <Link href={`/seat-plans${exam ? `?exam=${exam.id}` : ""}`}>
           <ArrowLeftIcon data-icon="inline-start" />
           Seat plans
         </Link>
@@ -543,9 +677,9 @@ export function SeatPlanForm({ planId }: { planId?: number }) {
       {existing ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <CircleAlertIcon className="size-4 shrink-0" />
-          This subject already has a seat plan.{" "}
-          <Link href={`/term-exam/seat-plans/${existing.id}/edit`} className="font-medium text-foreground underline underline-offset-4">
-            Edit it
+          {blockedBy || "This subject already has a seat plan."}{" "}
+          <Link href={`/seat-plans/${existing.id}/edit`} className="font-medium text-foreground underline underline-offset-4">
+            {blockedBy ? "Open that plan" : "Edit it"}
           </Link>
         </p>
       ) : institute && exam && subjectId != null ? (

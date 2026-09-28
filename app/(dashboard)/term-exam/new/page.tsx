@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 
+import { RequireSurface } from "@/components/require-surface"
 import { TermExamForm } from "@/components/term-exams/term-exam-form"
 
 export const metadata: Metadata = {
@@ -18,10 +19,12 @@ export default async function NewTermExamPage({
   const copy = Number(one(query.copy)) || undefined
 
   return (
-    <TermExamForm
-      instituteId={institute}
-      copyId={copy}
-      returnTo={one(query.returnTo)}
-    />
+    <RequireSurface resource="term-exam" surface={["Admin", "Manage"]}>
+      <TermExamForm
+        instituteId={institute}
+        copyId={copy}
+        returnTo={one(query.returnTo)}
+      />
+    </RequireSurface>
   )
 }

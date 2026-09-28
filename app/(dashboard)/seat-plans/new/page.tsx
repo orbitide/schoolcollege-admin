@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { SeatPlanForm } from "@/components/term-exams/seat-plan-form"
+import { SeatPlanForm } from "@/components/seat-plans/seat-plan-form"
 
 export const metadata: Metadata = {
   title: "Generate Exam Seat Plan · SMS Admin",

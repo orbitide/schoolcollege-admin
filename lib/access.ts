@@ -18,6 +18,14 @@ export const SURFACE_PATH: Record<AccessSurface, string> = {
   View: "/view",
 }
 
+// Resources whose legacy menu offers only some surfaces (e.g. Correct Answer
+// has no ManageView); every other resource offers all three.
+const resourceSurfaces: Record<string, readonly AccessSurface[]> = {
+  "correct-answer": ["Admin", "Manage"],
+}
+
+export const surfacesOf = (resource: string) => resourceSurfaces[resource] ?? accessSurfaces
+
 export const surfaceHref = (baseUrl: string, surface: AccessSurface) =>
   `${baseUrl}${SURFACE_PATH[surface]}`
 
@@ -44,7 +52,7 @@ export function useCan() {
 // The surfaces of a resource the current user holds, Admin first.
 export function useSurfaces(resource: string) {
   const can = useCan()
-  return accessSurfaces.filter((surface) => can(permissionCode(resource, surface)))
+  return surfacesOf(resource).filter((surface) => can(permissionCode(resource, surface)))
 }
 
 // The actions a surface offers on its rows (ezducms SurfaceMeta

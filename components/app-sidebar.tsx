@@ -5,7 +5,7 @@ import * as React from "react"
 import { NavDocuments } from "@/components/nav-documents"
 import { NavMain, filterNavItems, type NavItem, type NavMainItem } from "@/components/nav-main"
 import { NavSearch, matchesQuery } from "@/components/nav-search"
-import { accessSurfaces, permissionCode, surfaceHref, useCan } from "@/lib/access"
+import { permissionCode, surfaceHref, surfacesOf, useCan } from "@/lib/access"
 import { basicSettingsHref, basicSettingsMenu, basicSettingsResource } from "@/lib/basic-settings"
 import { useCurrentUser } from "@/lib/current-user"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -71,12 +71,9 @@ const data = {
       icon: <ClipboardListIcon />,
       tone: "amber",
       items: [
-        { title: "Manage Term Exam", url: "/term-exam" },
-        { title: "Correct Answer", url: "/term-exam/correct-answers" },
-        { title: "Generate Merit List", url: "/term-exam/merit-list" },
-        { title: "Manage Exam Seat Plan", url: "/term-exam/seat-plans" },
-        { title: "Seat Plan At a Glance", url: "/reports/seat-plan", permission: "seat-plan-report.view" },
-        { title: "Seat Plan (Room Wise)", url: "/reports/seat-plan-rooms", permission: "seat-plan-report.view" },
+        { title: "Manage Term Exam", url: "/term-exam", resource: "term-exam" },
+        { title: "Manage Correct Answer", url: "/term-exam/correct-answers", resource: "correct-answer" },
+        { title: "Generate Merit List", url: "/term-exam/merit-list", permission: "merit-list.manage" },
       ],
     },
     {
@@ -134,6 +131,8 @@ const data = {
         { title: "Admit Card", url: "/reports/admit-card", permission: "admit-card.view" },
         { title: "ID Card", url: "/reports/id-card", permission: "id-card.view" },
         { title: "Marks Upload Report", url: "/reports/marks-upload", permission: "marks-upload-report.view" },
+        { title: "Seat Plan At a Glance", url: "/reports/seat-plan", permission: "seat-plan-report.view" },
+        { title: "Seat Plan (Room Wise)", url: "/reports/seat-plan-rooms", permission: "seat-plan-report.view" },
       ],
     },
     {
@@ -157,6 +156,12 @@ const data = {
         { title: "Dashboard Menu Manage", url: "/configurations/dashboard-menus", resource: "dashboard-menu" },
       ],
     },
+    {
+      title: "Seat Plan",
+      icon: <ArmchairIcon />,
+      tone: "orange",
+      items: [{ title: "Manage Exam Seat Plan", url: "/seat-plans" }],
+    },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose" },
     { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky" },
@@ -179,7 +184,7 @@ function resolveNav(items: NavMainItem[], can: (code: string) => boolean) {
   const resolve = (item: NavItem): NavItem[] => {
     if (item.permission && !can(item.permission)) return []
     if (!item.resource) return [item]
-    const surface = accessSurfaces.find((s) => can(permissionCode(item.resource!, s)))
+    const surface = surfacesOf(item.resource).find((s) => can(permissionCode(item.resource!, s)))
     return surface ? [{ ...item, href: surfaceHref(item.url, surface) }] : []
   }
   return items.flatMap<NavMainItem>((item) => {

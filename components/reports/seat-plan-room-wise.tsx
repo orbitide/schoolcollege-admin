@@ -6,7 +6,7 @@ import { PrinterIcon } from "lucide-react"
 import { ExamReportEmpty, ExamReportFilterFields, useExamReportFilter } from "@/components/reports/exam-report-filter"
 import { PrintArea } from "@/components/reports/print-area"
 import { useStudentLookups } from "@/components/students/student-lookups"
-import { formatExamDate, formatTime } from "@/components/term-exams/seat-plan-list"
+import { formatExamDate, formatTime } from "@/components/seat-plans/seat-plan-list"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
 import {
@@ -190,7 +190,14 @@ export function SeatPlanRoomWise() {
           const rolls = seated.map(({ student, enrolment }) =>
             institute.showClassRoll ? enrolment.classRoll : String(student.studentIdentificationNo)
           )
-          return { plan, building: b, room, rolls, rollFrom: rolls[0] ?? "-", rollTo: rolls.at(-1) ?? "-" }
+          // Laid out on the benches the plan saved (legacy reads ExamSeatPlanDetail), not the room's current ones.
+          const laidOut = {
+            ...room,
+            totalColumns: seat.totalColumns,
+            benchesPerColumn: seat.benchesPerColumn,
+            studentsPerBench: seat.studentsPerBench,
+          }
+          return { plan, building: b, room: laidOut, rolls, rollFrom: rolls[0] ?? "-", rollTo: rolls.at(-1) ?? "-" }
         })
       : []
 
@@ -265,7 +272,7 @@ export function SeatPlanRoomWise() {
             <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
               <p>No seat plan for {subjectName(subject.subjectId)} of {chosen.fullName} yet.</p>
               <Button asChild size="sm" variant="outline">
-                <Link href={`/term-exam/seat-plans/new?exam=${chosen.id}&subject=${subject.subjectId}`}>Generate seat plan</Link>
+                <Link href={`/seat-plans/new?exam=${chosen.id}&subject=${subject.subjectId}`}>Generate seat plan</Link>
               </Button>
             </div>
           ) : (
