@@ -225,11 +225,29 @@ export function saveAttendance(
       })
       added++
     } else if (old.isPresent !== entry.isPresent) {
-      changed.set(old.id, { ...old, isPresent: entry.isPresent, modifiedBy: user, modifiedAt: now })
+      changed.set(old.id, {
+        ...old,
+        isPresent: entry.isPresent,
+        // A teacher correcting the day becomes who took it.
+        teacherId: input.teacherId ?? old.teacherId,
+        modifiedBy: user,
+        modifiedAt: now,
+      })
       updated++
     }
   }
 
   if (added || updated) emit([...attendance.map((r) => changed.get(r.id) ?? r), ...fresh])
   return { added, updated }
+}
+
+// Legacy ResetStudentAttendance: clears what was saved for the section on
+// the day so it can be taken afresh. Legacy scoped a teacher's reset to the
+// rows they took; here a section can have several teachers, so the whole
+// day goes rather than leaving it half taken. Returns how many were removed.
+export function resetAttendance(input: { sectionId: number; date: string }) {
+  const keep = attendance.filter((r) => !(r.sectionId === input.sectionId && r.date === input.date))
+  const removed = attendance.length - keep.length
+  if (removed) emit(keep)
+  return removed
 }

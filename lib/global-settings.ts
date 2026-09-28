@@ -34,15 +34,22 @@ export const districtStore = createRecordStore<District>(
   }))
 )
 
-export const userRoles = ["Super Admin", "Institute Admin"] as const
+export const userRoles = [
+  "Super Admin",
+  "Institute Admin",
+  "Institute Manager",
+  "Institute Viewer",
+  "Teacher",
+] as const
 export type UserRole = (typeof userRoles)[number]
 
 export type AdminUser = {
   id: number
   name: string
   email: string
-  // A super admin works with every institute; an institute admin only with
-  // the institutes linked to them in User Institutes.
+  // A super admin works with every institute; everyone else only with the
+  // institutes linked to them in User Institutes. What they may do there
+  // (Admin / Manage / View) comes from the role, see lib/access.ts.
   role: UserRole
 }
 
@@ -52,6 +59,10 @@ export const adminUsers: AdminUser[] = [
   { id: 2, name: "Rafiq Hasan", email: "rafiq@sms.app", role: "Institute Admin" },
   { id: 3, name: "Nusrat Jahan", email: "nusrat@sms.app", role: "Institute Admin" },
   { id: 4, name: "Tanvir Ahmed", email: "tanvir@sms.app", role: "Institute Admin" },
+  { id: 5, name: "Farhana Akter", email: "farhana@sms.app", role: "Institute Manager" },
+  { id: 6, name: "Imran Hossain", email: "imran@sms.app", role: "Institute Viewer" },
+  // Signs in as teacher 1 (Teacher.userId).
+  { id: 7, name: "Abdul Karim", email: "abdul@school.edu.bd", role: "Teacher" },
 ]
 
 // Which institutes a user can work with (legacy UserInstitute).
@@ -66,6 +77,9 @@ let userInstitutes: UserInstitute[] = [
   { id: 1, userId: 2, instituteId: 1, status: "Active" },
   { id: 2, userId: 2, instituteId: 2, status: "Active" },
   { id: 3, userId: 3, instituteId: 3, status: "Active" },
+  { id: 4, userId: 5, instituteId: 1, status: "Active" },
+  { id: 5, userId: 6, instituteId: 1, status: "Active" },
+  { id: 6, userId: 7, instituteId: 1, status: "Active" },
 ]
 const seedUserInstitutes = userInstitutes
 const listeners = new Set<() => void>()

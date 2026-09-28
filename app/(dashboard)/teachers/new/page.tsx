@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 
+import { RequireSurface } from "@/components/require-surface"
 import { TeacherForm } from "@/components/teachers/teacher-form"
 
 export const metadata: Metadata = {
@@ -16,9 +17,11 @@ export default async function NewTeacherPage({
   const query = await searchParams
 
   return (
-    <TeacherForm
-      instituteId={Number(one(query.institute)) || undefined}
-      returnTo={one(query.returnTo)}
-    />
+    <RequireSurface resource="teacher" surface={["Admin", "Manage"]}>
+      <TeacherForm
+        instituteId={Number(one(query.institute)) || undefined}
+        returnTo={one(query.returnTo)}
+      />
+    </RequireSurface>
   )
 }

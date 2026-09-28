@@ -4,14 +4,24 @@ import * as React from "react"
 
 import { adminUsers, useUserInstitutes } from "@/lib/global-settings"
 import { useInstitutes } from "@/lib/institutes-store"
+import { useTeachers } from "@/lib/teachers"
 
 // Who is using the admin panel. There is no login yet, so this is the super
 // admin; replace it with the signed-in user once authentication exists.
-// (Set it to 3 to try the panel as an institute admin of one institute.)
+// (Set it to 3 to try the panel as an institute admin of one institute, 5 as
+// an institute manager, 6 as an institute viewer, 7 as a teacher.)
 const currentUserId = 1
 
 export function useCurrentUser() {
   return adminUsers.find((user) => user.id === currentUserId) ?? adminUsers[0]
+}
+
+// The teacher the current user signs in as (legacy
+// TeacherService.GetTeacherByNccUserId), if one is linked.
+export function useCurrentTeacher() {
+  const user = useCurrentUser()
+  const teachers = useTeachers()
+  return teachers.find((t) => t.userId === user.id && t.status !== "Deleted")
 }
 
 // The institutes the current user may work with (legacy

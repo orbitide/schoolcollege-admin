@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { subjectStore } from "@/lib/academic-store"
+import { surfaceHref, useSurfaces } from "@/lib/access"
 import { useInstitute } from "@/lib/institutes-store"
 import { useTeacher } from "@/lib/teachers"
 
@@ -34,7 +35,12 @@ export function TeacherDetail({ id, returnTo }: { id: number; returnTo?: string 
   const institute = useInstitute(teacher?.instituteId ?? -1)
   const subjects = subjectStore.useAll()
   const name = useStudentLookups()
-  const listHref = returnTo?.startsWith("/") ? returnTo : "/teachers"
+  // Back to the list the user came from, else the first one they may open.
+  const surfaces = useSurfaces("teacher")
+  const canEdit = surfaces.some((surface) => surface !== "View")
+  const listHref = returnTo?.startsWith("/")
+    ? returnTo
+    : surfaceHref("/teachers", surfaces[0] ?? "View")
 
   if (!teacher || !institute) {
     return (
@@ -79,7 +85,7 @@ export function TeacherDetail({ id, returnTo }: { id: number; returnTo?: string 
             Teachers
           </Link>
         </Button>
-        {!deleted && (
+        {!deleted && canEdit && (
           <Button asChild variant="outline" size="sm">
             <Link href={`/teachers/${teacher.id}/edit?returnTo=${encodeURIComponent(listHref)}`}>
               <PencilIcon data-icon="inline-start" />

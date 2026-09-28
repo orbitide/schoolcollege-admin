@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import type { Capabilities } from "@/lib/access"
 import { useCurrentUser } from "@/lib/current-user"
 import {
   deleteTeacher,
@@ -56,13 +57,16 @@ import {
 type Confirm = "delete" | "retrieve" | "permanent"
 
 // Row menu of the legacy ManageAdmin grid. What it offers depends on the
-// status: deleted teachers can only be viewed, retrieved or deleted for good.
+// surface (`can`) and the status: deleted teachers can only be viewed,
+// retrieved or deleted for good.
 export function TeacherActions({
   teacher,
   returnTo,
+  can,
 }: {
   teacher: Teacher
   returnTo: string
+  can: Capabilities
 }) {
   const user = useCurrentUser()
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
@@ -129,36 +133,46 @@ export function TeacherActions({
           </DropdownMenuItem>
           {!deleted && (
             <>
-              <DropdownMenuItem asChild>
-                <Link href={`/teachers/${teacher.id}/edit?${back}`}>
-                  <PencilIcon />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={toggleStatus}>
-                {teacher.status === "Active" ? <CircleMinusIcon /> : <CircleCheckIcon />}
-                {teacher.status === "Active" ? "Inactivate" : "Activate"}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setRanking(true)}>
-                <ArrowUpDownIcon />
-                Change rank
-              </DropdownMenuItem>
+              {can.edit && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/teachers/${teacher.id}/edit?${back}`}>
+                    <PencilIcon />
+                    Edit
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {can.status && (
+                <DropdownMenuItem onSelect={toggleStatus}>
+                  {teacher.status === "Active" ? <CircleMinusIcon /> : <CircleCheckIcon />}
+                  {teacher.status === "Active" ? "Inactivate" : "Activate"}
+                </DropdownMenuItem>
+              )}
+              {can.reorder && (
+                <DropdownMenuItem onSelect={() => setRanking(true)}>
+                  <ArrowUpDownIcon />
+                  Change rank
+                </DropdownMenuItem>
+              )}
             </>
           )}
-          {deleted && (
+          {deleted && can.restore && (
             <DropdownMenuItem onSelect={() => setConfirm("retrieve")}>
               <ArchiveRestoreIcon />
               Retrieve
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setConfirm(deleted ? "permanent" : "delete")}
-          >
-            <Trash2Icon />
-            {deleted ? "Delete permanently" : "Delete"}
-          </DropdownMenuItem>
+          {can.delete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setConfirm(deleted ? "permanent" : "delete")}
+              >
+                <Trash2Icon />
+                {deleted ? "Delete permanently" : "Delete"}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

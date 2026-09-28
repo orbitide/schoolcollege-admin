@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PlusIcon, SearchIcon } from "lucide-react"
 
 import { StatusBadge } from "@/components/institutes/status-badge"
+import { SurfaceTabs } from "@/components/surface-tabs"
 import { useStudentLookups } from "@/components/students/student-lookups"
 import { TeacherActions } from "@/components/teachers/teacher-actions"
 import { FilterField, stamp } from "@/components/term-exams/term-exam-fields"
@@ -26,14 +27,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { useTeachers, type Teacher } from "@/lib/teachers"
 import { cn } from "@/lib/utils"
 
-// Legacy "Manage Teacher (Admin)" (Teacher/ManageAdmin): every institute's
-// teachers with the sections and subjects they take, and the status, rank
-// and (soft) delete actions.
-export function TeacherList() {
+const titles: Record<AccessSurface, string> = {
+  Admin: "Manage Teacher (Admin)",
+  Manage: "Manage Teacher",
+  View: "View Teacher",
+}
+
+// Legacy Teacher/ManageAdmin, Manage and ManageView: every institute's
+// teachers with the sections and subjects they take. The surface decides the
+// actions: Manage adds, edits, (in)activates and reranks; Admin also deletes,
+// sees deleted teachers and retrieves them; View only reads.
+export function TeacherList({ surface }: { surface: AccessSurface }) {
+  const can = capabilitiesFor(surface)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -46,7 +56,7 @@ export function TeacherList() {
   const institute = canPick
     ? institutes.find((i) => String(i.id) === param("institute"))
     : institutes[0]
-  const withDeleted = param("deleted") === "1"
+  const withDeleted = can.restore && param("deleted") === "1"
 
   const [query, setQuery] = React.useState("")
   const needle = query.trim().toLowerCase()
@@ -99,18 +109,23 @@ export function TeacherList() {
       <Card>
         <CardHeader className="flex flex-wrap items-start justify-between gap-2 border-b">
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-lg">Manage Teacher (Admin)</CardTitle>
+            <CardTitle className="text-lg">{titles[surface]}</CardTitle>
             <CardDescription>
               Each institute&apos;s teachers, with the sections they take and the subjects they
               teach.
             </CardDescription>
           </div>
-          <Button asChild size="sm">
-            <Link href={newHref}>
-              <PlusIcon data-icon="inline-start" />
-              Add teacher
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SurfaceTabs resource="teacher" baseUrl="/teachers" current={surface} />
+            {can.create && (
+              <Button asChild size="sm">
+                <Link href={newHref}>
+                  <PlusIcon data-icon="inline-start" />
+                  Add teacher
+                </Link>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {canPick && (
@@ -122,15 +137,17 @@ export function TeacherList() {
               allLabel="All institutes"
             />
           )}
-          <FilterField
-            label="Deleted teachers"
-            value={withDeleted ? "1" : "0"}
-            onChange={(v) => setParam({ deleted: v === "1" ? "1" : "" })}
-            options={[
-              { value: "0", label: "Without deleted" },
-              { value: "1", label: "With deleted" },
-            ]}
-          />
+          {can.restore && (
+            <FilterField
+              label="Deleted teachers"
+              value={withDeleted ? "1" : "0"}
+              onChange={(v) => setParam({ deleted: v === "1" ? "1" : "" })}
+              options={[
+                { value: "0", label: "Without deleted" },
+                { value: "1", label: "With deleted" },
+              ]}
+            />
+          )}
           <div className="flex flex-col justify-end sm:col-span-2 lg:col-span-1">
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -222,7 +239,7 @@ export function TeacherList() {
                       <StatusBadge status={teacher.status} />
                     </TableCell>
                     <TableCell>
-                      <TeacherActions teacher={teacher} returnTo={returnTo} />
+                      <TeacherActions teacher={teacher} returnTo={returnTo} can={can} />
                     </TableCell>
                   </TableRow>
                 )

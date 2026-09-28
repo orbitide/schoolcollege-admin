@@ -15,6 +15,12 @@ export function sectionTeachers(teachers: Teacher[], sectionId: number, yearId: 
   )
 }
 
+// The other way round: the sections the teacher takes in the year (legacy
+// SectionTeacherService.GetSectionTeacherByTeacherId).
+export function teacherSectionIds(teacher: Teacher, yearId: number) {
+  return teacher.sections.filter((s) => s.yearId === yearId).map((s) => s.sectionId)
+}
+
 // The row a teacher gets for the section, built as the teacher form does:
 // the structure comes from the section, medium from the class.
 function sectionRow(institute: Institute, academicClass: AcademicClass, section: Section, yearId: number): TeacherSection {

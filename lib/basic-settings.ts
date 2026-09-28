@@ -31,6 +31,11 @@ export function basicSettingsHref(segment: string) {
   return segment === "institutes" ? "/institutes" : `/basic-settings/${segment}`
 }
 
+// Permission resource of a kind's all-institutes page (settings.classes.view).
+export function basicSettingsResource(segment: string) {
+  return `settings.${segment}`
+}
+
 export function basicSettingsItem(segment: string) {
   return basicSettingsMenu.find((item) => item.segment === segment && item.kind)
 }

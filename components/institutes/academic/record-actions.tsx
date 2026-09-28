@@ -35,22 +35,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { capabilitiesFor, type Capabilities } from "@/lib/access"
 import { studentsUsing } from "@/lib/students"
 
 // Row menu shared by the per-institute lists and the all-institutes admin
-// lists: edit, set current, (in)activate and delete with its confirmation.
+// lists: edit, set current, (in)activate and delete with its confirmation,
+// as far as the surface allows (`can`, everything by default).
 export function RecordActions({
   kind,
   record,
   singular,
   instituteName,
   editHref,
+  can = capabilitiesFor("Admin"),
 }: {
   kind: AcademicKind
   record: EditableRecord
   singular: string
   instituteName: string
   editHref: string
+  can?: Capabilities
 }) {
   const config = kindConfig(kind)
   const hasCurrent = config.fields.some((field) => field.current)
@@ -91,6 +95,8 @@ export function RecordActions({
     setDeleting(false)
   }
 
+  if (!can.edit && !can.status && !can.delete) return null
+
   return (
     <>
       <DropdownMenu modal={false}>
@@ -105,27 +111,35 @@ export function RecordActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem asChild>
-            <Link href={editHref}>
-              <PencilIcon />
-              Edit
-            </Link>
-          </DropdownMenuItem>
-          {hasCurrent && !record.isCurrent && (
+          {can.edit && (
+            <DropdownMenuItem asChild>
+              <Link href={editHref}>
+                <PencilIcon />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {can.status && hasCurrent && !record.isCurrent && (
             <DropdownMenuItem onSelect={makeCurrent}>
               <CalendarCheckIcon />
               Set as current
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onSelect={toggleStatus}>
-            {record.status === "Active" ? <CircleMinusIcon /> : <CircleCheckIcon />}
-            {record.status === "Active" ? "Inactivate" : "Activate"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={requestDelete}>
-            <Trash2Icon />
-            Delete
-          </DropdownMenuItem>
+          {can.status && (
+            <DropdownMenuItem onSelect={toggleStatus}>
+              {record.status === "Active" ? <CircleMinusIcon /> : <CircleCheckIcon />}
+              {record.status === "Active" ? "Inactivate" : "Activate"}
+            </DropdownMenuItem>
+          )}
+          {can.delete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={requestDelete}>
+                <Trash2Icon />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

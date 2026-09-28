@@ -33,7 +33,14 @@ export type NavTone =
 
 export type NavItem = {
   title: string
+  // Where the item lives; it stays highlighted on every page below it.
   url: string
+  // Where the link goes, when not to `url` itself (a resource's highest
+  // surface the user holds, e.g. /teachers/admin).
+  href?: string
+  // Access resource (lib/access.ts): the item shows only to users holding
+  // one of its surfaces.
+  resource?: string
   icon?: React.ReactNode
   tone?: NavTone
 }
@@ -246,7 +253,7 @@ export function NavMain({
                             isActive={activeSub(item.items)?.url === sub.url}
                             className="h-8 text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground data-active:bg-sidebar-primary/10 data-active:font-medium data-active:text-sidebar-primary"
                           >
-                            <Link href={sub.url}>
+                            <Link href={sub.href ?? sub.url}>
                               {sub.icon}
                               <span>
                                 <Highlight text={sub.title} query={query} />
@@ -267,7 +274,7 @@ export function NavMain({
                   isActive={isActive(item.url)}
                   className={navButtonClass}
                 >
-                  <Link href={item.url}>
+                  <Link href={item.href ?? item.url}>
                     <ActiveBar />
                     {item.icon && <NavIcon icon={item.icon} tone={item.tone} />}
                     <span>

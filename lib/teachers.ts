@@ -36,6 +36,10 @@ export type Teacher = {
   // A login was made for the teacher (institute's "Create user account on
   // teacher registration"). The password itself belongs to the backend.
   hasAccount: boolean
+  // The admin-panel user who signs in as this teacher (legacy
+  // Teacher.NccUser); null when none is linked. The teacher form doesn't
+  // edit it, so it isn't part of TeacherInput.
+  userId: number | null
   subjectIds: number[]
   sections: TeacherSection[]
   status: TeacherStatus
@@ -47,7 +51,7 @@ export type Teacher = {
 
 export type TeacherInput = Omit<
   Teacher,
-  "id" | "rank" | "status" | "createdBy" | "createdAt" | "modifiedBy" | "modifiedAt"
+  "id" | "rank" | "userId" | "status" | "createdBy" | "createdAt" | "modifiedBy" | "modifiedAt"
 >
 
 const now = () => new Date().toISOString()
@@ -87,6 +91,7 @@ function seedTeacher(
     email: `${name.split(" ")[0].toLowerCase()}@school.edu.bd`,
     mobile,
     hasAccount: false,
+    userId: null,
     subjectIds,
     sections: sectionIds.map(seedSection),
     status: "Active",
@@ -99,7 +104,10 @@ function seedTeacher(
 }
 
 const seed: Teacher[] = [
-  seedTeacher(1, "Abdul Karim", "T-1001", "01711000001", [1], [1, 2, 3]),
+  seedTeacher(1, "Abdul Karim", "T-1001", "01711000001", [1], [1, 2, 3], {
+    hasAccount: true,
+    userId: 7,
+  }),
   seedTeacher(2, "Salma Begum", "T-1002", "01811000002", [2], [3, 4, 5, 6]),
   seedTeacher(3, "Mahmudul Hasan", "T-1003", "01911000003", [3, 4], [7, 8, 9, 10], {
     modifiedAt: "2026-03-12T08:15:00.000Z",
@@ -174,6 +182,7 @@ export function addTeacher(input: TeacherInput, user: string) {
   const stamp = now()
   const teacher: Teacher = {
     ...input,
+    userId: null,
     id: Math.max(0, ...teachers.map((t) => t.id)) + 1,
     rank: maxTeacherRank(input.instituteId) + 1,
     status: "Active",

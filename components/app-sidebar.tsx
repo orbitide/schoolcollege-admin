@@ -3,9 +3,10 @@
 import * as React from "react"
 
 import { NavDocuments } from "@/components/nav-documents"
-import { NavMain, filterNavItems, type NavMainItem } from "@/components/nav-main"
+import { NavMain, filterNavItems, type NavItem, type NavMainItem } from "@/components/nav-main"
 import { NavSearch, matchesQuery } from "@/components/nav-search"
-import { basicSettingsHref, basicSettingsMenu } from "@/lib/basic-settings"
+import { accessSurfaces, permissionCode, surfaceHref, useCan } from "@/lib/access"
+import { basicSettingsHref, basicSettingsMenu, basicSettingsResource } from "@/lib/basic-settings"
 import { useCurrentUser } from "@/lib/current-user"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
@@ -43,7 +44,7 @@ const data = {
       icon: <UserRoundIcon />,
       tone: "sky",
       items: [
-        { title: "Manage Teacher (Admin)", url: "/teachers" },
+        { title: "Manage Teacher", url: "/teachers", resource: "teacher" },
         { title: "Section Teacher (Admin)", url: "/section-teachers" },
       ],
     },
@@ -52,8 +53,11 @@ const data = {
       icon: <CalendarCheckIcon />,
       tone: "emerald",
       items: [
+        { title: "Take Attendance", url: "/attendance/take" },
         { title: "Take Attendance By Admin", url: "/attendance" },
         { title: "Exam Attendance By Admin", url: "/attendance/exam" },
+        { title: "Manage Monthly Attendance Fine", url: "/attendance/fines" },
+        { title: "Absent Fine Date Configuration", url: "/attendance/fines/configuration" },
       ],
     },
     {
@@ -90,6 +94,7 @@ const data = {
       items: basicSettingsMenu.map((item) => ({
         title: item.title,
         url: basicSettingsHref(item.segment),
+        resource: item.kind && basicSettingsResource(item.segment),
       })),
     },
     { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
@@ -107,12 +112,31 @@ const data = {
   ],
 }
 
+// The menu as the current user may use it: an item with a resource links to
+// the first surface they hold (Admin, else Manage, else View) and is dropped
+// when they hold none; a menu left empty is dropped too. The page's surface
+// tabs lead to the others.
+function resolveNav(items: NavMainItem[], can: (code: string) => boolean) {
+  const resolve = (item: NavItem): NavItem[] => {
+    if (!item.resource) return [item]
+    const surface = accessSurfaces.find((s) => can(permissionCode(item.resource!, s)))
+    return surface ? [{ ...item, href: surfaceHref(item.url, surface) }] : []
+  }
+  return items.flatMap<NavMainItem>((item) => {
+    if (!("items" in item)) return resolve(item)
+    const subs = item.items.flatMap(resolve)
+    return subs.length ? [{ ...item, items: subs }] : []
+  })
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = useCurrentUser()
+  const can = useCan()
+  const navMain = React.useMemo(() => resolveNav(data.navMain, can), [can])
   const [query, setQuery] = React.useState("")
   const nothingFound =
     query.trim() !== "" &&
-    filterNavItems(data.navMain, query).length === 0 &&
+    filterNavItems(navMain, query).length === 0 &&
     !data.documents.some((item) => matchesQuery(item.name, query)) &&
     !data.navSecondary.some((item) => matchesQuery(item.title, query))
 
@@ -142,7 +166,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarSeparator className="mx-0" />
       <SidebarContent className="gap-0 py-1">
-        <NavMain items={data.navMain} query={query} />
+        <NavMain items={navMain} query={query} />
         <NavDocuments items={data.documents} query={query} />
         {nothingFound && (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">

@@ -2,23 +2,10 @@
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { ClipboardCheckIcon, ClipboardListIcon, TriangleAlertIcon } from "lucide-react"
-import { toast } from "sonner"
+import { ClipboardListIcon } from "lucide-react"
 
-import { classRollLabel, studentIdLabel } from "@/components/students/student-lookups"
+import { AttendanceSheet, savedKey } from "@/components/attendance/attendance-sheet"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -26,15 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   branchStore,
   classStore,
@@ -45,17 +23,11 @@ import {
   yearStore,
 } from "@/lib/academic-store"
 import { useAccessibleInstitutes, useCurrentUser } from "@/lib/current-user"
-import {
-  examAttendanceSheet,
-  saveExamAttendance,
-  useExamAttendance,
-  type ExamAttendanceRow,
-} from "@/lib/exam-attendance"
-import { academicMediums, academicVersions, type Institute } from "@/lib/institutes"
+import { examAttendanceSheet, saveExamAttendance, useExamAttendance } from "@/lib/exam-attendance"
+import { academicMediums, academicVersions } from "@/lib/institutes"
 import { todayIso } from "@/lib/student-attendance"
 import { useStudents } from "@/lib/students"
-import { useTermExams, type TermExam } from "@/lib/term-exams"
-import { cn } from "@/lib/utils"
+import { useTermExams } from "@/lib/term-exams"
 
 // Legacy "Exam Attendance By Admin" (StudentAttendance/AdminExamAttendance):
 // pick a term exam and subject (and optionally a section), tick who sat it,
@@ -68,6 +40,7 @@ export function ExamAttendance() {
   const students = useStudents()
   const records = useExamAttendance()
   const exams = useTermExams()
+  const user = useCurrentUser()
   const canPick = institutes.length > 1
 
   const param = (key: string) => searchParams.get(key) ?? ""
@@ -100,7 +73,10 @@ export function ExamAttendance() {
       (!param("group") || s.groupId == null || String(s.groupId) === param("group"))
   )
   const section = classSections.find((s) => String(s.id) === param("section"))
-  const examOptions = exams.filter(
+  // Legacy LoadTermExam(isEditable: true, isOnlinePublish: false): only
+  // exams still open for editing and not published online, latest result
+  // first. Attendance of a locked exam would no longer match its results.
+  const classExams = exams.filter(
     (e) =>
       e.status === "Active" &&
       e.instituteId === iid &&
@@ -108,12 +84,20 @@ export function ExamAttendance() {
       String(e.yearId) === year &&
       (!medium || !e.medium || e.medium === medium)
   )
+  const examOptions = classExams
+    .filter((e) => e.editEnable && !e.onlinePublished)
+    .sort((a, b) => b.resultPublish.localeCompare(a.resultPublish))
+  const lockedExams = classExams.length - examOptions.length
   const exam = examOptions.find((e) => String(e.id) === param("exam"))
   const subject = exam?.subjects.find((s) => String(s.subjectId) === param("subject"))
   const subjectName = (id: number) => {
     const s = subjects.find((x) => x.id === id)
     return s ? `${s.name}${s.code ? ` (${s.code})` : ""}` : String(id)
   }
+  // Subjects already taken for the exam, marked in the subject list.
+  const takenSubjects = new Set(
+    exam ? records.filter((r) => r.termExamId === exam.id).map((r) => r.subjectId) : []
+  )
 
   function setParam(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams)
@@ -253,7 +237,7 @@ export function ExamAttendance() {
             onChange={(v) => setParam({ exam: v, subject: "" })}
             options={examOptions.map((e) => ({ value: String(e.id), label: e.fullName }))}
             placeholder={
-              selectedClass && year ? (examOptions.length ? "Select term exam" : "No active exam") : "Select class and year first"
+              selectedClass && year ? (examOptions.length ? "Select term exam" : "No open exam") : "Select class and year first"
             }
             disabled={!selectedClass || !year}
           />
@@ -262,7 +246,10 @@ export function ExamAttendance() {
             required
             value={param("subject")}
             onChange={(v) => setParam({ subject: v })}
-            options={(exam?.subjects ?? []).map((s) => ({ value: String(s.subjectId), label: subjectName(s.subjectId) }))}
+            options={(exam?.subjects ?? []).map((s) => ({
+              value: String(s.subjectId),
+              label: `${subjectName(s.subjectId)}${takenSubjects.has(s.subjectId) ? " · taken" : ""}`,
+            }))}
             placeholder={exam ? "Select subject" : "Select a term exam first"}
             disabled={!exam}
           />
@@ -270,14 +257,23 @@ export function ExamAttendance() {
       </Card>
 
       {ready ? (
-        <ExamAttendanceSheet
-          key={`${exam.id}|${subject.subjectId}|${param("section")}|${param("branch")}|${param("shift")}|${param("group")}|${param("version")}`}
+        <AttendanceSheet
+          key={`${exam.id}|${subject.subjectId}|${param("section")}|${param("branch")}|${param("shift")}|${param("group")}|${param("version")}|${savedKey(rows)}`}
           institute={institute}
-          exam={exam}
-          subjectId={subject.subjectId}
           rows={rows}
           title={`${exam.fullName} · ${subjectName(subject.subjectId)}`}
-          scope={`${selectedClass.name}${section ? `, Section ${section.name}` : ", all sections"}`}
+          context={`${selectedClass.name}${section ? `, Section ${section.name}` : ", all sections"}`}
+          note={
+            exam.examStart && exam.examStart > todayIso()
+              ? `This exam starts on ${exam.examStart}.`
+              : undefined
+          }
+          emptyText="No active student here takes this subject."
+          // Legacy lists each student's section when the whole class shows.
+          sectionName={
+            section ? undefined : (id) => sections.find((s) => s.id === id)?.name ?? "—"
+          }
+          onSave={(entries) => saveExamAttendance(exam, subject.subjectId, entries, user.name)}
         />
       ) : (
         <Card>
@@ -287,236 +283,15 @@ export function ExamAttendance() {
             <p className="text-sm text-muted-foreground">
               The students who take the subject are listed here to take exam attendance.
             </p>
+            {selectedClass && lockedExams > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {lockedExams} exam{lockedExams === 1 ? " is" : "s are"} hidden because editing is off or
+                results are published online.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
     </div>
-  )
-}
-
-function ExamAttendanceSheet({
-  institute,
-  exam,
-  subjectId,
-  rows,
-  title,
-  scope,
-}: {
-  institute: Institute
-  exam: TermExam
-  subjectId: number
-  rows: ExamAttendanceRow[]
-  title: string
-  scope: string
-}) {
-  const user = useCurrentUser()
-  // What is ticked now; starts from what was saved (unsaved means absent,
-  // as in the legacy sheet).
-  const [present, setPresent] = React.useState<Record<number, boolean>>(() =>
-    Object.fromEntries(rows.map(({ student, record }) => [student.id, record?.isPresent ?? false]))
-  )
-  const [confirming, setConfirming] = React.useState(false)
-
-  const isPresent = (id: number) => present[id] ?? false
-  const presentCount = rows.filter(({ student }) => isPresent(student.id)).length
-  const absentCount = rows.length - presentCount
-  const taken = rows.filter((row) => row.record)
-  const lastSaved = taken
-    .map((row) => row.record!)
-    .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))[0]
-  const unsaved = rows.filter(({ student, record }) => record?.isPresent !== isPresent(student.id)).length
-  const allPresent = rows.length > 0 && presentCount === rows.length
-  const showRoll = institute.showClassRoll
-  const actionLabel = taken.length ? "Update attendance" : "Take attendance"
-  const notHeld = exam.examStart && exam.examStart > todayIso()
-
-  function toggle(id: number, value = !isPresent(id)) {
-    setPresent((current) => ({ ...current, [id]: value }))
-  }
-
-  function markAll(value: boolean) {
-    setPresent(Object.fromEntries(rows.map(({ student }) => [student.id, value])))
-  }
-
-  function save() {
-    setConfirming(false)
-    try {
-      const { added, updated } = saveExamAttendance(
-        exam,
-        subjectId,
-        rows.map(({ student, enrolment }) => ({
-          studentId: student.id,
-          sectionId: enrolment.sectionId,
-          isPresent: isPresent(student.id),
-        })),
-        user.name
-      )
-      if (!added && !updated) toast.info("Nothing changed", { description: "The saved attendance already matches." })
-      else
-        toast.success("Exam attendance taken successfully", {
-          description: [added && `${added} added`, updated && `${updated} updated`].filter(Boolean).join(", "),
-        })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The attendance could not be saved.")
-    }
-  }
-
-  const stats = [
-    { label: "Total students", value: rows.length, className: "text-foreground" },
-    { label: "Present", value: presentCount, className: "text-emerald-600 dark:text-emerald-400" },
-    { label: "Absent", value: absentCount, className: "text-rose-600 dark:text-rose-400" },
-  ]
-
-  return (
-    <Card>
-      <CardHeader className="border-b">
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          {scope} ·{" "}
-          {lastSaved
-            ? `Taken; last saved by ${lastSaved.modifiedBy} at ${lastSaved.modifiedAt.slice(11, 16)} on ${lastSaved.modifiedAt.slice(0, 10)}.`
-            : "Exam attendance not taken yet."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {notHeld && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-            <span>This exam starts on {exam.examStart}. You can still take attendance.</span>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-          <div className="grid flex-1 grid-cols-3 divide-x rounded-lg border">
-            {stats.map((stat) => (
-              <div key={stat.label} className="flex flex-col items-center gap-0.5 px-2 py-3">
-                <span className={cn("text-2xl font-semibold tabular-nums", stat.className)}>{stat.value}</span>
-                <span className="text-xs text-muted-foreground">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-          <Button
-            type="button"
-            className="h-auto min-h-10 sm:w-48"
-            onClick={() => setConfirming(true)}
-            disabled={!rows.length}
-          >
-            <ClipboardCheckIcon data-icon="inline-start" />
-            {actionLabel}
-          </Button>
-        </div>
-
-        {rows.length ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">
-                {unsaved
-                  ? `${unsaved} student${unsaved === 1 ? "" : "s"} differ from what is saved.`
-                  : "Everything ticked is saved."}
-              </p>
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => markAll(true)}>
-                  All present
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => markAll(false)}>
-                  All absent
-                </Button>
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader className="bg-muted">
-                  <TableRow>
-                    <TableHead className="w-12">Sl</TableHead>
-                    <TableHead>{showRoll ? classRollLabel(institute) : studentIdLabel(institute)}</TableHead>
-                    <TableHead>Student name</TableHead>
-                    <TableHead className="w-28">
-                      <label className="flex items-center gap-2">
-                        <Checkbox
-                          checked={allPresent ? true : presentCount > 0 ? "indeterminate" : false}
-                          onCheckedChange={(checked) => markAll(checked === true)}
-                          aria-label="Mark all present"
-                        />
-                        Present
-                      </label>
-                    </TableHead>
-                    <TableHead>Saved</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map(({ student, enrolment, record }, index) => {
-                    const here = isPresent(student.id)
-                    return (
-                      <TableRow
-                        key={student.id}
-                        className="cursor-pointer"
-                        data-state={here ? "selected" : undefined}
-                        onClick={() => toggle(student.id)}
-                      >
-                        <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
-                        <TableCell className="tabular-nums">
-                          {showRoll ? enrolment.classRoll || "—" : student.studentIdentificationNo}
-                        </TableCell>
-                        <TableCell className="font-medium">{student.name}</TableCell>
-                        <TableCell onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            className="size-5"
-                            checked={here}
-                            onCheckedChange={(checked) => toggle(student.id, checked === true)}
-                            aria-label={`${student.name} present`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {record ? (
-                            <Badge
-                              variant="outline"
-                              className={
-                                record.isPresent
-                                  ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
-                                  : "border-rose-500/40 text-rose-700 dark:text-rose-400"
-                              }
-                            >
-                              {record.isPresent ? "Present" : "Absent"}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">Not taken</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex justify-center">
-              <Button type="button" onClick={() => setConfirming(true)}>
-                <ClipboardCheckIcon data-icon="inline-start" />
-                {actionLabel}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No active student here takes this subject.
-          </p>
-        )}
-      </CardContent>
-
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save exam attendance?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Total present: <strong className="text-foreground">{presentCount}</strong> and total
-              absent: <strong className="text-foreground">{absentCount}</strong> for {title}, {scope}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={save}>Save</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
   )
 }

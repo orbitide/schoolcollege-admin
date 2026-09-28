@@ -13,6 +13,7 @@ import {
 } from "@/components/institutes/academic/kinds"
 import { RecordActions } from "@/components/institutes/academic/record-actions"
 import { StatusBadge } from "@/components/institutes/status-badge"
+import { SurfaceTabs } from "@/components/surface-tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,16 +41,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
+import { basicSettingsHref, basicSettingsResource } from "@/lib/basic-settings"
 import { academicMediums, recordStatuses, type Institute } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
 
 const ALL = "all"
 
-// The legacy "Manage X (Admin)" page: one kind of record across every
-// institute that uses it, with institute, medium, status and name filters.
-export function ManageAdminList({ kind }: { kind: AcademicKind }) {
+// The legacy "Manage X (Admin)" / "Manage X" / "View X" pages: one kind of
+// record across every institute that uses it, with institute, medium, status
+// and name filters. The surface decides the actions: Manage adds, edits,
+// (in)activates and reranks, Admin also deletes, View only reads.
+export function ManageAdminList({
+  kind,
+  segment,
+  surface,
+}: {
+  kind: AcademicKind
+  // The Basic Settings segment the page lives under.
+  segment: string
+  surface: AccessSurface
+}) {
   const config = kindConfig(kind)
+  const can = capabilitiesFor(surface)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -109,36 +124,44 @@ export function ManageAdminList({ kind }: { kind: AcademicKind }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
-            Manage {config.plural} (Admin)
+            {surface === "View" ? "View" : "Manage"} {config.plural}
+            {surface === "Admin" && " (Admin)"}
           </h2>
           <p className="text-sm text-muted-foreground">{config.description}</p>
         </div>
-        {selected ? (
-          <Button asChild>
-            <Link href={recordHref(selected, "new")}>
-              <PlusIcon data-icon="inline-start" />
-              Add {config.singular.toLowerCase()}
-            </Link>
-          </Button>
-        ) : (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button disabled={!enabled.length}>
+        <div className="flex flex-wrap items-center gap-2">
+          <SurfaceTabs
+            resource={basicSettingsResource(segment)}
+            baseUrl={basicSettingsHref(segment)}
+            current={surface}
+          />
+          {!can.create ? null : selected ? (
+            <Button asChild>
+              <Link href={recordHref(selected, "new")}>
                 <PlusIcon data-icon="inline-start" />
                 Add {config.singular.toLowerCase()}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-y-auto">
-              <DropdownMenuLabel>For institute</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {enabled.map((institute) => (
-                <DropdownMenuItem key={institute.id} asChild>
-                  <Link href={recordHref(institute, "new")}>{institute.name}</Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+              </Link>
+            </Button>
+          ) : (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={!enabled.length}>
+                  <PlusIcon data-icon="inline-start" />
+                  Add {config.singular.toLowerCase()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-y-auto">
+                <DropdownMenuLabel>For institute</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {enabled.map((institute) => (
+                  <DropdownMenuItem key={institute.id} asChild>
+                    <Link href={recordHref(institute, "new")}>{institute.name}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -238,7 +261,14 @@ export function ManageAdminList({ kind }: { kind: AcademicKind }) {
                       record={record}
                       // Rank is per institute, so it can only be moved
                       // while one institute is shown.
-                      movable={Boolean(selected) && ranked && !needle && status === ALL && medium === ALL}
+                      movable={
+                        can.reorder &&
+                        Boolean(selected) &&
+                        ranked &&
+                        !needle &&
+                        status === ALL &&
+                        medium === ALL
+                      }
                       first={index === 0}
                       last={index === rows.length - 1}
                     />
@@ -253,6 +283,7 @@ export function ManageAdminList({ kind }: { kind: AcademicKind }) {
                       singular={config.singular}
                       instituteName={institute.name}
                       editHref={recordHref(institute, `${record.id}/edit`)}
+                      can={can}
                     />
                   </TableCell>
                 </TableRow>
