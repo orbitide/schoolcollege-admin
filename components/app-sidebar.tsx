@@ -112,6 +112,7 @@ const data = {
         { title: "Tabulation", url: "/reports/tabulation", permission: "tabulation.view" },
         { title: "Number Sheet", url: "/reports/number-sheet", permission: "number-sheet.view" },
         { title: "Student Information", url: "/reports/student-information", permission: "student-information.view" },
+        { title: "Student Statistics", url: "/reports/student-statistics", permission: "student-statistics.view" },
       ],
     },
     {

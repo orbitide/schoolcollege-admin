@@ -47,6 +47,7 @@ import { academicMediums, academicVersions } from "@/lib/institutes"
 import {
   columnLabel,
   decodeConfig,
+  DEFAULT_COLUMNS,
   DEFAULT_ROWS_PER_PAGE,
   DEFAULT_TITLE,
   encodeConfig,
@@ -59,8 +60,6 @@ import { cn } from "@/lib/utils"
 
 // Radix Select can't use "" as a value; "" here means "All …".
 const ALL = "__all"
-
-const defaultColumns = ["Roll", "StudentIdentityNo", "FullName", "Gender", "AcademicClass", "Section", "FatherName", "Mobile"]
 
 type Form = {
   institute: string
@@ -125,7 +124,7 @@ export function StudentReportForm() {
   const [form, setForm] = React.useState<Form>(() =>
     fromConfig(initial, canPick ? "" : String(institutes[0]?.id ?? ""))
   )
-  const [columns, setColumns] = React.useState<string[]>(initial?.columns ?? defaultColumns)
+  const [columns, setColumns] = React.useState<string[]>(initial?.columns ?? DEFAULT_COLUMNS)
   const [search, setSearch] = React.useState("")
   const [errors, setErrors] = React.useState<{ institute?: string; columns?: string; rowsPerPage?: string }>({})
   const [exporting, setExporting] = React.useState(false)

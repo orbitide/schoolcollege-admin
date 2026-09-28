@@ -162,6 +162,7 @@ export type ReportConfig = {
 
 export const DEFAULT_TITLE = "Dynamic Student Report"
 export const DEFAULT_ROWS_PER_PAGE = 45
+export const DEFAULT_COLUMNS = ["Roll", "StudentIdentityNo", "FullName", "Gender", "AcademicClass", "Section", "FatherName", "Mobile"]
 
 export function encodeConfig(config: ReportConfig) {
   return encodeURIComponent(JSON.stringify(config))

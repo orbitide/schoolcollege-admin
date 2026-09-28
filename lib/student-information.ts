@@ -23,7 +23,7 @@ export type StudentInformation = {
 
 // The class's subjects in the year, with the latest type each is listed
 // with (legacy MAX(SubjectType)); a group's own subjects only for that group.
-function classSubjects(sets: ClassYearSubject[], e: Enrolment) {
+export function classSubjects(sets: ClassYearSubject[], e: Enrolment) {
   const types = new Map<number, number>()
   for (const set of sets) {
     if (set.status !== "Active" || set.classId !== e.classId || set.yearId !== e.yearId) continue
@@ -35,6 +35,10 @@ function classSubjects(sets: ClassYearSubject[], e: Enrolment) {
   }
   return types
 }
+
+// A student without a subject list takes all of the class's subjects.
+export const takenSubjects = (types: Map<number, number>, e: Enrolment) =>
+  e.subjectIds.length ? e.subjectIds : [...types.keys()]
 
 export function studentInformation(
   institute: Institute,
@@ -72,8 +76,7 @@ export function studentInformation(
       if (key !== rollOrId) return []
     }
     const types = classSubjects(options.classYearSubjects, enrolment)
-    // A student without a subject list takes all of the class's subjects.
-    const taken = enrolment.subjectIds.length ? enrolment.subjectIds : [...types.keys()]
+    const taken = takenSubjects(types, enrolment)
     const kindOf = (id: number): SubjectKind =>
       id === enrolment.optionalSubjectId ? "optional" : (types.get(id) ?? 0) === 0 ? "compulsory" : "elective"
     const kindOrder: SubjectKind[] = ["compulsory", "elective", "optional"]
