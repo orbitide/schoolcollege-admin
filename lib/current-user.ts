@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { adminUsers, useUserInstitutes } from "@/lib/global-settings"
+import { adminUsers, useUserInstitutes, type AdminUser } from "@/lib/global-settings"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useTeachers } from "@/lib/teachers"
 
@@ -11,6 +11,12 @@ import { useTeachers } from "@/lib/teachers"
 // (Set it to 3 to try the panel as an institute admin of one institute, 5 as
 // an institute manager, 6 as an institute viewer, 7 as a teacher.)
 const currentUserId = 1
+
+// The SaaS owner's staff, who work across every institute (platform
+// dashboard, plans, subscriptions); everyone else works inside institutes.
+export function isPlatformAdmin(user: Pick<AdminUser, "role">) {
+  return user.role === "Super Admin"
+}
 
 export function useCurrentUser() {
   return getCurrentUser()
@@ -37,7 +43,7 @@ export function useAccessibleInstitutes() {
   const institutes = useInstitutes()
   const links = useUserInstitutes()
   return React.useMemo(() => {
-    if (user.role === "Super Admin") return institutes
+    if (isPlatformAdmin(user)) return institutes
     const allowed = new Set(
       links
         .filter((link) => link.userId === user.id && link.status === "Active")

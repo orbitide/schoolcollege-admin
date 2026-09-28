@@ -246,6 +246,16 @@ export function useSmsBalance(instituteId: number) {
   )
 }
 
+// Every institute's balance, keyed by institute id (missing means 0), for
+// the platform dashboard.
+export function useSmsBalances(): Readonly<Record<number, number>> {
+  return React.useSyncExternalStore(
+    subscribe,
+    () => balances,
+    () => seedBalances
+  )
+}
+
 export type SmsDraft = Pick<
   SmsMessage,
   "mobile" | "message" | "studentId" | "numberType" | "chars" | "parts"

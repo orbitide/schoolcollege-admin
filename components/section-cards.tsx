@@ -1,12 +1,8 @@
 "use client"
 
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { BuildingIcon, DollarSignIcon, GraduationCapIcon, LoaderIcon } from "lucide-react"
+
+import { StatCard, StatGrid } from "@/components/dashboard/stat-card"
 import { monthlyRevenue, type Institute } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 
@@ -31,62 +27,43 @@ function getSummary(institutes: Institute[]) {
   }
 }
 
+// The platform dashboard's KPI row: revenue and tenants across every
+// institute.
 export function SectionCards() {
   const summary = getSummary(useInstitutes())
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
-      <SummaryCard
+    <StatGrid>
+      <StatCard
         label="Monthly Recurring Revenue"
         value={`$${summary.mrr.toLocaleString()}`}
         headline="From active subscriptions"
         detail={`Across ${summary.paying} paying institutes`}
+        icon={<DollarSignIcon />}
       />
-      <SummaryCard
+      <StatCard
         label="Total Institutes"
         value={summary.total.toLocaleString()}
         headline={`${summary.newThisMonth} new this month`}
         detail={`${summary.trial} on trial, ${summary.suspended} suspended`}
+        icon={<BuildingIcon />}
+        href="/institutes"
       />
-      <SummaryCard
+      <StatCard
         label="Total Students"
         value={summary.students.toLocaleString()}
         headline="Enrolled across all institutes"
         detail={`Plus ${summary.teachers.toLocaleString()} teachers`}
+        icon={<GraduationCapIcon />}
       />
-      <SummaryCard
+      <StatCard
         label="On Trial"
         value={`${summary.trialShare}%`}
         headline={`${summary.trial} institutes evaluating`}
         detail="Share of institutes still on a trial"
+        icon={<LoaderIcon />}
+        href="/institutes"
       />
-    </div>
-  )
-}
-
-function SummaryCard({
-  label,
-  value,
-  headline,
-  detail,
-}: {
-  label: string
-  value: string
-  headline: string
-  detail: string
-}) {
-  return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-          {value}
-        </CardTitle>
-      </CardHeader>
-      <CardFooter className="flex-col items-start gap-1.5 text-sm">
-        <div className="line-clamp-1 font-medium">{headline}</div>
-        <div className="text-muted-foreground">{detail}</div>
-      </CardFooter>
-    </Card>
+    </StatGrid>
   )
 }

@@ -1,15 +1,18 @@
-import { ChartAreaInteractive } from "@/components/chart-area-interactive"
-import { DataTable } from "@/components/data-table"
-import { SectionCards } from "@/components/section-cards"
+import type { Metadata } from "next"
+import { Suspense } from "react"
 
+import { DashboardView } from "@/components/dashboard/dashboard-view"
+
+export const metadata: Metadata = {
+  title: "Dashboard · SMS Admin",
+}
+
+// Platform admins get the platform dashboard, institute users their
+// institute's; ?institute= picks the institute for a user with several.
 export default function Page() {
   return (
-    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-      <SectionCards />
-      <div className="px-4 lg:px-6">
-        <ChartAreaInteractive />
-      </div>
-      <DataTable />
-    </div>
+    <Suspense>
+      <DashboardView />
+    </Suspense>
   )
 }

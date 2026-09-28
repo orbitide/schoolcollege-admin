@@ -7,7 +7,7 @@ import { NavMain, filterNavItems, type NavItem, type NavMainItem } from "@/compo
 import { NavSearch, matchesQuery } from "@/components/nav-search"
 import { permissionCode, surfaceHref, surfacesOf, useCan } from "@/lib/access"
 import { basicSettingsHref, basicSettingsMenu, basicSettingsResource } from "@/lib/basic-settings"
-import { useCurrentUser } from "@/lib/current-user"
+import { isPlatformAdmin, useCurrentUser } from "@/lib/current-user"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -26,6 +26,7 @@ import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2I
 const data = {
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon />, tone: "blue" },
+    { title: "Institute Dashboard", url: "/institute-dashboard", icon: <SchoolIcon />, tone: "emerald", platform: true },
     {
       title: "Students",
       icon: <GraduationCapIcon />,
@@ -182,33 +183,37 @@ const data = {
         { title: "Common Log", url: "/basic-actions/common-log", permission: "common-log.manage" },
       ],
     },
-    { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange" },
-    { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose" },
-    { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky" },
+    { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange", platform: true },
+    { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose", platform: true },
+    { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky", platform: true },
   ] satisfies NavMainItem[],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
     { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
   ],
   documents: [
-    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
-    { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const },
+    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const, platform: true },
+    { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const, platform: true },
   ],
 }
 
 // The menu as the current user may use it: an item with a resource links to
 // the first surface they hold (Admin, else Manage, else View) and is dropped
 // when they hold none; a menu left empty is dropped too. The page's surface
-// tabs lead to the others.
-function resolveNav(items: NavMainItem[], can: (code: string) => boolean) {
+// tabs lead to the others. Platform pages show to platform admins only.
+function resolveNav(items: NavMainItem[], can: (code: string) => boolean, platform: boolean) {
   const resolve = (item: NavItem): NavItem[] => {
+    if (item.platform && !platform) return []
     if (item.permission && !can(item.permission)) return []
+    // A platform admin's /dashboard is the platform one, beside Institute Dashboard.
+    if (platform && item.url === "/dashboard") return [{ ...item, title: "Platform Dashboard" }]
     if (!item.resource) return [item]
     const surface = surfacesOf(item.resource).find((s) => can(permissionCode(item.resource!, s)))
     return surface ? [{ ...item, href: surfaceHref(item.url, surface) }] : []
   }
   return items.flatMap<NavMainItem>((item) => {
     if (!("items" in item)) return resolve(item)
+    if (item.platform && !platform) return []
     const subs = item.items.flatMap(resolve)
     return subs.length ? [{ ...item, items: subs }] : []
   })
@@ -217,12 +222,17 @@ function resolveNav(items: NavMainItem[], can: (code: string) => boolean) {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = useCurrentUser()
   const can = useCan()
-  const navMain = React.useMemo(() => resolveNav(data.navMain, can), [can])
+  const platform = isPlatformAdmin(user)
+  const navMain = React.useMemo(() => resolveNav(data.navMain, can, platform), [can, platform])
+  const documents = React.useMemo(
+    () => data.documents.filter((item) => !item.platform || platform),
+    [platform]
+  )
   const [query, setQuery] = React.useState("")
   const nothingFound =
     query.trim() !== "" &&
     filterNavItems(navMain, query).length === 0 &&
-    !data.documents.some((item) => matchesQuery(item.name, query)) &&
+    !documents.some((item) => matchesQuery(item.name, query)) &&
     !data.navSecondary.some((item) => matchesQuery(item.title, query))
 
   return (
@@ -252,7 +262,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarSeparator className="mx-0" />
       <SidebarContent className="gap-0 py-1">
         <NavMain items={navMain} query={query} />
-        <NavDocuments items={data.documents} query={query} />
+        <NavDocuments items={documents} query={query} />
         {nothingFound && (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <span className="flex size-10 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground/60">

@@ -44,6 +44,9 @@ export type NavItem = {
   // Permission code (lib/access.ts) the item needs, for a single page with
   // no surfaces to choose between (e.g. "sms-send.manage").
   permission?: string
+  // Platform console page (plans, subscriptions, platform users): shown to
+  // platform admins only, never inside an institute's workspace.
+  platform?: boolean
   icon?: React.ReactNode
   tone?: NavTone
 }
