@@ -189,7 +189,13 @@ export type AcademicClass = AcademicRecord & {
 
 // Capacity 0 means unlimited. Ids are null and `version` is "" when that
 // structure is turned off for the institute.
+// Legacy Section: `medium` is "" for all mediums; names and short names are
+// unique, and ranks counted, among sections sharing every other field.
 export type Section = AcademicRecord & {
+  shortName: string
+  relatedSectionName: string
+  medium: string
+  yearId: number | null
   classId: number
   branchId: number | null
   shiftId: number | null

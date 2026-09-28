@@ -242,6 +242,7 @@ export function StudentExamList() {
   const sectionOptions = sections.filter(
     (s) =>
       s.instituteId === iid &&
+      s.status !== "Deleted" &&
       is(s.classId, "class") &&
       (!param("branch") || s.branchId == null || String(s.branchId) === param("branch")) &&
       (!param("shift") || s.shiftId == null || String(s.shiftId) === param("shift"))

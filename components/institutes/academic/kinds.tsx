@@ -305,6 +305,8 @@ export const academicKinds = {
     plural: "Shifts",
     description: "Daily sessions such as Morning and Day, used by classes and routines.",
     toggle: "enableShift",
+    softDelete: true,
+    manageDeletes: true,
     fields: [],
     columns: [],
     inUse: (record) =>
@@ -508,15 +510,34 @@ export const academicKinds = {
     singular: "Section",
     plural: "Sections",
     description: "Divisions of a class, such as Section A, that students are placed in.",
-    uniqueScope: ["classId", "shiftId", "branchId", "version"],
+    // Legacy: names and short names are unique among sections sharing every
+    // other field (as ranks are counted).
+    uniqueScope: ["classId", "shiftId", "branchId", "version", "medium", "yearId", "gender", "groupId"],
+    softDelete: true,
+    manageDeletes: true,
+    recordFilters: [
+      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "yearId", label: "Year", allLabel: "All years", store: asEditable(yearStore) },
+    ],
     fields: [
+      mediumField,
       {
         key: "classId",
         label: "Class",
         type: "record",
         required: true,
         source: asEditable(classStore),
+        sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
       },
+      {
+        key: "yearId",
+        label: "Year",
+        type: "record",
+        required: true,
+        source: asEditable(yearStore),
+      },
+      { key: "shortName", label: "Short name", type: "text", required: true, unique: true },
+      { key: "relatedSectionName", label: "Related section", type: "text" },
       {
         key: "branchId",
         label: "Branch",
@@ -568,13 +589,19 @@ export const academicKinds = {
     ],
     columns: [
       {
+        label: "Branch",
+        showWhen: (institute) => institute.enableBranch,
+        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+      },
+      mediumColumn,
+      {
         label: "Class",
         render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} />,
       },
       {
-        label: "Branch",
-        showWhen: (institute) => institute.enableBranch,
-        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+        label: "Year",
+        render: (r) =>
+          r.yearId == null ? "All" : <RecordName store={asEditable(yearStore)} id={r.yearId} />,
       },
       {
         label: "Shift",
@@ -596,6 +623,8 @@ export const academicKinds = {
         showWhen: (institute) => institute.enableSectionGender,
         render: (r) => String(r.gender || "Any"),
       },
+      { label: "Short Name", render: (r) => String(r.shortName || "—") },
+      { label: "Related Section", render: (r) => String(r.relatedSectionName || "—") },
       {
         label: "Capacity",
         align: "right",
@@ -723,6 +752,8 @@ export const academicKinds = {
     singular: "Session",
     plural: "Sessions",
     description: "Admission sessions for classes that run across years, such as 2025-26.",
+    softDelete: true,
+    manageDeletes: true,
     fields: [],
     columns: [],
     studentMatch: (r, _s, e) => e?.sessionId === r.id,

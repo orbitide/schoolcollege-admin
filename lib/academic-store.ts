@@ -535,17 +535,27 @@ export const sectionStore = createRecordStore<Section>(
         instituteId: 1,
         classId,
         name,
+        shortName: name,
+        relatedSectionName: "",
+        medium: "",
+        yearId: 2,
         branchId: 1,
         shiftId: index + 1,
         version: "",
         groupId: null,
         capacity: 50,
         gender: "Any" as const,
-        rank: n + 1,
+        // Each sits alone in its shift, so first in its ranks.
+        rank: 1,
         status: "Active" as const,
       }
     })
-  )
+  ),
+  {
+    // Legacy ranks a section among those sharing every other field.
+    rankWithin: ["branchId", "medium", "version", "classId", "shiftId", "yearId", "gender", "groupId"],
+    compare: (a, b) => a.classId - b.classId || a.rank - b.rank || a.name.localeCompare(b.name),
+  }
 )
 
 export const subjectStore = createRecordStore<Subject>(
