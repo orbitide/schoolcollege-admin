@@ -206,6 +206,38 @@ const data = {
   ],
 }
 
+export type PermissionMenu = {
+  title: string
+  items: { title: string; codes: { code: string; label: string }[] }[]
+}
+
+// Every permission the menu checks, grouped as the sidebar shows it: the
+// tree Users › Extra Permission picks from (legacy module › admin menu ›
+// menu item). Items that check nothing aren't listed; a code two items share
+// shows once, under both titles.
+export function permissionMenus(): PermissionMenu[] {
+  const seen = new Map<string, { title: string }>()
+  return (data.navMain as NavMainItem[]).flatMap((menu) => {
+    const items = ("items" in menu ? menu.items : [menu]).flatMap((item) => {
+      const codes = item.resource
+        ? surfacesOf(item.resource).map((s) => ({ code: permissionCode(item.resource!, s), label: s }))
+        : item.permission
+          ? [{ code: item.permission, label: item.permission.endsWith(".view") ? "View" : "Manage" }]
+          : []
+      const shared = codes.length === 1 ? seen.get(codes[0]!.code) : undefined
+      if (shared) {
+        shared.title += ` / ${item.title}`
+        return []
+      }
+      if (!codes.length) return []
+      const entry = { title: item.title, codes }
+      codes.forEach((c) => seen.set(c.code, entry))
+      return [entry]
+    })
+    return items.length ? [{ title: menu.title, items }] : []
+  })
+}
+
 // The menu as the current user may use it: an item with a resource links to
 // the first surface they hold (Admin, else Manage, else View) and is dropped
 // when they hold none; a menu left empty is dropped too. The page's surface

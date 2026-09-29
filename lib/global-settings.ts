@@ -46,6 +46,10 @@ export type AdminUser = {
   // Legacy IsRequireLogin: the session is ended and the user must sign in
   // again (force logout, password reset, block). Signing in clears it.
   requireLogin: boolean
+  // Legacy Extra Permission: permission codes (lib/access.ts) allowed or
+  // denied to this user on top of their role. A code is in at most one list.
+  extraAllow: string[]
+  extraDeny: string[]
   createdBy: string
   createdAt: string
   modifiedBy: string
@@ -82,6 +86,8 @@ const userSeedStamp = {
   forcePasswordChange: false,
   twoFactorEnabled: false,
   requireLogin: false,
+  extraAllow: [] as string[],
+  extraDeny: [] as string[],
   status: "Active" as const,
   createdBy: "Super Admin",
   createdAt: "2026-01-05T09:00:00.000Z",
@@ -196,6 +202,8 @@ export function addAdminUser(input: AdminUserInput, by: string) {
     ...userFields(input),
     status: "Active",
     requireLogin: false,
+    extraAllow: [],
+    extraDeny: [],
     createdBy: by,
     createdAt: now,
     modifiedBy: by,
@@ -251,6 +259,16 @@ export function resetAdminUserPassword(id: number, by: string) {
 
 export function setAdminUserRole(id: number, role: UserRole, by: string) {
   patchUser(id, { role }, by)
+}
+
+// Legacy ExtraPermissionOperation / ExtraDenyOperation: allowing a code
+// drops it from the denies and vice versa. It takes hold at once, as legacy
+// drops the user from its permission cache.
+export function saveUserExtraPermissions(id: number, allow: string[], deny: string[], by: string) {
+  const denied = new Set(deny)
+  const extraAllow = [...new Set(allow)].filter((code) => !denied.has(code)).sort()
+  const extraDeny = [...denied].sort()
+  patchUser(id, { extraAllow, extraDeny }, by)
 }
 
 // Who has a live session (legacy GlobalCache NccUser.IsOnline). Kept off the

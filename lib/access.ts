@@ -3,7 +3,7 @@
 import * as React from "react"
 
 import { useCurrentUser } from "@/lib/current-user"
-import type { UserRole } from "@/lib/global-settings"
+import type { AdminUser, UserRole } from "@/lib/global-settings"
 
 // The three ways into a resource (legacy ManageAdmin / Manage / ManageView,
 // ezducms AccessSurface). Each is its own permission; a role just bundles
@@ -45,9 +45,22 @@ const roleGrants: Record<UserRole, (code: string) => boolean> = {
   Teacher: () => false,
 }
 
+// The role's grant as adjusted by the user's Extra Permission: a deny always
+// wins, an allow adds. A super admin holds everything (legacy superadmins
+// bypass permission checks).
+export function grants(user: Pick<AdminUser, "role" | "extraAllow" | "extraDeny">, code: string) {
+  if (user.role === "Super Admin") return true
+  if (user.extraDeny.includes(code)) return false
+  return user.extraAllow.includes(code) || roleGrants[user.role](code)
+}
+
+export function roleGrantsCode(role: UserRole, code: string) {
+  return roleGrants[role](code)
+}
+
 export function useCan() {
   const user = useCurrentUser()
-  return React.useCallback((code: string) => roleGrants[user.role](code), [user.role])
+  return React.useCallback((code: string) => grants(user, code), [user])
 }
 
 // The surfaces of a resource the current user holds, Admin first.

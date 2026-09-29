@@ -2,7 +2,16 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ChevronDownIcon, LogOutIcon, PencilIcon, PlusIcon, SearchIcon } from "lucide-react"
+import {
+  BuildingIcon,
+  ChevronDownIcon,
+  KeyRoundIcon,
+  LogOutIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -90,6 +99,7 @@ export function UserList() {
   const [role, setRole] = React.useState<UserRole | "">("")
   const [confirm, setConfirm] = React.useState<BulkOperation | null>(null)
   const [newPasswords, setNewPasswords] = React.useState<{ userName: string; password: string }[]>([])
+  const [results, setResults] = React.useState<Outcome[]>([])
 
   // Super admins first, then by user name (legacy OrderByDescending
   // IsSuperAdmin, ThenBy UserName).
@@ -127,13 +137,13 @@ export function UserList() {
     return true
   }
 
+  // Every user's result stays on the page until dismissed (legacy
+  // NccAlert.ShowMessages, ezducms's results panel).
   function report(outcomes: Outcome[]) {
-    const failed = outcomes.filter((o) => !o.ok)
-    const done = outcomes.length - failed.length
-    if (done) toast.success(`${done} of ${outcomes.length} ${outcomes.length === 1 ? "user" : "users"} updated`, {
-      description: outcomes.filter((o) => o.ok).map((o) => o.message).join(" "),
-    })
-    failed.forEach((o) => toast.error(o.message))
+    setResults(outcomes)
+    const failed = outcomes.filter((o) => !o.ok).length
+    if (failed) toast.error(`${failed} of ${outcomes.length} could not be completed.`)
+    else toast.success("Operation successful.")
   }
 
   function applyBulk() {
@@ -244,6 +254,22 @@ export function UserList() {
         </form>
       </div>
 
+      {results.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+          <ul className="flex-1 space-y-1">
+            {results.map((r, i) => (
+              <li key={i} className={r.ok ? undefined : "text-destructive"}>
+                {r.message}
+              </li>
+            ))}
+          </ul>
+          <Button variant="ghost" size="icon" className="size-7" onClick={() => setResults([])}>
+            <XIcon />
+            <span className="sr-only">Dismiss results</span>
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader className="bg-muted">
@@ -261,6 +287,8 @@ export function UserList() {
               <TableHead>Email</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Roles</TableHead>
+              <TableHead className="w-20 text-center">Extra Allow</TableHead>
+              <TableHead className="w-20 text-center">Extra Deny</TableHead>
               <TableHead className="w-28 text-center">Actions</TableHead>
               <TableHead className="w-32 text-center">Status</TableHead>
             </TableRow>
@@ -268,7 +296,7 @@ export function UserList() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   No users found.
                 </TableCell>
               </TableRow>
@@ -304,8 +332,17 @@ export function UserList() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="tabular-nums">{user.mobile || "—"}</TableCell>
                     <TableCell>{user.role}</TableCell>
+                    <TableCell className="text-center tabular-nums">{user.extraAllow.length}</TableCell>
+                    <TableCell className="text-center tabular-nums">{user.extraDeny.length}</TableCell>
                     <TableCell className="text-center">
-                      <UserActions user={user} online={status === "Online"} />
+                      <UserActions
+                        user={user}
+                        status={status}
+                        onForceLogout={() => {
+                          requireAdminUserLogin(user.id, me.name)
+                          report([{ ok: true, message: `Logout successful for user ${user.userName}.` }])
+                        }}
+                      />
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={cn(statusClass[status])}>
@@ -396,10 +433,23 @@ export function UserList() {
   )
 }
 
-// Legacy row actions: Update User, and Force Logout while the user is online.
-function UserActions({ user, online }: { user: AdminUser; online: boolean }) {
+// Legacy row actions: Update User, Extra Permission, Data Permission and
+// Force Logout. Legacy lists Force Logout only for online users; like ezducms
+// it is on every row here, since a session on another device may not show as
+// online. It's off for yourself (use Log out) and for users already signed
+// out (Blocked / Require Login).
+function UserActions({
+  user,
+  status,
+  onForceLogout,
+}: {
+  user: AdminUser
+  status: UserSessionStatus
+  onForceLogout: () => void
+}) {
   const me = useCurrentUser()
   const self = user.id === me.id
+  const signedOut = status === "Blocked" || status === "Require Login"
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -408,27 +458,35 @@ function UserActions({ user, online }: { user: AdminUser; online: boolean }) {
           <ChevronDownIcon data-icon="inline-end" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem asChild>
           <Link href={`/users/${user.id}/edit`}>
             <PencilIcon />
             Update User
           </Link>
         </DropdownMenuItem>
-        {online && !self && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => {
-                requireAdminUserLogin(user.id, me.name)
-                toast.success(`${user.userName} logged out`)
-              }}
-            >
-              <LogOutIcon />
-              Force Logout
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuItem asChild>
+          <Link href={`/users/${user.id}/extra-permission`}>
+            <KeyRoundIcon />
+            Extra Permission
+          </Link>
+        </DropdownMenuItem>
+        {/* Legacy Data Permission limits which records a user reaches; here
+            that is the institutes they may work with. */}
+        <DropdownMenuItem asChild>
+          <Link href={`/basic-settings/user-institutes/user-wise?user=${user.id}`}>
+            <BuildingIcon />
+            Data Permission
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" disabled={self || signedOut} onSelect={onForceLogout}>
+          <LogOutIcon />
+          Force Logout
+          {(self || signedOut) && (
+            <span className="ml-auto text-xs text-muted-foreground">{self ? "You" : "Signed out"}</span>
+          )}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
