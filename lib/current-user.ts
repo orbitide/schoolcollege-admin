@@ -2,14 +2,23 @@
 
 import * as React from "react"
 
-import { getAdminUsers, useAdminUsers, useUserInstitutes, type AdminUser } from "@/lib/global-settings"
+import {
+  getAdminUsers,
+  markSignedIn,
+  passwordOf,
+  setUserOnline,
+  useAdminUsers,
+  useUserInstitutes,
+  type AdminUser,
+} from "@/lib/global-settings"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useTeachers } from "@/lib/teachers"
 
 // ---- Dummy session ----
 // Who is using the admin panel: the user signed in on the login page, kept
-// in localStorage so a refresh stays signed in. Every active user shares
-// DEMO_PASSWORD. Replace with the auth API once the backend exists.
+// in localStorage so a refresh stays signed in. Every active user signs in with
+// DEMO_PASSWORD unless Users/CreateEdit set their own. Replace with the auth
+// API once the backend exists.
 
 export const DEMO_PASSWORD = "123456"
 
@@ -51,19 +60,22 @@ export function useSessionUserId() {
   return React.useSyncExternalStore(subscribeSession, readSession, () => null)
 }
 
-// Signs in an active user by email and the demo password. Throws with the
+// Signs in an active user by email and their password. Throws with the
 // message to show when that isn't possible.
 export function signIn(email: string, password: string) {
   const user = getAdminUsers().find(
     (u) => u.email.toLowerCase() === email.trim().toLowerCase()
   )
-  if (!user || password !== DEMO_PASSWORD) throw new Error("Invalid email or password.")
+  if (!user || password !== (passwordOf(user.id) ?? DEMO_PASSWORD)) throw new Error("Invalid email or password.")
   if (user.status !== "Active") throw new Error("This user is blocked and can't sign in.")
+  markSignedIn(user.id)
   setSession(user.id)
   return user
 }
 
 export function signOut() {
+  const userId = readSession()
+  if (userId != null) setUserOnline(userId, false)
   setSession(null)
 }
 

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 
-import { useAdminUsers } from "@/lib/global-settings"
+import { setUserOnline, useAdminUsers } from "@/lib/global-settings"
 import { signOut, useSessionUserId } from "@/lib/current-user"
 
 const noopSubscribe = () => () => {}
@@ -18,7 +18,8 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
   const userId = useSessionUserId()
   const users = useAdminUsers()
   const user = users.find((u) => u.id === userId)
-  const allowed = user?.status === "Active"
+  // Require Login (force logout, password reset) ends the session too.
+  const allowed = user?.status === "Active" && !user.requireLogin
   // Whether someone was signed in here: then losing the session is a log
   // out (or a block), and the next user starts from the dashboard rather
   // than this page.
@@ -28,6 +29,8 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
     if (!hydrated) return
     if (allowed) {
       wasSignedIn.current = true
+      // A session restored after a refresh is live again.
+      if (userId != null) setUserOnline(userId, true)
       return
     }
     // A blocked or removed user's session ends too.

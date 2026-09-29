@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { DEMO_PASSWORD, signIn, useSessionUserId } from "@/lib/current-user"
-import { useAdminUsers, type AdminUser } from "@/lib/global-settings"
+import { passwordOf, useAdminUsers, type AdminUser } from "@/lib/global-settings"
 import { cn } from "@/lib/utils"
 
 // Where to go after signing in: the page that sent the user here, when it
@@ -143,12 +143,12 @@ export function LoginForm() {
 
   const submitRef = React.useRef<HTMLButtonElement>(null)
 
-  // Fills the form with a demo user's email and the demo password; Sign in
+  // Fills the form with a demo user's email and password; Sign in
   // (or Enter) then signs in as them.
-  function fillDemoUser(userEmail: string) {
+  function fillDemoUser(user: AdminUser) {
     setError(null)
-    setEmail(userEmail)
-    setPassword(DEMO_PASSWORD)
+    setEmail(user.email)
+    setPassword(passwordOf(user.id) ?? DEMO_PASSWORD)
     submitRef.current?.focus()
   }
 
@@ -242,7 +242,7 @@ export function LoginForm() {
                 <button
                   key={u.id}
                   type="button"
-                  onClick={() => fillDemoUser(u.email)}
+                  onClick={() => fillDemoUser(u)}
                   aria-pressed={email.trim().toLowerCase() === u.email.toLowerCase()}
                   className="group flex items-center gap-3 rounded-lg border bg-card p-2.5 text-left transition-colors hover:border-foreground/20 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:ring-1 aria-pressed:ring-primary"
                 >

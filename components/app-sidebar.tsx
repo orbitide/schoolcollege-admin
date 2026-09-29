@@ -185,7 +185,16 @@ const data = {
     },
     { title: "Pricing", url: "/plans", icon: <PackageIcon />, tone: "orange", platform: true },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose", platform: true },
-    { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky", platform: true },
+    {
+      title: "Users",
+      icon: <UsersIcon />,
+      tone: "sky",
+      platform: true,
+      items: [
+        { title: "New User", url: "/users/new" },
+        { title: "Manage Users", url: "/users" },
+      ],
+    },
   ] satisfies NavMainItem[],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
