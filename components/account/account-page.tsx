@@ -14,6 +14,7 @@ import {
   disableOwnTwoFactor,
   profileErrors,
   updateOwnProfile,
+  useAdminUsers,
   userGenders,
   type AdminUser,
   type ProfileInput,
@@ -24,7 +25,12 @@ import {
 // signed-in user's own details, password and two-factor sign-in. External
 // logins aren't ported (legacy: "No active external login provider found").
 export function AccountPage() {
-  const user = useCurrentUser()
+  const currentUser = useCurrentUser()
+  // The full profile (mobile, gender, 2FA…) still lives in the in-memory users
+  // list until the users API (Step 2); the signed-in user only carries the basics.
+  const user = useAdminUsers().find((u) => u.id === currentUser.id)
+
+  if (!user) return null
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">

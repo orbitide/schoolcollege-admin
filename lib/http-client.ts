@@ -2,8 +2,9 @@ import axios, { type AxiosError, type AxiosRequestConfig } from "axios"
 
 // The one HTTP client every store talks to the SchoolCollege API through.
 // Requests go to /api/v1 on this origin; next.config.ts proxies them to the
-// .NET host, so the sign-in cookie stays same-origin (no CORS, no tokens in
-// JavaScript). Browser-only: the stores that use it are client modules.
+// .NET host. Whether someone is signed in is the backend's business (its
+// httpOnly cookie); the frontend only sees the user data it returns.
+// Browser-only: the stores that use it are client modules.
 
 // Successful responses arrive as { data } (Framework/Api/ApiResponse.cs).
 type ApiEnvelope<T> = { data: T }
@@ -58,26 +59,18 @@ function toApiError(error: AxiosError<ProblemDetails>): ApiError {
   return new ApiError(message, response.status, fieldErrors, problem.traceId)
 }
 
+// Same-origin requests: the browser sends and receives the API's httpOnly
+// session cookie on its own; nothing here reads or stores it.
 const instance = axios.create({
   baseURL: "/api/v1",
-  withCredentials: true,
   timeout: 30_000,
   headers: { Accept: "application/json" },
 })
 
-// Called when the API answers 401 (the session ended or was revoked), so the
-// session store can sign the user out. Set by lib/current-user.ts.
-let unauthorizedHandler: (() => void) | undefined
-
-export function onUnauthorized(handler: () => void) {
-  unauthorizedHandler = handler
-}
-
-instance.interceptors.response.use(undefined, (error: AxiosError<ProblemDetails>) => {
-  const apiError = toApiError(error)
-  if (apiError.status === 401) unauthorizedHandler?.()
-  return Promise.reject(apiError)
-})
+// Every failure becomes an ApiError; a 401 (no valid session) is status 401.
+instance.interceptors.response.use(undefined, (error: AxiosError<ProblemDetails>) =>
+  Promise.reject(toApiError(error))
+)
 
 // Unwraps { data }; an empty response (204) resolves to undefined.
 const unwrap = <T>(response: { data: ApiEnvelope<T> | "" }) =>

@@ -1,48 +1,55 @@
 "use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 
-import { setUserOnline, useAdminUsers } from "@/lib/global-settings"
-import { signOut, useSessionUserId } from "@/lib/current-user"
+import { setUserOnline } from "@/lib/global-settings"
+import {
+  CurrentUserContext,
+  fetchCurrentUser,
+  setStampUser,
+  type CurrentUser,
+} from "@/lib/current-user"
 
-const noopSubscribe = () => () => {}
-
-// Shows the panel only to a signed-in, active user; anyone else goes to the
-// login page and comes back here after signing in. The session lives in the
-// browser, so nothing renders until the page has hydrated.
+// Shows the panel only when the backend says someone is signed in: on load it
+// asks GET /auth/me (the API checks its own session cookie). A user coming
+// back means signed in, and is provided to every page below; a 401 sends the
+// browser to the login page, which returns here after signing in.
 export function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname()
-  const hydrated = React.useSyncExternalStore(noopSubscribe, () => true, () => false)
-  const userId = useSessionUserId()
-  const users = useAdminUsers()
-  const user = users.find((u) => u.id === userId)
-  // Require Login (force logout, password reset) ends the session too.
-  const allowed = user?.status === "Active" && !user.requireLogin
-  // Whether someone was signed in here: then losing the session is a log
-  // out (or a block), and the next user starts from the dashboard rather
-  // than this page.
-  const wasSignedIn = React.useRef(false)
+  const [user, setUser] = React.useState<CurrentUser | null>(null)
+  const [unreachable, setUnreachable] = React.useState(false)
 
   React.useEffect(() => {
-    // Wait for the API to say whose session this is.
-    if (!hydrated || userId === undefined) return
-    if (allowed) {
-      wasSignedIn.current = true
-      // A session restored after a refresh is live again.
-      if (userId != null) setUserOnline(userId, true)
-      return
+    let active = true
+    fetchCurrentUser()
+      .then((found) => {
+        if (!active) return
+        if (found) {
+          setStampUser(found)
+          // The Users page's Online dot (in-memory until the users API).
+          setUserOnline(found.id, true)
+          setUser(found)
+          return
+        }
+        const back = `${window.location.pathname}${window.location.search}`
+        router.replace(back === "/dashboard" ? "/login" : `/login?returnUrl=${encodeURIComponent(back)}`)
+      })
+      .catch(() => {
+        if (active) setUnreachable(true)
+      })
+    return () => {
+      active = false
     }
-    // A blocked or removed user's session ends too.
-    if (userId != null) signOut()
-    const back = `${pathname}${window.location.search}`
-    router.replace(
-      wasSignedIn.current || back === "/dashboard"
-        ? "/login"
-        : `/login?returnUrl=${encodeURIComponent(back)}`
-    )
-  }, [hydrated, allowed, userId, pathname, router])
+  }, [router])
 
-  return hydrated && allowed ? children : null
+  if (unreachable) {
+    return (
+      <p role="alert" className="m-auto p-6 text-center text-sm text-muted-foreground">
+        Can&apos;t reach the server. Check that the API is running, then reload the page.
+      </p>
+    )
+  }
+
+  return user ? <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider> : null
 }

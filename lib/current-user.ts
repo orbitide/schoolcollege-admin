@@ -3,69 +3,60 @@
 import * as React from "react"
 
 import {
-  getAdminUsers,
   markSignedIn,
   setOwnPassword,
-  setUserOnline,
-  useAdminUsers,
   useUserInstitutes,
   type AdminUser,
 } from "@/lib/global-settings"
-import { ApiError, httpClient, onUnauthorized } from "@/lib/http-client"
+import { ApiError, httpClient } from "@/lib/http-client"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useTeachers } from "@/lib/teachers"
 
-// ---- Session ----
-// Who is using the admin panel. The session is the API's httpOnly cookie
-// (SchoolCollege AuthController); this module only remembers whose it is.
-// The users themselves are still the in-memory list in lib/global-settings,
-// whose seed ids and emails match the API's development seed.
+// ---- Signed-in user ----
+// Whether someone is signed in is decided by the backend alone, through its
+// httpOnly session cookie (SchoolCollege AuthController). The frontend never
+// reads or stores it: it asks GET /auth/me, and the user data coming back is
+// what "signed in" means here. The user lives in React memory (RequireLogin's
+// context) and is fetched again on every page load.
 
-// The API's development seed password (DevelopmentSeeder).
+// The seed migration's demo password (SeedDemoUsers).
 export const DEMO_PASSWORD = "123456"
 
-const sessionListeners = new Set<() => void>()
-// undefined: not asked the API yet (or still asking); null: signed out.
-let sessionUserId: number | null | undefined
-let sessionRequest: Promise<void> | undefined
+// What login and /auth/me return about the signed-in user (CurrentUser in
+// Framework/Identity/AuthContracts.cs).
+export type CurrentUser = Pick<
+  AdminUser,
+  "id" | "userName" | "name" | "email" | "role" | "profilePicture" | "forcePasswordChange" | "extraAllow" | "extraDeny"
+>
 
-function setSession(userId: number | null) {
-  sessionUserId = userId
-  sessionListeners.forEach((listener) => listener())
+// The user the session cookie belongs to, or null when there's no valid
+// session (the API answers 401).
+export async function fetchCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    return await httpClient.get<CurrentUser>("/auth/me")
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null
+    throw error
+  }
 }
 
-// Asks the API once per page load whose cookie this browser holds.
-function loadSession() {
-  sessionRequest ??= httpClient
-    .get<AdminUser | null>("/auth/session")
-    .then((user) => setSession(user?.id ?? null))
-    .catch(() => setSession(null))
-}
-
-function subscribeSession(listener: () => void) {
-  loadSession()
-  sessionListeners.add(listener)
-  return () => sessionListeners.delete(listener)
-}
-
-// A 401 from any call means the session ended (expired, blocked, forced out).
-onUnauthorized(() => {
-  if (sessionUserId != null) setSession(null)
-})
-
-// The signed-in user's id; null when signed out, undefined while the API
-// hasn't answered yet (and on the server).
-export function useSessionUserId() {
-  return React.useSyncExternalStore(subscribeSession, () => sessionUserId, () => undefined)
-}
-
-// Signs in by email (or user name) and password. Throws an ApiError with
-// the message to show when that isn't possible.
+// Signs in by email (or user name) and password; the API sets its cookie and
+// returns the user. Throws an ApiError with the message to show otherwise.
 export async function signIn(email: string, password: string) {
-  const user = await httpClient.post<AdminUser>("/auth/login", { login: email.trim(), password })
+  const user = await httpClient.post<CurrentUser>("/auth/login", { login: email.trim(), password })
   markSignedIn(user.id)
-  setSession(user.id)
   return user
+}
+
+// Provided by RequireLogin once /auth/me has answered with a user.
+export const CurrentUserContext = React.createContext<CurrentUser | null>(null)
+
+// The same user for code outside React (stores stamping who wrote a row).
+// A mirror of the context value, set by RequireLogin; never a login flag.
+let stampUser: Pick<CurrentUser, "id" | "name"> | null = null
+
+export function setStampUser(user: Pick<CurrentUser, "id" | "name"> | null) {
+  stampUser = user
 }
 
 type PasswordChange = { oldPassword: string; newPassword: string; confirmPassword: string }
@@ -86,11 +77,17 @@ export async function changeOwnPassword(input: PasswordChange): Promise<Partial<
   return {}
 }
 
-export function signOut() {
-  if (sessionUserId != null) setUserOnline(sessionUserId, false)
-  setSession(null)
-  // Ends the cookie; failing here (server down) still leaves this tab signed out.
-  httpClient.post("/auth/logout").catch(() => {})
+// The API ends the session (clears its cookie); a full page load to the login
+// page then drops everything this tab held in memory.
+export async function signOut() {
+  try {
+    await httpClient.post("/auth/logout")
+  } finally {
+    // A full load on purpose (not router.push): nothing the previous user
+    // loaded may survive in memory.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign("/login")
+  }
 }
 
 // The SaaS owner's staff, who work across every institute (platform
@@ -99,19 +96,17 @@ export function isPlatformAdmin(user: Pick<AdminUser, "role">) {
   return user.role === "Super Admin"
 }
 
-// The signed-in user. Pages sit behind RequireLogin, so there always is
-// one there; the first user stands in only while it redirects.
-export function useCurrentUser() {
-  const users = useAdminUsers()
-  const userId = useSessionUserId()
-  return users.find((user) => user.id === userId) ?? users[0]
+// The signed-in user. Pages sit behind RequireLogin, which only renders them
+// once /auth/me has returned the user.
+export function useCurrentUser(): CurrentUser {
+  const user = React.useContext(CurrentUserContext)
+  if (!user) throw new Error("useCurrentUser() must be used inside <RequireLogin>.")
+  return user
 }
 
 // The same user outside React, for stores that stamp what they write.
-export function getCurrentUser() {
-  const users = getAdminUsers()
-  const userId = typeof window === "undefined" ? null : sessionUserId
-  return users.find((user) => user.id === userId) ?? users[0]
+export function getCurrentUser(): Pick<CurrentUser, "id" | "name"> {
+  return stampUser ?? { id: 0, name: "System" }
 }
 
 // The teacher the current user signs in as (legacy

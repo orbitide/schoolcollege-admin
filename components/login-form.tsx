@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { DEMO_PASSWORD, signIn, useSessionUserId } from "@/lib/current-user"
+import { DEMO_PASSWORD, fetchCurrentUser, signIn } from "@/lib/current-user"
 import type { AdminUser } from "@/lib/global-settings"
 import { httpClient } from "@/lib/http-client"
 import { cn } from "@/lib/utils"
@@ -132,21 +132,25 @@ function BrandPanel() {
   )
 }
 
-// The dummy login: an active user's email and the shared demo password, or
-// one click on a user to try the panel in that role.
+// Sign in against the API (email or user name and password), or one click on
+// a seeded demo user to try the panel in that role.
 export function LoginForm() {
   const router = useRouter()
   const users = useDemoUsers()
-  const signedIn = useSessionUserId() != null
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  // Already signed in (another tab, or the back button): skip the form.
+  // Already signed in (another tab, or the back button): the backend says so
+  // by returning the user, so skip the form.
   React.useEffect(() => {
-    if (signedIn) router.replace(returnUrl())
-  }, [signedIn, router])
+    fetchCurrentUser()
+      .then((user) => {
+        if (user) router.replace(returnUrl())
+      })
+      .catch(() => {})
+  }, [router])
 
   const [pending, setPending] = React.useState(false)
 
@@ -156,10 +160,11 @@ export function LoginForm() {
     setPending(true)
     setError(null)
     try {
+      // The user coming back means the backend signed us in.
       await signIn(email, password)
+      router.replace(returnUrl())
     } catch (reason) {
       setError((reason as Error).message)
-    } finally {
       setPending(false)
     }
   }
