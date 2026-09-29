@@ -1,48 +1,76 @@
 "use client"
 
 import * as React from "react"
+import Highlight from "@tiptap/extension-highlight"
 import Image from "@tiptap/extension-image"
-import Placeholder from "@tiptap/extension-placeholder"
+import Subscript from "@tiptap/extension-subscript"
+import Superscript from "@tiptap/extension-superscript"
+import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table"
+import TextAlign from "@tiptap/extension-text-align"
+import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style"
+import Youtube from "@tiptap/extension-youtube"
+import { CharacterCount, Placeholder } from "@tiptap/extensions"
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import {
-  BoldIcon,
-  CodeIcon,
-  Heading2Icon,
-  Heading3Icon,
-  ImageIcon,
-  ItalicIcon,
-  LinkIcon,
-  ListIcon,
-  ListOrderedIcon,
-  QuoteIcon,
-  Redo2Icon,
-  StrikethroughIcon,
-  UnderlineIcon,
-  Undo2Icon,
-} from "lucide-react"
+import { toast } from "sonner"
 
-import { richTextClass } from "@/components/blog/post-content"
-import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { Toggle } from "@/components/ui/toggle"
+  FindReplaceForm,
+  ImageForm,
+  IMAGE_TYPES,
+  LinkForm,
+  readImage,
+  VideoForm,
+} from "@/components/blog/editor/editor-dialogs"
+import { EditorToolbar, type EditorDialog } from "@/components/blog/editor/editor-toolbar"
+import { richTextClass } from "@/components/blog/post-content"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+// Extras on top of the shared post typography that only matter while
+// editing: table cell selection and column resizing, image resize handles,
+// the selected node, and the empty-editor placeholder.
+const editingClass = cn(
+  "[&_.selectedCell]:after:pointer-events-none [&_.selectedCell]:after:absolute [&_.selectedCell]:after:inset-0 [&_.selectedCell]:after:bg-primary/15 [&_.selectedCell]:after:content-['']",
+  "[&_.column-resize-handle]:pointer-events-none [&_.column-resize-handle]:absolute [&_.column-resize-handle]:top-0 [&_.column-resize-handle]:-right-0.5 [&_.column-resize-handle]:-bottom-px [&_.column-resize-handle]:w-1 [&_.column-resize-handle]:bg-primary [&_.resize-cursor]:cursor-col-resize",
+  "[&_[data-resize-wrapper]]:inline-block [&_[data-resize-handle]]:z-10 [&_[data-resize-handle]]:size-3 [&_[data-resize-handle]]:rounded-full [&_[data-resize-handle]]:border-2 [&_[data-resize-handle]]:border-background [&_[data-resize-handle]]:bg-primary [&_[data-resize-handle]]:opacity-0 [&_[data-resize-wrapper]:hover_[data-resize-handle]]:opacity-100 [&_.ProseMirror-selectednode_[data-resize-handle]]:opacity-100",
+  "[&_[data-resize-handle=top-left]]:cursor-nwse-resize [&_[data-resize-handle=bottom-right]]:cursor-nwse-resize [&_[data-resize-handle=top-right]]:cursor-nesw-resize [&_[data-resize-handle=bottom-left]]:cursor-nesw-resize",
+  "[&_img.ProseMirror-selectednode]:outline-2 [&_img.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode>iframe]:outline-2 [&_.ProseMirror-selectednode>iframe]:outline-primary [&_hr.ProseMirror-selectednode]:border-primary",
+  "[&_.is-editor-empty:first-child]:before:pointer-events-none [&_.is-editor-empty:first-child]:before:float-left [&_.is-editor-empty:first-child]:before:h-0 [&_.is-editor-empty:first-child]:before:text-muted-foreground [&_.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]"
+)
 
-// The post content editor (legacy CKEditor). It emits HTML; whatever shows
-// it must sanitise it (PostContent does). `value` is read once: remount it
-// (a new `key`) to load other content.
+// Puts block tags on their own lines so the source view is readable.
+function formatHtml(html: string) {
+  return html
+    .replace(/(<\/(p|h[1-6]|li|blockquote|pre|tr|table|ul|ol|div|thead|tbody)>)/g, "$1\n")
+    .replace(/(<(ul|ol|table|thead|tbody|tr|blockquote)(\s[^>]*)?>)/g, "$1\n")
+    .replace(/(<hr[^>]*>)/g, "$1\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim()
+}
+
+function insertImageFiles(editor: Editor, files: File[], pos?: number) {
+  const images = files.filter((f) => IMAGE_TYPES.includes(f.type))
+  if (!images.length) return false
+  for (const file of images) {
+    const ok = readImage(file, (src) => {
+      const content = { type: "image", attrs: { src, alt: file.name.replace(/\.[^.]+$/, "") } }
+      if (pos == null) editor.chain().focus().insertContent(content).run()
+      else editor.chain().focus().insertContentAt(pos, content).run()
+    })
+    if (!ok) toast.error(`${file.name} is over 2 MB and wasn't added.`)
+  }
+  return true
+}
+
+// The post content editor, in the spirit of the legacy CKEditor toolbar:
+// paragraph styles and headings, font, size and colours, bold / italic /
+// underline / strike / sub- and superscript, alignment, lists and indent,
+// quotes, links, images (upload, paste or drop; resizable), YouTube
+// embeds, tables, special characters, find and replace, an HTML source
+// view, full screen and a word count. It emits HTML; whatever shows it must
+// sanitise it (PostContent does). `value` is read once: remount it (a new
+// `key`) to load other content.
 export function RichTextEditor({
   id,
   value,
@@ -56,204 +84,177 @@ export function RichTextEditor({
   placeholder?: string
   invalid?: boolean
 }) {
+  const [dialog, setDialog] = React.useState<EditorDialog | null>(null)
+  const [source, setSource] = React.useState<string | null>(null)
+  const [fullscreen, setFullscreen] = React.useState(false)
+
   const editor = useEditor({
     // Rendered on the client only; Next pre-renders pages on the server.
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2, 3] },
+        heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, autolink: true, defaultProtocol: "https" },
       }),
-      Image.configure({ allowBase64: true }),
+      TextStyle,
+      Color,
+      FontFamily,
+      FontSize,
+      Highlight.configure({ multicolor: true }),
+      Subscript,
+      Superscript,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image.configure({
+        allowBase64: true,
+        resize: {
+          enabled: true,
+          directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
+          minWidth: 48,
+          minHeight: 48,
+          alwaysPreserveAspectRatio: true,
+        },
+      }),
+      Youtube.configure({ nocookie: true, modestBranding: true, width: 640, height: 360 }),
       Placeholder.configure({ placeholder: placeholder ?? "Write the post…" }),
+      CharacterCount,
     ],
     content: value,
     editorProps: {
       attributes: {
         ...(id && { id }),
-        class: cn(richTextClass, "min-h-64 px-3 py-2 outline-none"),
+        spellcheck: "true",
+        class: cn(richTextClass, editingClass, "min-h-72 px-4 py-3 outline-none"),
+      },
+      handleKeyDown: (_view, event) => {
+        const mod = event.ctrlKey || event.metaKey
+        if (mod && !event.shiftKey && event.key.toLowerCase() === "k") {
+          setDialog("link")
+          return true
+        }
+        if (mod && !event.shiftKey && event.key.toLowerCase() === "f") {
+          setDialog("find")
+          return true
+        }
+        return false
       },
     },
     onUpdate: ({ editor }) => onChange(editor.isEmpty ? "" : editor.getHTML()),
   })
 
+  // Pasted and dropped image files become images (data URLs for now).
+  React.useEffect(() => {
+    if (!editor) return
+    editor.setOptions({
+      editorProps: {
+        ...editor.options.editorProps,
+        handlePaste: (_view, event) => insertImageFiles(editor, [...(event.clipboardData?.files ?? [])]),
+        handleDrop: (view, event, _slice, moved) => {
+          if (moved) return false
+          const files = [...(event.dataTransfer?.files ?? [])]
+          if (!files.length) return false
+          const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
+          if (!insertImageFiles(editor, files, pos)) return false
+          event.preventDefault()
+          return true
+        },
+      },
+    })
+  }, [editor])
+
+  // Esc leaves full screen; the page behind doesn't scroll meanwhile.
+  React.useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !dialog) setFullscreen(false)
+    }
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", onKey)
+    return () => {
+      document.body.style.overflow = overflow
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [fullscreen, dialog])
+
+  function toggleSource() {
+    if (!editor) return
+    if (source == null) {
+      setSource(formatHtml(editor.getHTML()))
+      return
+    }
+    editor.commands.setContent(source, { emitUpdate: true })
+    setSource(null)
+    editor.commands.focus()
+  }
+
   return (
     <div
       aria-invalid={invalid}
       className={cn(
-        "overflow-hidden rounded-lg border border-input bg-transparent transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 aria-invalid:border-destructive",
-        // Tiptap's placeholder: the empty first paragraph shows data-placeholder.
-        "[&_.is-editor-empty:first-child]:before:pointer-events-none [&_.is-editor-empty:first-child]:before:float-left [&_.is-editor-empty:first-child]:before:h-0 [&_.is-editor-empty:first-child]:before:text-muted-foreground [&_.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]"
+        "flex flex-col overflow-hidden rounded-lg border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 aria-invalid:border-destructive",
+        fullscreen && "fixed inset-0 z-50 rounded-none border-0 focus-within:ring-0"
       )}
     >
-      {editor ? <Toolbar editor={editor} /> : <div className="h-10 border-b bg-muted/40" />}
-      <EditorContent editor={editor} />
-    </div>
-  )
-}
-
-function Toolbar({ editor }: { editor: Editor }) {
-  const [linking, setLinking] = React.useState(false)
-  const fileId = React.useId()
-  const state = useEditorState({
-    editor,
-    selector: ({ editor }) => ({
-      h2: editor.isActive("heading", { level: 2 }),
-      h3: editor.isActive("heading", { level: 3 }),
-      bold: editor.isActive("bold"),
-      italic: editor.isActive("italic"),
-      underline: editor.isActive("underline"),
-      strike: editor.isActive("strike"),
-      bullet: editor.isActive("bulletList"),
-      ordered: editor.isActive("orderedList"),
-      quote: editor.isActive("blockquote"),
-      code: editor.isActive("codeBlock"),
-      link: editor.isActive("link"),
-      canUndo: editor.can().undo(),
-      canRedo: editor.can().redo(),
-    }),
-  })
-
-  const chain = () => editor.chain().focus()
-  const tools: { label: string; icon: React.ReactNode; on: boolean; run: () => void }[][] = [
-    [
-      { label: "Heading", icon: <Heading2Icon />, on: state.h2, run: () => chain().toggleHeading({ level: 2 }).run() },
-      { label: "Sub-heading", icon: <Heading3Icon />, on: state.h3, run: () => chain().toggleHeading({ level: 3 }).run() },
-    ],
-    [
-      { label: "Bold", icon: <BoldIcon />, on: state.bold, run: () => chain().toggleBold().run() },
-      { label: "Italic", icon: <ItalicIcon />, on: state.italic, run: () => chain().toggleItalic().run() },
-      { label: "Underline", icon: <UnderlineIcon />, on: state.underline, run: () => chain().toggleUnderline().run() },
-      { label: "Strikethrough", icon: <StrikethroughIcon />, on: state.strike, run: () => chain().toggleStrike().run() },
-    ],
-    [
-      { label: "Bullet list", icon: <ListIcon />, on: state.bullet, run: () => chain().toggleBulletList().run() },
-      { label: "Numbered list", icon: <ListOrderedIcon />, on: state.ordered, run: () => chain().toggleOrderedList().run() },
-      { label: "Quote", icon: <QuoteIcon />, on: state.quote, run: () => chain().toggleBlockquote().run() },
-      { label: "Code block", icon: <CodeIcon />, on: state.code, run: () => chain().toggleCodeBlock().run() },
-    ],
-    [
-      { label: "Link", icon: <LinkIcon />, on: state.link, run: () => setLinking(true) },
-    ],
-  ]
-
-  function insertImage(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file || !IMAGE_TYPES.includes(file.type)) return
-    const reader = new FileReader()
-    reader.onload = () => chain().setImage({ src: String(reader.result), alt: file.name }).run()
-    reader.readAsDataURL(file)
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1 border-b bg-muted/40 p-1">
-      {tools.map((group, index) => (
-        <React.Fragment key={index}>
-          {index > 0 && <Separator orientation="vertical" className="mx-0.5 h-5!" />}
-          {group.map((tool) => (
-            <Toggle
-              key={tool.label}
-              size="sm"
-              pressed={tool.on}
-              onPressedChange={tool.run}
-              aria-label={tool.label}
-              title={tool.label}
-            >
-              {tool.icon}
-            </Toggle>
-          ))}
-        </React.Fragment>
-      ))}
-      {/* A visually hidden file input under a label: it stays keyboard reachable. */}
-      <input
-        id={fileId}
-        type="file"
-        accept={IMAGE_TYPES.join(",")}
-        className="peer sr-only"
-        onChange={insertImage}
-      />
-      <label
-        htmlFor={fileId}
-        title="Image"
-        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-[min(var(--radius-md),12px)] hover:bg-muted peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 [&_svg]:size-3.5"
-      >
-        <ImageIcon />
-        <span className="sr-only">Insert image</span>
-      </label>
-      <div className="ml-auto flex items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" title="Undo" disabled={!state.canUndo} onClick={() => chain().undo().run()}>
-          <Undo2Icon />
-          <span className="sr-only">Undo</span>
-        </Button>
-        <Button type="button" variant="ghost" size="icon-sm" title="Redo" disabled={!state.canRedo} onClick={() => chain().redo().run()}>
-          <Redo2Icon />
-          <span className="sr-only">Redo</span>
-        </Button>
+      {editor ? (
+        <EditorToolbar
+          editor={editor}
+          source={source != null}
+          fullscreen={fullscreen}
+          onSource={toggleSource}
+          onFullscreen={() => setFullscreen((f) => !f)}
+          onDialog={setDialog}
+        />
+      ) : (
+        <div className="h-10 border-b bg-muted/40" />
+      )}
+      <div className={cn("overflow-y-auto", fullscreen ? "flex-1" : "max-h-[70vh]", fullscreen && "mx-auto w-full max-w-4xl")}>
+        {source != null ? (
+          <textarea
+            aria-label="HTML source"
+            spellCheck={false}
+            className="block min-h-72 w-full resize-y bg-muted/30 px-4 py-3 font-mono text-xs leading-relaxed outline-none"
+            style={{ height: fullscreen ? "100%" : undefined }}
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value)
+              onChange(e.target.value)
+            }}
+          />
+        ) : (
+          <EditorContent editor={editor} />
+        )}
       </div>
-      <Dialog open={linking} onOpenChange={setLinking}>
+      {editor && <StatusBar editor={editor} source={source != null} />}
+      <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent className="sm:max-w-md">
-          {linking && <LinkForm editor={editor} onDone={() => setLinking(false)} />}
+          {editor && dialog === "link" && <LinkForm editor={editor} onDone={() => setDialog(null)} />}
+          {editor && dialog === "image" && <ImageForm editor={editor} onDone={() => setDialog(null)} />}
+          {editor && dialog === "video" && <VideoForm editor={editor} onDone={() => setDialog(null)} />}
+          {editor && dialog === "find" && <FindReplaceForm editor={editor} onDone={() => setDialog(null)} />}
         </DialogContent>
       </Dialog>
     </div>
   )
 }
 
-// Sets, changes or removes the link on the selection.
-function LinkForm({ editor, onDone }: { editor: Editor; onDone: () => void }) {
-  const id = React.useId()
-  const current = (editor.getAttributes("link").href as string | undefined) ?? ""
-  const [href, setHref] = React.useState(current)
-  const [error, setError] = React.useState<string>()
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault()
-    event.stopPropagation()
-    const url = href.trim()
-    if (!url) {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run()
-      onDone()
-      return
-    }
-    if (!/^(https?:\/\/|mailto:|\/)/i.test(url) && !/^[\w-]+(\.[\w-]+)+/.test(url)) {
-      setError("Enter a web address, e.g. https://example.com.")
-      return
-    }
-    const safe = /^(https?:\/\/|mailto:|\/)/i.test(url) ? url : `https://${url}`
-    editor.chain().focus().extendMarkRange("link").setLink({ href: safe }).run()
-    onDone()
-  }
-
+function StatusBar({ editor, source }: { editor: Editor; source: boolean }) {
+  const { words, characters } = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      words: e.storage.characterCount.words() as number,
+      characters: e.storage.characterCount.characters() as number,
+    }),
+  })
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <DialogHeader>
-        <DialogTitle>{current ? "Edit link" : "Add link"}</DialogTitle>
-        <DialogDescription>
-          Select text first to turn it into a link. Leave the address empty to remove the link.
-        </DialogDescription>
-      </DialogHeader>
-      <Field data-invalid={!!error}>
-        <FieldLabel htmlFor={id}>Address</FieldLabel>
-        <Input
-          id={id}
-          autoFocus
-          value={href}
-          placeholder="https://"
-          aria-invalid={!!error}
-          onChange={(event) => {
-            setHref(event.target.value)
-            setError(undefined)
-          }}
-        />
-        <FieldError>{error}</FieldError>
-      </Field>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button type="submit">Save</Button>
-      </DialogFooter>
-    </form>
+    <div className="flex items-center justify-between gap-2 border-t bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
+      <span>{source ? "Editing HTML source. Switch back to see the post." : "Paste or drop images straight in."}</span>
+      <span className="tabular-nums">
+        {words.toLocaleString()} word{words === 1 ? "" : "s"} · {characters.toLocaleString()} characters
+      </span>
+    </div>
   )
 }

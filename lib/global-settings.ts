@@ -41,6 +41,8 @@ export type AdminUser = {
   gender: UserGender
   // yyyy-mm-dd
   dateOfBirth: string
+  // A data URL, or "" for none (legacy ProfilePicture, set on User Profile).
+  profilePicture: string
   // Asked to set a new password at next sign-in.
   forcePasswordChange: boolean
   twoFactorEnabled: boolean
@@ -86,6 +88,7 @@ const userSeedStamp = {
   mobileConfirmed: false,
   gender: "Unknown" as const,
   dateOfBirth: "1990-01-01",
+  profilePicture: "",
   forcePasswordChange: false,
   twoFactorEnabled: false,
   requireLogin: false,
@@ -146,6 +149,13 @@ const USER_MOBILE_PATTERN = /^(88)?01[3-9]\d{8}$/
 // ASP.NET Identity's default AllowedUserNameCharacters.
 const USER_NAME_PATTERN = /^[A-Za-z0-9\-._@+]+$/
 
+// Identity's production password rules: 6+ characters with a digit.
+export function passwordError(password: string) {
+  if (password.length < 6) return "Passwords must be at least 6 characters."
+  if (!/\d/.test(password)) return "Passwords must have at least one digit ('0'-'9')."
+  return undefined
+}
+
 // Legacy CreateEdit's checks: user name, full name and email required, the
 // password (required for a new user) confirmed and meeting Identity's
 // production rules (6+ characters with a digit).
@@ -170,8 +180,8 @@ export function adminUserErrors(input: AdminUserInput, exceptId?: number) {
   if (!input.dateOfBirth) errors.dateOfBirth = "Date of birth is required."
   if (exceptId == null && !input.password) errors.password = "Password is required."
   else if (input.password) {
-    if (input.password.length < 6) errors.password = "Passwords must be at least 6 characters."
-    else if (!/\d/.test(input.password)) errors.password = "Passwords must have at least one digit ('0'-'9')."
+    const error = passwordError(input.password)
+    if (error) errors.password = error
   }
   if ((input.password || input.confirmPassword) && input.password !== input.confirmPassword)
     errors.confirmPassword = "Password does not match."
@@ -203,6 +213,7 @@ export function addAdminUser(input: AdminUserInput, by: string) {
     id: Math.max(0, ...adminUsers.map((u) => u.id)) + 1,
     userName: input.userName.trim(),
     ...userFields(input),
+    profilePicture: "",
     status: "Active",
     requireLogin: false,
     extraAllow: [],
@@ -246,6 +257,60 @@ export function setAdminUserStatus(id: number, status: UserStatus, by: string) {
 export function requireAdminUserLogin(id: number, by: string) {
   setUserOnline(id, false)
   patchUser(id, { requireLogin: true }, by)
+}
+
+// ---- The signed-in user's own account (legacy Manage/IndexBackend) ----
+
+export type ProfileInput = Pick<AdminUser, "name" | "gender" | "dateOfBirth" | "email" | "mobile" | "profilePicture">
+
+export function profileErrors(input: ProfileInput, id: number) {
+  const errors: Partial<Record<keyof ProfileInput, string>> = {}
+  if (!input.name.trim()) errors.name = "Full name is required."
+  const email = input.email.trim().toLowerCase()
+  if (!email) errors.email = "The Email field is required"
+  else if (!EMAIL_PATTERN.test(email)) errors.email = "Enter a valid email address."
+  else if (adminUsers.some((u) => u.id !== id && u.email.toLowerCase() === email))
+    errors.email = `Email '${email}' is already taken.`
+  if (input.mobile.trim() && !USER_MOBILE_PATTERN.test(input.mobile.trim()))
+    errors.mobile = "Enter a mobile number like 01XXXXXXXXX."
+  if (!input.dateOfBirth) errors.dateOfBirth = "Date of birth is required."
+  return errors
+}
+
+// The user stays signed in. As with Identity's SetEmail / SetPhoneNumber, a
+// changed email or mobile is no longer confirmed.
+export function updateOwnProfile(id: number, input: ProfileInput, by: string) {
+  const user = adminUsers.find((u) => u.id === id)
+  if (!user) return
+  const email = input.email.trim().toLowerCase()
+  const mobile = input.mobile.trim()
+  patchUser(
+    id,
+    {
+      name: input.name.trim(),
+      gender: input.gender,
+      dateOfBirth: input.dateOfBirth,
+      profilePicture: input.profilePicture,
+      email,
+      emailConfirmed: user.emailConfirmed && email === user.email,
+      mobile,
+      mobileConfirmed: user.mobileConfirmed && !!mobile && mobile === user.mobile,
+    },
+    by
+  )
+}
+
+// Legacy ChangePasswordBackend, once lib/current-user.ts has checked the
+// current password: the user stays signed in, and a pending Force Password
+// Change is done.
+export function setOwnPassword(id: number, password: string, by: string) {
+  passwords.set(id, password)
+  patchUser(id, { forcePasswordChange: false }, by)
+}
+
+// Legacy Disable2fa.
+export function disableOwnTwoFactor(id: number, by: string) {
+  patchUser(id, { twoFactorEnabled: false }, by)
 }
 
 // Legacy ResetPasswords: a new 6-character password, and the user signs in

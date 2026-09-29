@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -252,7 +252,6 @@ const data = {
   ] satisfies NavMainItem[],
   navSecondary: [
     { title: "Settings", url: "/settings", icon: <Settings2Icon />, platform: true },
-    { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
   ],
   documents: [
     { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
@@ -376,7 +375,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={navSecondary} query={query} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
-        <NavUser user={{ name: user.name, email: user.email, avatar: "" }} />
+        <NavUser user={{ name: user.name, email: user.email, avatar: user.profilePicture }} />
       </SidebarFooter>
     </Sidebar>
   )

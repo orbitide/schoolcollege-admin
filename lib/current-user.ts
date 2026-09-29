@@ -5,7 +5,9 @@ import * as React from "react"
 import {
   getAdminUsers,
   markSignedIn,
+  passwordError,
   passwordOf,
+  setOwnPassword,
   setUserOnline,
   useAdminUsers,
   useUserInstitutes,
@@ -71,6 +73,22 @@ export function signIn(email: string, password: string) {
   markSignedIn(user.id)
   setSession(user.id)
   return user
+}
+
+// Legacy ChangePasswordBackend for the signed-in user. Returns the errors
+// to show; none means the password was changed.
+export function changeOwnPassword(input: { oldPassword: string; newPassword: string; confirmPassword: string }) {
+  const user = getCurrentUser()
+  const errors: Partial<Record<keyof typeof input, string>> = {}
+  if (!input.oldPassword) errors.oldPassword = "Current password is required."
+  else if (input.oldPassword !== (passwordOf(user.id) ?? DEMO_PASSWORD)) errors.oldPassword = "Incorrect password."
+  const weak = passwordError(input.newPassword)
+  if (!input.newPassword) errors.newPassword = "New password is required."
+  else if (weak) errors.newPassword = weak
+  if (input.newPassword !== input.confirmPassword)
+    errors.confirmPassword = "The new password and confirmation password do not match."
+  if (!Object.keys(errors).length) setOwnPassword(user.id, input.newPassword, user.name)
+  return errors
 }
 
 export function signOut() {
