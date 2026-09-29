@@ -61,7 +61,7 @@ const titles: Record<AccessSurface, string> = {
 // exams left "Edit enable"; Admin edits any exam, deletes, sees deleted
 // exams and retrieves them; View only reads.
 export function TermExamList({ surface }: { surface: AccessSurface }) {
-  const can = capabilitiesFor(surface)
+  const can = capabilitiesFor(surface, { resource: "term-exam", softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

@@ -64,8 +64,17 @@ export function useSurfaces(resource: string) {
 }
 
 // The actions a surface offers on its rows (ezducms SurfaceMeta
-// capabilities). Retiring records (delete, retrieve, deleted rows) is Admin
-// only; View is read-only.
+// capabilities). Legacy grants each page (ManageAdmin / Manage / ManageView)
+// on its own, and each page's SubActions decide what it can do:
+//
+//             rows            create/edit/status/rank   delete   retrieve, permanent delete
+//   Admin     incl. Deleted   yes                       yes      yes
+//   Manage    not Deleted     yes                       soft     no
+//   View      not Deleted     no (Details only)         no       no
+//
+// Manage deletes only where the record is soft-deleted (a Deleted status that
+// Admin can retrieve); a hard delete stays on Admin. Every surface lists the
+// user's own institutes (all of them for a super admin).
 export type Capabilities = {
   create: boolean
   edit: boolean
@@ -75,7 +84,26 @@ export type Capabilities = {
   restore: boolean
 }
 
-export function capabilitiesFor(surface: AccessSurface): Capabilities {
+// Where a resource's legacy page offers less than the table above.
+const resourceCapabilities: Record<string, Partial<Record<AccessSurface, Partial<Capabilities>>>> = {
+  // Legacy Manage has no Rank for these (older AcademicClass-style pages).
+  "settings.classes": { Manage: { reorder: false } },
+  "settings.class-subjects": { Manage: { reorder: false } },
+  "settings.grades": { Manage: { reorder: false } },
+}
+
+export type CapabilityOptions = {
+  // Permission resource, for its overrides above.
+  resource?: string
+  // Whether delete marks the record Deleted (retrievable on Admin) rather
+  // than removing it; only then may Manage delete.
+  softDelete?: boolean
+}
+
+export function capabilitiesFor(
+  surface: AccessSurface,
+  { resource, softDelete = false }: CapabilityOptions = {}
+): Capabilities {
   const manage = surface !== "View"
   const admin = surface === "Admin"
   return {
@@ -83,7 +111,8 @@ export function capabilitiesFor(surface: AccessSurface): Capabilities {
     edit: manage,
     status: manage,
     reorder: manage,
-    delete: admin,
+    delete: admin || (manage && softDelete),
     restore: admin,
+    ...(resource ? resourceCapabilities[resource]?.[surface] : undefined),
   }
 }

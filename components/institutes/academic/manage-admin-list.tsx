@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/table"
 import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { academicMediums, recordStatuses, type Institute } from "@/lib/institutes"
-import { useInstitutes } from "@/lib/institutes-store"
+import { useAccessibleInstitutes } from "@/lib/current-user"
 import { cn } from "@/lib/utils"
 
 const ALL = "all"
@@ -68,14 +68,13 @@ export function ManageAdminList({
 }) {
   const config = kindConfig(kind)
   const soft = Boolean(config.softDelete)
-  const can = {
-    ...capabilitiesFor(surface),
-    ...(config.manageDeletes && surface === "Manage" && { delete: true }),
-  }
+  // Manage deletes too when the kind soft-deletes (lib/access.ts).
+  const can = capabilitiesFor(surface, { resource, softDelete: soft })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const institutes = useInstitutes()
+  // Every surface lists the user's own institutes; a super admin sees all.
+  const institutes = useAccessibleInstitutes()
   // Subscribes to the store; rows are read per institute below so they come
   // out in each institute's own order (rank or date).
   config.store.useAll()

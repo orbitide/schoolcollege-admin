@@ -135,8 +135,6 @@ export type KindConfig = {
   // show who created / modified them, and each has a Details page. Needs a
   // [recordId] details route under the kind's institute segment.
   softDelete?: boolean
-  // Legacy Manage (not only ManageAdmin) offers Delete.
-  manageDeletes?: boolean
   // Legacy Copy: a row action opening the new form started from that record
   // (the form reads `?copy=`).
   copyable?: boolean
@@ -306,7 +304,6 @@ export const academicKinds = {
     description: "Daily sessions such as Morning and Day, used by classes and routines.",
     toggle: "enableShift",
     softDelete: true,
-    manageDeletes: true,
     fields: [],
     columns: [],
     inUse: (record) =>
@@ -514,7 +511,6 @@ export const academicKinds = {
     // other field (as ranks are counted).
     uniqueScope: ["classId", "shiftId", "branchId", "version", "medium", "yearId", "gender", "groupId"],
     softDelete: true,
-    manageDeletes: true,
     recordFilters: [
       { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
       { key: "yearId", label: "Year", allLabel: "All years", store: asEditable(yearStore) },
@@ -680,7 +676,6 @@ export const academicKinds = {
     customForm: true,
     mediumFilter: true,
     softDelete: true,
-    manageDeletes: true,
     copyable: true,
     recordFilters: [
       { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
@@ -753,7 +748,6 @@ export const academicKinds = {
     plural: "Sessions",
     description: "Admission sessions for classes that run across years, such as 2025-26.",
     softDelete: true,
-    manageDeletes: true,
     fields: [],
     columns: [],
     studentMatch: (r, _s, e) => e?.sessionId === r.id,
@@ -770,7 +764,6 @@ export const academicKinds = {
     // class; names are unique, and ranked, within that scope.
     uniqueScope: ["medium", "classId"],
     softDelete: true,
-    manageDeletes: true,
     fields: [
       mediumField,
       {
@@ -816,7 +809,6 @@ export const academicKinds = {
     columns: [],
     studentMatch: (r, s, e) => !e && s.categoryId === r.id,
     softDelete: true,
-    manageDeletes: true,
     store: asEditable(categoryStore),
   },
   grades: {
@@ -880,7 +872,6 @@ export const academicKinds = {
     // and ranked, within that scope.
     uniqueScope: ["medium", "classId"],
     softDelete: true,
-    manageDeletes: true,
     nameLabel: "Remarks",
     nameMultiline: true,
     recordFilters: [

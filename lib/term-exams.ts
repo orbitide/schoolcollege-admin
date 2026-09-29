@@ -82,7 +82,7 @@ export type TermExam = {
 // Admin may always edit an exam; Manage only while its "Edit enable" is on
 // (legacy ManageAjax); View never.
 export function canEditExam(exam: TermExam, surface: AccessSurface) {
-  return capabilitiesFor(surface).edit && (surface === "Admin" || exam.editEnable)
+  return capabilitiesFor(surface, { resource: "term-exam", softDelete: true }).edit && (surface === "Admin" || exam.editEnable)
 }
 
 export type TermExamInput = Omit<

@@ -50,7 +50,7 @@ const titles: Record<AccessSurface, string> = {
 // edits and (in)activates; Admin also deletes, sees deleted templates and
 // retrieves them; View only reads.
 export function SmsTemplateList({ surface }: { surface: AccessSurface }) {
-  const can = capabilitiesFor(surface)
+  const can = capabilitiesFor(surface, { resource: "sms-template", softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

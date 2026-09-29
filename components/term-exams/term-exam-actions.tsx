@@ -60,7 +60,7 @@ export function TermExamActions({
   returnTo: string
   surface: AccessSurface
 }) {
-  const can = capabilitiesFor(surface)
+  const can = capabilitiesFor(surface, { resource: "term-exam", softDelete: true })
   const user = useCurrentUser()
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const back = `returnTo=${encodeURIComponent(returnTo)}`

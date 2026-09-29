@@ -43,7 +43,7 @@ const titles: Record<AccessSurface, string> = {
 // actions: Manage adds, edits, (in)activates and reranks; Admin also deletes,
 // sees deleted teachers and retrieves them; View only reads.
 export function TeacherList({ surface }: { surface: AccessSurface }) {
-  const can = capabilitiesFor(surface)
+  const can = capabilitiesFor(surface, { resource: "teacher", softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

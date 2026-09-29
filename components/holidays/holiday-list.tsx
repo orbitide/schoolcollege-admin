@@ -56,7 +56,7 @@ export function HolidayList({
   surface: AccessSurface
   instituteId?: number
 }) {
-  const can = { ...capabilitiesFor(surface), delete: surface !== "View" }
+  const can = capabilitiesFor(surface, { resource: HOLIDAYS_RESOURCE, softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

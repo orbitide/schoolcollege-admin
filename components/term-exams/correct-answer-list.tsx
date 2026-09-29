@@ -66,7 +66,8 @@ const titles: Record<"Admin" | "Manage", string> = {
 // ManageView): the MCQ answer keys of every institute's term exams, narrowed
 // by class, exam and subject. Both add and edit keys; only Admin deletes.
 export function CorrectAnswerList({ surface }: { surface: Exclude<AccessSurface, "View"> }) {
-  const can = capabilitiesFor(surface)
+  // Answer keys are removed outright, so only Admin deletes them.
+  const can = capabilitiesFor(surface, { resource: "correct-answer" })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
