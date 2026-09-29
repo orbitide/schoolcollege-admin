@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 
 import { setUserOnline } from "@/lib/global-settings"
+import { loadInstitutes } from "@/lib/institutes-store"
 import {
   CurrentUserContext,
   fetchCurrentUser,
@@ -23,9 +24,12 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     let active = true
     fetchCurrentUser()
-      .then((found) => {
+      .then(async (found) => {
         if (!active) return
         if (found) {
+          // Every page works inside the user's institutes, so they load first.
+          await loadInstitutes()
+          if (!active) return
           setStampUser(found)
           // The Users page's Online dot (in-memory until the users API).
           setUserOnline(found.id, true)

@@ -49,17 +49,23 @@ export function InstituteActions({
   const [dialog, setDialog] = React.useState<Dialog>(null)
   const isSuspended = institute.status === "Suspended"
 
-  function toggleStatus() {
-    setInstituteStatus(institute.id, isSuspended ? "Active" : "Suspended")
-    toast.success(
-      `${institute.name} ${isSuspended ? "activated" : "suspended"}`
-    )
+  async function toggleStatus() {
+    try {
+      await setInstituteStatus(institute.id, isSuspended ? "Active" : "Suspended")
+      toast.success(`${institute.name} ${isSuspended ? "activated" : "suspended"}`)
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
   }
 
-  function remove() {
-    deleteInstitute(institute.id)
-    toast.success(`${institute.name} deleted`)
-    onDeleted?.()
+  async function remove() {
+    try {
+      await deleteInstitute(institute.id)
+      toast.success(`${institute.name} deleted`)
+      onDeleted?.()
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
   }
 
   return (

@@ -27,7 +27,7 @@ import {
 } from "@/lib/attendance-fines"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { defaultConfiguration, type Institute } from "@/lib/institutes"
-import { updateInstituteConfiguration } from "@/lib/institutes-store"
+import { updateInstituteFinePeriod } from "@/lib/institutes-store"
 import { todayIso } from "@/lib/student-attendance"
 
 // Legacy "Attendance Absent Fine Date Configuration"
@@ -115,17 +115,21 @@ function PeriodForm({ institute, canEdit }: { institute: Institute; canEdit: boo
   const config = valid ? { dayFrom: Number(dayFrom), dayTo: Number(dayTo) } : undefined
   const changed = config ? config.dayFrom !== saved.dayFrom || config.dayTo !== saved.dayTo : true
 
-  function save(event: React.FormEvent) {
+  async function save(event: React.FormEvent) {
     event.preventDefault()
     setTouched(true)
     if (!config) {
       toast.error("Please fix the highlighted fields.")
       return
     }
-    updateInstituteConfiguration(institute.id, { ...saved, ...config })
-    toast.success("Absent fine date configuration saved", {
-      description: `${institute.name}: day ${config.dayFrom} to day ${config.dayTo}.`,
-    })
+    try {
+      await updateInstituteFinePeriod(institute.id, config)
+      toast.success("Absent fine date configuration saved", {
+        description: `${institute.name}: day ${config.dayFrom} to day ${config.dayTo}.`,
+      })
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
   }
 
   function useDefault() {

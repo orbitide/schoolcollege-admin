@@ -56,7 +56,7 @@ export function SubscriptionActions({
   const [dialog, setDialog] = React.useState<"rates" | "trial" | null>(null)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
 
-  const confirms: Record<Confirm, { title: string; description: string; action: string; destructive?: boolean; run: () => void; done: string }> = {
+  const confirms: Record<Confirm, { title: string; description: string; action: string; destructive?: boolean; run: () => void | Promise<unknown>; done: string }> = {
     activate: {
       title: `Activate ${institute.name}?`,
       description:
@@ -64,8 +64,8 @@ export function SubscriptionActions({
           ? "The trial ends now and the institute is billed from this month's invoice."
           : "The institute gets its access back and is billed from this month's invoice.",
       action: "Activate",
-      run: () => {
-        setInstituteStatus(institute.id, "Active")
+      run: async () => {
+        await setInstituteStatus(institute.id, "Active")
         if (subscription.trialEndsAt) endTrial(institute.id, user.name)
       },
       done: `${institute.name} activated`,
@@ -155,8 +155,10 @@ export function SubscriptionActions({
               variant={current?.destructive ? "destructive" : "default"}
               onClick={() => {
                 if (!current) return
-                current.run()
-                toast.success(current.done)
+                Promise.resolve(current.run()).then(
+                  () => toast.success(current.done),
+                  (error: Error) => toast.error(error.message)
+                )
               }}
             >
               {current?.action}

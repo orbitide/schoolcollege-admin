@@ -155,7 +155,7 @@ export function ConfigurationFormBody({
     return next
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const input: Config = {
       ...values,
@@ -172,9 +172,13 @@ export function ConfigurationFormBody({
       return
     }
 
-    updateInstituteConfiguration(id, input)
-    toast.success(`${name} configuration saved`)
-    if (backHref) router.push(backHref)
+    try {
+      await updateInstituteConfiguration(id, input)
+      toast.success(`${name} configuration saved`)
+      if (backHref) router.push(backHref)
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
   }
 
   return (

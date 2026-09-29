@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { ApiError } from "@/lib/http-client"
 import { cn } from "@/lib/utils"
 import {
   defaultConfiguration,
@@ -201,8 +202,11 @@ function InstituteFormBody({
     return next
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  const [pending, setPending] = React.useState(false)
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (pending) return
     const input: InstituteInput = {
       ...values,
       name: values.name.trim(),
@@ -228,14 +232,22 @@ function InstituteFormBody({
       return
     }
 
-    if (id !== undefined) {
-      updateInstitute(id, input)
-      toast.success(`${input.name} updated`)
-      router.push(`/institutes/${id}`)
-    } else {
-      const created = addInstitute(input)
-      toast.success(`${input.name} created`)
-      router.push(`/institutes/${created.id}`)
+    setPending(true)
+    try {
+      if (id !== undefined) {
+        await updateInstitute(id, input)
+        toast.success(`${input.name} updated`)
+        router.push(`/institutes/${id}`)
+      } else {
+        const created = await addInstitute(input)
+        toast.success(`${input.name} created`)
+        router.push(`/institutes/${created.id}`)
+      }
+    } catch (error) {
+      // The API's own checks (e.g. a subdomain taken meanwhile) come back per field.
+      if (error instanceof ApiError) setErrors(error.fieldErrors as Errors)
+      toast.error((error as Error).message)
+      setPending(false)
     }
   }
 
@@ -564,7 +576,7 @@ function InstituteFormBody({
         <Button asChild variant="outline">
           <Link href={backHref}>Cancel</Link>
         </Button>
-        <Button type="submit">
+        <Button type="submit" disabled={pending}>
           {isEdit ? "Save changes" : "Create institute"}
         </Button>
       </div>

@@ -234,11 +234,10 @@ const columns = columnHelper.columns([
           </Label>
           <Select
             onValueChange={(value) => {
-              updateInstitute(row.original.id, {
-                ...row.original,
-                manager: value,
-              })
-              toast.success(`${value} assigned to ${row.original.name}`)
+              updateInstitute(row.original.id, { ...row.original, manager: value }).then(
+                () => toast.success(`${value} assigned to ${row.original.name}`),
+                (error: Error) => toast.error(error.message)
+              )
             }}
           >
             <SelectTrigger
