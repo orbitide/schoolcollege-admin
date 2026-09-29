@@ -5,10 +5,13 @@ import { removeInstituteClassFees } from "@/lib/fee-setup"
 import { removeInstituteWaivers } from "@/lib/fee-waivers"
 import { removeInstituteNotices } from "@/lib/notices"
 import { removeInstituteOnlinePayments } from "@/lib/online-payments"
+import { questionChapterStore, removeInstituteQuestions } from "@/lib/question-bank"
+import { removeInstitutePapers } from "@/lib/question-papers"
 import { periodStore, removeInstituteRoutine } from "@/lib/routine"
 import { removeInstituteSaasPayments } from "@/lib/saas-payments"
 
-// A deleted institute's fees, routine, notices and platform payments. lib/institutes-store.ts
+// A deleted institute's fees, routine, notices, question bank, generated
+// papers and platform payments. lib/institutes-store.ts
 // loads this lazily: these stores seed from lib/academic-store.ts when they
 // load, and academic-store (through common-log and current-user) imports
 // institutes-store, so a static import would seed them before it is ready.
@@ -22,5 +25,8 @@ export function removeInstituteModuleData(instituteId: number) {
   removeInstituteRoutine(instituteId)
   periodStore.removeForInstitute(instituteId)
   removeInstituteNotices(instituteId)
+  removeInstitutePapers(instituteId)
+  removeInstituteQuestions(instituteId)
+  questionChapterStore.removeForInstitute(instituteId)
   removeInstituteSaasPayments(instituteId)
 }

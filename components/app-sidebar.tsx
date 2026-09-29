@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon, FileQuestionIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -86,6 +86,19 @@ const data = {
         { title: "Manage Term Exam", url: "/term-exam", resource: "term-exam" },
         { title: "Manage Correct Answer", url: "/term-exam/correct-answers", resource: "correct-answer" },
         { title: "Generate Merit List", url: "/term-exam/merit-list", permission: "merit-list.manage" },
+        { title: "Generate Question", url: "/term-exam/generate-question", permission: "question-generate.manage" },
+        { title: "Manage Generated Question", url: "/term-exam/generated-questions", resource: "generated-question" },
+        { title: "OMR Sheet", url: "/term-exam/omr-sheet", permission: "omr-sheet.view" },
+      ],
+    },
+    {
+      title: "Question Bank",
+      icon: <FileQuestionIcon />,
+      tone: "sky",
+      items: [
+        { title: "Chapter & Topic", url: "/questions/chapters", resource: "question-chapter" },
+        { title: "Manage Question", url: "/questions", resource: "question" },
+        { title: "Add Question", url: "/questions/new", permission: "question.manage" },
       ],
     },
     {
@@ -95,6 +108,7 @@ const data = {
       items: [
         { title: "Student Marks Manage", url: "/term-exam-marks" },
         { title: "Marks Upload", url: "/term-exam-marks/upload" },
+        { title: "OMR Scan", url: "/term-exam-marks/omr-scan", permission: "omr-scan.manage" },
         { title: "Edit Student Marks", url: "/term-exam-marks/edit" },
         { title: "Subject Marks Edit", url: "/term-exam-marks/subject-edit" },
         { title: "Student Marks Set Change", url: "/term-exam-marks/set-change" },

@@ -10,6 +10,7 @@ import type { AccessSurface } from "@/lib/access"
 export const moduleKinds = {
   feeHeads: { resource: "fee-head", url: "/fees/heads", title: "Fee heads" },
   routinePeriods: { resource: "routine-period", url: "/routine/periods", title: "Periods" },
+  questionChapters: { resource: "question-chapter", url: "/questions/chapters", title: "Chapters & topics" },
 } as const satisfies Partial<Record<AcademicKind, { resource: string; url: string; title: string }>>
 
 export type ModuleKind = keyof typeof moduleKinds

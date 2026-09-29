@@ -37,6 +37,7 @@ import {
 } from "@/lib/institutes"
 import { plansUsingRoom } from "@/lib/exam-seat-plans"
 import { feeFrequencies, feeHeadStore } from "@/lib/fee-heads"
+import { chapterInUse, questionChapterStore } from "@/lib/question-bank"
 import { feeHeadBilled } from "@/lib/fee-invoices"
 import { feeHeadInUse } from "@/lib/fee-setup"
 import {
@@ -1112,6 +1113,54 @@ export const academicKinds = {
     },
     inUse: (record) => periodInUse(record.id),
     store: asEditable(periodStore),
+  },
+  // Question Bank › Chapter & Topic: a class subject's chapters, and the
+  // topics inside a chapter (a record with a parent chapter).
+  questionChapters: {
+    segment: "question-chapters",
+    singular: "Chapter / Topic",
+    plural: "Chapters & Topics",
+    description: "The chapters of each class subject, and optional topics inside them, that questions are filed under.",
+    recordFilters: [
+      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "subjectId", label: "Subject", allLabel: "All subjects", store: asEditable(subjectStore) },
+    ],
+    uniqueScope: ["classId", "subjectId", "parentId"],
+    fields: [
+      { key: "nameBn", label: "Name (Bangla)", type: "text" },
+      { key: "classId", label: "Class", type: "record", required: true, source: asEditable(classStore) },
+      { key: "subjectId", label: "Subject", type: "record", required: true, source: asEditable(subjectStore) },
+      {
+        key: "parentId",
+        label: "Chapter",
+        type: "record",
+        source: asEditable(questionChapterStore),
+        allLabel: "None — this is a chapter",
+        description: "Pick a chapter to make this a topic inside it.",
+        sourceFilter: (c, values) =>
+          c.parentId == null && String(c.classId) === String(values.classId) && String(c.subjectId) === String(values.subjectId),
+      },
+    ],
+    columns: [
+      { label: "Bangla name", render: (r) => String(r.nameBn || "—") },
+      { label: "Class", render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} /> },
+      { label: "Subject", render: (r) => <RecordName store={asEditable(subjectStore)} id={r.subjectId} /> },
+      {
+        label: "Chapter",
+        render: (r) =>
+          r.parentId == null ? <Badge variant="secondary">Chapter</Badge> : <RecordName store={asEditable(questionChapterStore)} id={r.parentId} />,
+      },
+    ],
+    softDelete: true,
+    ranked: false,
+    validate: (values, { record }) =>
+      record && values.parentId != null && Number(values.parentId) === record.id
+        ? { parentId: "A chapter can't be its own topic." }
+        : record && values.parentId != null && questionChapterStore.getList(record.instituteId).some((c) => c.parentId === record.id)
+          ? { parentId: "It has topics of its own, so it stays a chapter." }
+          : {},
+    inUse: (record) => chapterInUse(record),
+    store: asEditable(questionChapterStore),
   },
 } satisfies Record<string, KindConfig>
 
