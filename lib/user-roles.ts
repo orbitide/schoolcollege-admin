@@ -3,12 +3,14 @@
 import * as React from "react"
 
 import { logChanges } from "@/lib/common-log"
-import { getAdminUsers, reassignUsersRole } from "@/lib/global-settings"
+import { reassignUsersRole } from "@/lib/global-settings"
+import { httpClient } from "@/lib/http-client"
 
 // User roles (legacy NccPermission, Users/ManageUserRoles): a named bundle
-// of permission codes (lib/access.ts) that users are given. In-memory dummy
-// store like the rest of admin; replace with API calls once the backend
-// endpoints exist.
+// of permission codes (lib/access.ts) that users are given. Kept by the API
+// (api/v1/roles, super admin only); this store caches the list for the role
+// pages and pickers. The signed-in user's own role permissions come with
+// /auth/me instead, so other users never need this list.
 
 export type UserRoleRecord = {
   id: number
@@ -16,13 +18,14 @@ export type UserRoleRecord = {
   group: string
   description: string
   rank: number
-  // Permission codes the role grants. The seeded roles use patterns until
-  // their permissions are first saved: "*" is every code, "*.manage" /
-  // "*.view" every code of that surface.
+  // Permission codes the role grants, or patterns: "*" is every code,
+  // "*.manage" / "*.view" every code of that surface.
   permissions: string[]
-  // Seeded roles the code relies on by name (Super Admin, Teacher, ...):
-  // they can't be renamed or deleted (ezducms isSystemDefault).
+  // Roles the code relies on by name (Super Admin, Teacher, ...): they
+  // can't be renamed or deleted (ezducms isSystemDefault).
   builtIn: boolean
+  // Users holding the role, as the API counts them.
+  userCount: number
   createdBy: string
   createdAt: string
   modifiedBy: string
@@ -34,26 +37,11 @@ export type UserRoleInput = Pick<UserRoleRecord, "name" | "group" | "description
 // Holds every permission whatever its list says, like a legacy superadmin.
 export const SUPER_ADMIN_ROLE = "Super Admin"
 
-const seedStamp = {
-  builtIn: true,
-  createdBy: "Super Admin",
-  createdAt: "2026-01-05T09:00:00.000Z",
-  modifiedBy: "Super Admin",
-  modifiedAt: "2026-01-05T09:00:00.000Z",
-}
-
-const seedRoles: UserRoleRecord[] = [
-  { id: 1, name: SUPER_ADMIN_ROLE, group: "Platform", description: "Runs the platform and every institute.", rank: 1, permissions: ["*"], ...seedStamp },
-  { id: 2, name: "Institute Admin", group: "Institute", description: "Everything inside their institutes, including deleting records.", rank: 2, permissions: ["*"], ...seedStamp },
-  { id: 3, name: "Institute Manager", group: "Institute", description: "Adds and edits records, and sees every page, but can't delete.", rank: 3, permissions: ["*.manage", "*.view"], ...seedStamp },
-  { id: 4, name: "Institute Viewer", group: "Institute", description: "Read-only access to the view pages.", rank: 4, permissions: ["*.view"], ...seedStamp },
-  // A teacher works only on their own pages (e.g. Take Attendance, My
-  // Post), never the admin surfaces.
-  { id: 5, name: "Teacher", group: "Teacher", description: "Signs in as a teacher to take attendance for their sections, see their routine and the notice board, write blog posts, add questions to the bank, and print and scan OMR sheets.", rank: 5, permissions: ["blog-author.manage", "blog-my-comment.manage", "teacher-routine.view", "notice-board.view", "question.manage", "question-chapter.view", "omr-sheet.view", "omr-scan.manage"], ...seedStamp },
-]
-
-let roles = seedRoles
+let roles: UserRoleRecord[] = []
+let loaded = false
+let loading: Promise<void> | undefined
 const listeners = new Set<() => void>()
+const noRoles: UserRoleRecord[] = []
 
 function emit(next: UserRoleRecord[]) {
   logChanges("NccPermission", roles, next)
@@ -61,7 +49,23 @@ function emit(next: UserRoleRecord[]) {
   listeners.forEach((listener) => listener())
 }
 
+// Loads the list once, the first time a role page or picker needs it.
+function load() {
+  loading ??= httpClient
+    .get<UserRoleRecord[]>("/roles")
+    .then((list) => {
+      roles = list
+      loaded = true
+      listeners.forEach((listener) => listener())
+    })
+    .catch(() => {
+      // Not a super admin, or the API is down: no roles to show. Try again next time.
+      loading = undefined
+    })
+}
+
 function subscribe(listener: () => void) {
+  load()
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
@@ -71,7 +75,12 @@ export function getUserRoles() {
 }
 
 export function useUserRoles() {
-  return React.useSyncExternalStore(subscribe, () => roles, () => seedRoles)
+  return React.useSyncExternalStore(subscribe, () => roles, () => noRoles)
+}
+
+// Whether the list has arrived, so pages can wait rather than show "not found".
+export function useUserRolesLoaded() {
+  return React.useSyncExternalStore(subscribe, () => loaded, () => false)
 }
 
 // Role names in rank order, for role pickers.
@@ -83,6 +92,7 @@ export function useUserRoleNames() {
   )
 }
 
+// The same rule as the API's PermissionRules.PatternsAllow.
 export function roleAllows(role: Pick<UserRoleRecord, "name" | "permissions">, code: string) {
   if (role.name === SUPER_ADMIN_ROLE) return true
   return role.permissions.some(
@@ -100,6 +110,7 @@ export function nextRoleRank() {
   return Math.max(0, ...roles.map((r) => r.rank)) + 1
 }
 
+// A quick check before saving; the API checks the same and has the last word.
 export function roleErrors(input: UserRoleInput, exceptId?: number) {
   const errors: Partial<Record<keyof UserRoleInput, string>> = {}
   const name = input.name.trim()
@@ -110,63 +121,40 @@ export function roleErrors(input: UserRoleInput, exceptId?: number) {
   return errors
 }
 
-function fields(input: UserRoleInput) {
-  return {
-    name: input.name.trim(),
-    group: input.group.trim(),
-    description: input.description.trim(),
-    rank: input.rank,
-  }
+function replace(role: UserRoleRecord) {
+  emit(roles.map((r) => (r.id === role.id ? role : r)))
 }
 
-export function addUserRole(input: UserRoleInput, by: string) {
-  const now = new Date().toISOString()
-  const role: UserRoleRecord = {
-    id: Math.max(0, ...roles.map((r) => r.id)) + 1,
-    ...fields(input),
-    permissions: [],
-    builtIn: false,
-    createdBy: by,
-    createdAt: now,
-    modifiedBy: by,
-    modifiedAt: now,
-  }
+// Rejects with an ApiError (fieldErrors per input) when the API refuses.
+export async function addUserRole(input: UserRoleInput) {
+  const role = await httpClient.post<UserRoleRecord>("/roles", input)
   emit([...roles, role])
   return role
 }
 
-function patch(id: number, changes: Partial<UserRoleRecord>, by: string) {
-  emit(roles.map((r) => (r.id === id ? { ...r, ...changes, modifiedBy: by, modifiedAt: new Date().toISOString() } : r)))
+// A built-in role keeps its name (the API ignores a new one); renaming a
+// custom role renames it on the in-memory users too.
+export async function updateUserRole(id: number, input: UserRoleInput, by: string) {
+  const before = roles.find((r) => r.id === id)
+  const role = await httpClient.put<UserRoleRecord>(`/roles/${id}`, input)
+  replace(role)
+  if (before && role.name !== before.name) reassignUsersRole(before.name, role.name, by)
+  return role
 }
 
-// A built-in role keeps its name; renaming a custom role renames it on its
-// users too.
-export function updateUserRole(id: number, input: UserRoleInput, by: string) {
-  const role = roles.find((r) => r.id === id)
-  if (!role) return
-  const next = fields(input)
-  if (role.builtIn) next.name = role.name
-  patch(id, next, by)
-  if (next.name !== role.name) reassignUsersRole(role.name, next.name, by)
-}
-
-// Legacy SaveRolePermission / DeleteRolePermission, saved together. The
-// super admin role's permissions are fixed.
-export function saveRolePermissions(id: number, codes: string[], by: string) {
-  const role = roles.find((r) => r.id === id)
-  if (!role || role.name === SUPER_ADMIN_ROLE) return
-  patch(id, { permissions: [...new Set(codes)].sort() }, by)
-}
-
-export function roleUserCount(name: string) {
-  return getAdminUsers().filter((u) => u.role === name).length
+// Legacy SaveRolePermission / DeleteRolePermission, saved together. The API
+// refuses the super admin role, whose permissions are fixed.
+export async function saveRolePermissions(id: number, codes: string[]) {
+  const role = await httpClient.put<UserRoleRecord>(`/roles/${id}/permissions`, { permissions: codes })
+  replace(role)
+  return role
 }
 
 // Legacy DeleteRole removes the role from its users; here every user has a
-// role, so its users move to `moveTo` first.
-export function deleteUserRole(id: number, moveTo: string, by: string) {
+// role, so its users move to `moveTo` first (the API does both together).
+export async function deleteUserRole(id: number, moveTo: string, by: string) {
   const role = roles.find((r) => r.id === id)
-  if (!role || role.builtIn) return
-  reassignUsersRole(role.name, moveTo, by)
+  await httpClient.delete(`/roles/${id}`, { params: moveTo ? { moveTo } : undefined })
+  if (role && moveTo) reassignUsersRole(role.name, moveTo, by)
   emit(roles.filter((r) => r.id !== id))
 }

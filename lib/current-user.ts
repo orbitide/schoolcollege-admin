@@ -27,7 +27,10 @@ export const DEMO_PASSWORD = "123456"
 export type CurrentUser = Pick<
   AdminUser,
   "id" | "userName" | "name" | "email" | "role" | "profilePicture" | "forcePasswordChange" | "extraAllow" | "extraDeny"
->
+> & {
+  // The role's permission codes and patterns ("*", "*.view"), for grants().
+  permissions: string[]
+}
 
 // The user the session cookie belongs to, or null when there's no valid
 // session (the API answers 401).

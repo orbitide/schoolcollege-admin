@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { useCurrentUser } from "@/lib/current-user"
 import {
   SUPER_ADMIN_ROLE,
   roleAllows,
   saveRolePermissions,
   useUserRoles,
+  useUserRolesLoaded,
   type UserRoleRecord,
 } from "@/lib/user-roles"
 
@@ -28,7 +28,9 @@ const LIST_HREF = "/users/roles"
 // than on every click.
 export function RolePermissions({ roleId }: { roleId: number }) {
   const roles = useUserRoles()
+  const loaded = useUserRolesLoaded()
   const role = roles.find((r) => r.id === roleId)
+  if (!loaded) return null
   if (!role) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -44,7 +46,6 @@ export function RolePermissions({ roleId }: { roleId: number }) {
 }
 
 function Editor({ role }: { role: UserRoleRecord }) {
-  const me = useCurrentUser()
   const menus = React.useMemo(() => permissionMenus(), [])
   const allCodes = React.useMemo(() => menus.flatMap((m) => m.items.flatMap((i) => i.codes.map((c) => c.code))), [menus])
   // A seeded role's patterns ("*.view") become the codes they cover.
@@ -77,9 +78,19 @@ function Editor({ role }: { role: UserRoleRecord }) {
     })
   }
 
-  function save() {
-    saveRolePermissions(role.id, [...selected], me.name)
-    toast.success(`Permissions of ${role.name} saved.`)
+  const [pending, setPending] = React.useState(false)
+
+  async function save() {
+    if (pending) return
+    setPending(true)
+    try {
+      await saveRolePermissions(role.id, [...selected])
+      toast.success(`Permissions of ${role.name} saved.`)
+    } catch (error) {
+      toast.error((error as Error).message)
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -213,7 +224,7 @@ function Editor({ role }: { role: UserRoleRecord }) {
             <Button variant="outline" disabled={!dirty} onClick={() => setSelected(grantedNow(role))}>
               Reset
             </Button>
-            <Button disabled={!dirty} onClick={save}>
+            <Button disabled={!dirty || pending} onClick={save}>
               Save
             </Button>
           </div>

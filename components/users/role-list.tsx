@@ -28,7 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useCurrentUser } from "@/lib/current-user"
-import { useAdminUsers } from "@/lib/global-settings"
 import { deleteUserRole, roleAllows, useUserRoles, type UserRoleRecord } from "@/lib/user-roles"
 
 // Legacy "Contains Module(n), Menu(n)": the sidebar menus, and the items in
@@ -48,13 +47,13 @@ export function roleContains(role: UserRoleRecord, menus: PermissionMenu[]) {
 // many users hold it; Edit, Permissions and Delete per role.
 export function RoleList() {
   const roles = useUserRoles()
-  const users = useAdminUsers()
   const menus = React.useMemo(() => permissionMenus(), [])
   const [deleting, setDeleting] = React.useState<UserRoleRecord | null>(null)
 
   // Legacy orders by name.
   const rows = [...roles].sort((a, b) => a.name.localeCompare(b.name))
-  const usersOf = (role: UserRoleRecord) => users.filter((u) => u.role === role.name).length
+  // As the API counts them, since it's the API that moves them on delete.
+  const usersOf = (role: UserRoleRecord) => role.userCount
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
@@ -174,6 +173,19 @@ function DeleteRoleDialog({
   const me = useCurrentUser()
   const [moveTo, setMoveTo] = React.useState("")
   const [error, setError] = React.useState<string>()
+  const [pending, setPending] = React.useState(false)
+
+  async function remove() {
+    setPending(true)
+    try {
+      await deleteUserRole(role.id, moveTo, me.name)
+      toast.success(`Role ${role.name} delete successful.`)
+      onClose()
+    } catch (reason) {
+      toast.error((reason as Error).message)
+      setPending(false)
+    }
+  }
 
   return (
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
@@ -203,15 +215,15 @@ function DeleteRoleDialog({
           <AlertDialogCancel>Back</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            disabled={pending}
             onClick={(event) => {
+              // The dialog stays open until the API has answered.
+              event.preventDefault()
               if (userCount > 0 && !moveTo) {
-                event.preventDefault()
                 setError("Select the role its users move to.")
                 return
               }
-              deleteUserRole(role.id, moveTo, me.name)
-              toast.success(`Role ${role.name} delete successful.`)
-              onClose()
+              void remove()
             }}
           >
             Delete

@@ -4,7 +4,7 @@ import * as React from "react"
 
 import { useCurrentUser } from "@/lib/current-user"
 import type { AdminUser, UserRole } from "@/lib/global-settings"
-import { roleNameAllows, useUserRoles } from "@/lib/user-roles"
+import { roleAllows, roleNameAllows } from "@/lib/user-roles"
 
 // The three ways into a resource (legacy ManageAdmin / Manage / ManageView,
 // ezducms AccessSurface). Each is its own permission; a role just bundles
@@ -37,11 +37,19 @@ export const permissionCode = (resource: string, surface: AccessSurface) =>
 
 // The role's grant as adjusted by the user's Extra Permission: a deny always
 // wins, an allow adds. A super admin holds everything (legacy superadmins
-// bypass permission checks).
-export function grants(user: Pick<AdminUser, "role" | "extraAllow" | "extraDeny">, code: string) {
+// bypass permission checks). The same rules as the API's PermissionRules.
+// `permissions` are the role's own codes when known (the signed-in user,
+// from /auth/me); otherwise the role is looked up in the Manage User Roles list.
+export function grants(
+  user: Pick<AdminUser, "role" | "extraAllow" | "extraDeny"> & { permissions?: string[] },
+  code: string
+) {
   if (user.role === "Super Admin") return true
   if (user.extraDeny.includes(code)) return false
-  return user.extraAllow.includes(code) || roleNameAllows(user.role, code)
+  if (user.extraAllow.includes(code)) return true
+  return user.permissions
+    ? roleAllows({ name: user.role, permissions: user.permissions }, code)
+    : roleNameAllows(user.role, code)
 }
 
 // What a role gives, before any user's Extra Permission (Manage User Roles).
@@ -49,12 +57,10 @@ export function roleGrantsCode(role: UserRole, code: string) {
   return roleNameAllows(role, code)
 }
 
+// Checks the signed-in user with the role permissions /auth/me returned.
 export function useCan() {
   const user = useCurrentUser()
-  // Re-checks when a role's permissions change (Manage User Roles).
-  const roles = useUserRoles()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return React.useCallback((code: string) => grants(user, code), [user, roles])
+  return React.useCallback((code: string) => grants(user, code), [user])
 }
 
 // The surfaces of a resource the current user holds, Admin first.

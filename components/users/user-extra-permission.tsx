@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { roleGrantsCode } from "@/lib/access"
 import { isPlatformAdmin, useCurrentUser } from "@/lib/current-user"
 import { saveUserExtraPermissions, useAdminUsers, type AdminUser } from "@/lib/global-settings"
+import { useUserRoles } from "@/lib/user-roles"
 import { cn } from "@/lib/utils"
 
 const LIST_HREF = "/users"
@@ -45,6 +46,8 @@ export function UserExtraPermission({ userId }: { userId: number }) {
 
 function Editor({ user }: { user: AdminUser }) {
   const me = useCurrentUser()
+  // Loads the role list (and re-renders when it arrives) for "granted by role" below.
+  useUserRoles()
   const menus = React.useMemo(() => permissionMenus(), [])
   const [choices, setChoices] = React.useState(() => choicesOf(user))
   const [query, setQuery] = React.useState("")

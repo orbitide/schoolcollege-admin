@@ -11,12 +11,14 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useCurrentUser } from "@/lib/current-user"
+import { ApiError } from "@/lib/http-client"
 import {
   addUserRole,
   nextRoleRank,
   roleErrors,
   updateUserRole,
   useUserRoles,
+  useUserRolesLoaded,
   type UserRoleInput,
   type UserRoleRecord,
 } from "@/lib/user-roles"
@@ -28,9 +30,12 @@ const LIST_HREF = "/users/roles"
 // page.
 export function RoleForm({ roleId }: { roleId?: number }) {
   const roles = useUserRoles()
+  // Wait for the API's list: the rank default and "not found" depend on it.
+  const loaded = useUserRolesLoaded()
   const existing = roleId == null ? undefined : roles.find((r) => r.id === roleId)
   const [formKey, setFormKey] = React.useState(0)
 
+  if (!loaded) return null
   if (roleId != null && !existing) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -55,7 +60,10 @@ function FormBody({ existing, onSavedNew }: { existing?: UserRoleRecord; onSaved
   const [errors, setErrors] = React.useState<ReturnType<typeof roleErrors>>({})
   const isNew = !existing
 
-  function save(andNew: boolean) {
+  const [pending, setPending] = React.useState(false)
+
+  async function save(andNew: boolean) {
+    if (pending) return
     const input: UserRoleInput = { name, group, description, rank: Number(rank) }
     const found = roleErrors(input, existing?.id)
     setErrors(found)
@@ -63,16 +71,25 @@ function FormBody({ existing, onSavedNew }: { existing?: UserRoleRecord; onSaved
       toast.error("Please enter all required fields.")
       return
     }
-    if (existing) {
-      updateUserRole(existing.id, input, me.name)
-      toast.success(`Role ${existing.builtIn ? existing.name : input.name.trim()} updated.`)
-      router.push(LIST_HREF)
-      return
+    setPending(true)
+    try {
+      if (existing) {
+        const role = await updateUserRole(existing.id, input, me.name)
+        toast.success(`Role ${role.name} updated.`)
+        router.push(LIST_HREF)
+        return
+      }
+      const role = await addUserRole(input)
+      toast.success(`Role ${role.name} saved. Set its permissions next.`)
+      if (andNew) onSavedNew()
+      else router.push(`/users/roles/${role.id}/permissions`)
+    } catch (error) {
+      // The API's own checks (e.g. a name taken meanwhile) come back per field.
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).length) setErrors(error.fieldErrors)
+      toast.error((error as Error).message)
+    } finally {
+      setPending(false)
     }
-    const role = addUserRole(input, me.name)
-    toast.success(`Role ${role.name} saved. Set its permissions next.`)
-    if (andNew) onSavedNew()
-    else router.push(`/users/roles/${role.id}/permissions`)
   }
 
   return (
@@ -139,11 +156,11 @@ function FormBody({ existing, onSavedNew }: { existing?: UserRoleRecord; onSaved
             <Link href={LIST_HREF}>Back</Link>
           </Button>
           {isNew && (
-            <Button type="button" variant="secondary" onClick={() => save(true)}>
+            <Button type="button" variant="secondary" disabled={pending} onClick={() => save(true)}>
               Save and new
             </Button>
           )}
-          <Button type="submit">{isNew ? "Save" : "Update"}</Button>
+          <Button type="submit" disabled={pending}>{isNew ? "Save" : "Update"}</Button>
         </CardFooter>
       </Card>
     </form>
