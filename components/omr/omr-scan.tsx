@@ -95,6 +95,10 @@ async function readFile(file: File, questions: number): Promise<Omit<ScanRow, "i
   }
 }
 
+// A sheet can be printed with a different count from the exam subject's
+// (OMR Sheet lets it be typed in); what the sheet says wins.
+const countOf = (row: ScanRow, questions: number) => row.reading?.spec.questions || questions
+
 const splitAnswers = (text: string, questions: number) => {
   const parts = text.split(",").map((a) => a.trim().toUpperCase())
   return Array.from({ length: questions }, (_, i) => parts[i] ?? "")
@@ -144,7 +148,7 @@ export function OmrScan() {
                   registration: r.registration,
                   subjectCode: r.subjectCode,
                   setCode: r.setCode,
-                  answers: splitAnswers(r.answers, questions),
+                  answers: splitAnswers(r.answers, countOf(r, questions)),
                   flagged: r.flagged,
                 }
           ),
@@ -260,7 +264,7 @@ export function OmrScan() {
                 <>Drop the picture of one sheet filled in with the correct answers (fill the set bubble too).</>
               ) : (
                 <>
-                  Drop scans or photos of the {subjectName(subjectRow.subjectId)} sheets here — {questions} questions each.
+                  Drop scans or photos of the {subjectName(subjectRow.subjectId)} sheets here ({questions} questions unless the sheet was printed with a different count).
                 </>
               )}
               <p className="mt-1 text-xs text-muted-foreground">
@@ -304,12 +308,12 @@ export function OmrScan() {
           {mode === "key" && rows[0] && (
             <KeySheet
               row={rows[0]}
-              questions={questions}
+              questions={countOf(rows[0], questions)}
               onChange={(changes) => update(rows[0].id, changes)}
               onView={() => setViewing(rows[0])}
               onSave={() => {
                 const setCode = rows[0].setCode.trim().toUpperCase()
-                const answer = splitAnswers(rows[0].answers, questions).join(",")
+                const answer = splitAnswers(rows[0].answers, countOf(rows[0], questions)).join(",")
                 const existed = keys.some((k) => k.termExamId === exam.id && k.subjectId === subjectRow.subjectId && k.setCode.trim().toUpperCase() === setCode)
                 saveAnswerKeys([{ termExamId: exam.id, subjectId: subjectRow.subjectId, setCode, answer }], user.name)
                 toast.success(`${existed ? "Answer key replaced" : "Answer key saved"} for set ${setCode}`)

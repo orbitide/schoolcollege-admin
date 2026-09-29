@@ -22,11 +22,25 @@ export type OmrSheetInfo = {
   // Fill the roll (and registration) bubbles in print, for a student's sheet.
   prefill?: boolean
   lang: "bn" | "en"
+  color?: OmrColor
 }
 
-const INK = "#111"
-const LINE = "#333"
-const HINT = "#b0b0b0"
+// The sheet's print colour, like the education board's pink or green
+// sheets. Only the printing takes it: the corner, orientation and code
+// squares stay black for the scanner, and the letters inside the bubbles
+// stay as pale as the grey ones so an empty bubble still reads as empty.
+export const omrColors = {
+  black: { name: "Black", ink: "#111", line: "#333", hint: "#b0b0b0", soft: "#555", rule: "#ccc", tint: "none" },
+  pink: { name: "Pink", ink: "#ad1457", line: "#c2185b", hint: "#f4a6c0", soft: "#c2185b", rule: "#f8bbd0", tint: "#fdeef4" },
+  green: { name: "Green", ink: "#1b5e20", line: "#2e7d32", hint: "#a5d6a7", soft: "#2e7d32", rule: "#c8e6c9", tint: "#edf7ee" },
+  blue: { name: "Blue", ink: "#0d47a1", line: "#1565c0", hint: "#90caf9", soft: "#1565c0", rule: "#bbdefb", tint: "#eaf4fd" },
+} as const
+export type OmrColor = keyof typeof omrColors
+type Palette = (typeof omrColors)[OmrColor]
+
+// What's printed for the student (name, roll, subject code) and filled
+// bubbles are black on every colour.
+const DATA = "#111"
 
 const text = {
   bn: {
@@ -74,6 +88,7 @@ const fieldLabel = (field: string, t: (typeof text)["en"]) =>
 // Letters inside the bubbles are pale so they don't read as marks.
 export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetInfo }) {
   const t = text[info.lang]
+  const c = omrColors[info.color ?? "black"]
   const bangla = info.lang === "bn"
   const n = (v: string | number) => paperNumber(v, bangla)
   const { page, r, spec, id, answers } = layout
@@ -117,26 +132,26 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
         height={ORIENTATION_SIZE}
         fill="#000"
       />
-      {codeCells.map((c, i) =>
-        layout.bits[i] ? <rect key={i} x={c.x - CODE_SIZE / 2} y={c.y - CODE_SIZE / 2} width={CODE_SIZE} height={CODE_SIZE} fill="#000" /> : null
+      {codeCells.map((cell, i) =>
+        layout.bits[i] ? <rect key={i} x={cell.x - CODE_SIZE / 2} y={cell.y - CODE_SIZE / 2} width={CODE_SIZE} height={CODE_SIZE} fill="#000" /> : null
       )}
 
       {/* Header */}
       {layout.half ? (
         <>
-          <text x={center} y={20} textAnchor="middle" fontSize={3.6} fontWeight={700} fill={INK}>
+          <text x={center} y={20} textAnchor="middle" fontSize={3.6} fontWeight={700} fill={c.ink}>
             {info.institute}
           </text>
-          <text x={center} y={25.5} textAnchor="middle" fontSize={2.8} fill={INK}>
+          <text x={center} y={25.5} textAnchor="middle" fontSize={2.8} fill={c.ink}>
             {t.title} · {info.exam} · {info.subject}
           </text>
           {infoRows.map(([label, value], i) => (
             <g key={label}>
-              <text x={22 + i * 43} y={31.5} fontSize={2.5} fill={INK}>
+              <text x={22 + i * 43} y={31.5} fontSize={2.5} fill={c.ink}>
                 {label}:
               </text>
-              <line x1={22 + i * 43 + 11} y1={32.2} x2={22 + i * 43 + 41} y2={32.2} stroke={HINT} strokeWidth={0.2} />
-              <text x={22 + i * 43 + 12} y={31.5} fontSize={2.6} fontWeight={600} fill={INK}>
+              <line x1={22 + i * 43 + 11} y1={32.2} x2={22 + i * 43 + 41} y2={32.2} stroke={c.hint} strokeWidth={0.2} />
+              <text x={22 + i * 43 + 12} y={31.5} fontSize={2.6} fontWeight={600} fill={DATA}>
                 {value}
               </text>
             </g>
@@ -144,17 +159,17 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
         </>
       ) : (
         <>
-          <text x={center} y={20} textAnchor="middle" fontSize={3.4} fontWeight={700} fill={INK}>
+          <text x={center} y={20} textAnchor="middle" fontSize={3.4} fontWeight={700} fill={c.ink}>
             {t.title}
             {spec.type !== "standard" && ` · ${omrType(spec.type).name}`}
           </text>
-          <text x={center} y={26} textAnchor="middle" fontSize={4.4} fontWeight={700} fill={INK}>
+          <text x={center} y={26} textAnchor="middle" fontSize={4.4} fontWeight={700} fill={c.ink}>
             {info.institute}
           </text>
-          <text x={center} y={31.2} textAnchor="middle" fontSize={3.2} fill={INK}>
+          <text x={center} y={31.2} textAnchor="middle" fontSize={3.2} fill={c.ink}>
             {info.exam}
           </text>
-          <rect x={22} y={33.5} width={166} height={25} fill="none" stroke={LINE} strokeWidth={0.3} rx={1} />
+          <rect x={22} y={33.5} width={166} height={25} fill={c.tint} stroke={c.line} strokeWidth={0.3} rx={1} />
           {(
             [
               [t.name, info.student?.name ?? "", 24, 39, 186],
@@ -165,19 +180,19 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
             ] as const
           ).map(([label, value, x, y, end]) => (
             <g key={label}>
-              <text x={x} y={y} fontSize={2.8} fill={INK}>
+              <text x={x} y={y} fontSize={2.8} fill={c.ink}>
                 {label}:
               </text>
-              <line x1={x + 18} y1={y + 0.8} x2={end} y2={y + 0.8} stroke={HINT} strokeWidth={0.2} />
-              <text x={x + 19} y={y} fontSize={3} fontWeight={600} fill={INK}>
+              <line x1={x + 18} y1={y + 0.8} x2={end} y2={y + 0.8} stroke={c.hint} strokeWidth={0.2} />
+              <text x={x + 19} y={y} fontSize={3} fontWeight={600} fill={DATA}>
                 {value}
               </text>
             </g>
           ))}
-          <text x={24} y={57} fontSize={2.2} fill="#555">
+          <text x={24} y={57} fontSize={2.2} fill={c.soft}>
             {t.signature}: ____________________
           </text>
-          <text x={122} y={57} fontSize={2.2} fill="#555">
+          <text x={122} y={57} fontSize={2.2} fill={c.soft}>
             {t.invigilator}: ________________
           </text>
         </>
@@ -190,14 +205,14 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
         const boxW = Math.min(6, (block.columns[1] ?? first + 6) - first - 0.4)
         return (
           <g key={block.field}>
-            <text x={(first + last) / 2} y={id.labelY} textAnchor="middle" fontSize={2.5 * f} fontWeight={700} fill={INK}>
+            <text x={(first + last) / 2} y={id.labelY} textAnchor="middle" fontSize={2.5 * f} fontWeight={700} fill={c.ink}>
               {fieldLabel(block.field, t)}
             </text>
             {block.columns.map((x, i) => (
               <g key={i}>
-                <rect x={x - boxW / 2} y={id.boxTop} width={boxW} height={id.boxHeight} fill="none" stroke={LINE} strokeWidth={0.3} />
+                <rect x={x - boxW / 2} y={id.boxTop} width={boxW} height={id.boxHeight} fill="none" stroke={c.line} strokeWidth={0.3} />
                 {shown[block.field]?.[i]?.trim() && (block.field === "subject" || info.prefill) && (
-                  <text x={x} y={id.boxTop + id.boxHeight * 0.72} textAnchor="middle" fontSize={3.4 * f} fontWeight={700} fill={INK}>
+                  <text x={x} y={id.boxTop + id.boxHeight * 0.72} textAnchor="middle" fontSize={3.4 * f} fontWeight={700} fill={DATA}>
                     {n(shown[block.field][i])}
                   </text>
                 )}
@@ -208,16 +223,16 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
       })}
       {id.digitLabelX != null &&
         Array.from({ length: 10 }, (_, d) => (
-          <text key={d} x={id.digitLabelX!} y={id.firstRow + d * layout.row + 0.9 * f} fontSize={2.5 * f} fill="#555" textAnchor="middle">
+          <text key={d} x={id.digitLabelX!} y={id.firstRow + d * layout.row + 0.9 * f} fontSize={2.5 * f} fill={c.soft} textAnchor="middle">
             {n(d)}
           </text>
         ))}
 
       {/* Instructions */}
       {layout.instructions.box ? (
-        <Instructions x={layout.instructions.x} y={layout.instructions.y} width={layout.instructions.width} height={layout.instructions.height} t={t} r={r} />
+        <Instructions x={layout.instructions.x} y={layout.instructions.y} width={layout.instructions.width} height={layout.instructions.height} t={t} r={r} c={c} />
       ) : (
-        <text x={layout.instructions.x} y={layout.instructions.y} fontSize={2.2} fill="#444">
+        <text x={layout.instructions.x} y={layout.instructions.y} fontSize={2.2} fill={c.soft}>
           {layout.half
             ? t.lines.slice(0, 2).join(" ")
             : `${t.rules}: ${t.lines[0]} ${t.lines[1].replace(/:$/, "")}. ${t.lines[4]}`}
@@ -225,18 +240,18 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
       )}
       {layout.half &&
         t.lines.slice(2).map((line, i) => (
-          <text key={i} x={layout.instructions.x} y={layout.instructions.y + 4 + i * 3.6} fontSize={2.2} fill="#444">
+          <text key={i} x={layout.instructions.x} y={layout.instructions.y + 4 + i * 3.6} fontSize={2.2} fill={c.soft}>
             {line}
           </text>
         ))}
 
       {/* Answers */}
       {layout.half ? (
-        <line x1={answers.left - 4} y1={answers.top - 2} x2={answers.left - 4} y2={answers.firstRow + (answers.rows - 1) * layout.row + 3} stroke={LINE} strokeWidth={0.3} />
+        <line x1={answers.left - 4} y1={answers.top - 2} x2={answers.left - 4} y2={answers.firstRow + (answers.rows - 1) * layout.row + 3} stroke={c.line} strokeWidth={0.3} />
       ) : (
         <>
-          <line x1={14} y1={answers.top} x2={196} y2={answers.top} stroke={LINE} strokeWidth={0.3} />
-          <text x={center} y={answers.top + 3.6} textAnchor="middle" fontSize={2.8 * f} fontWeight={700} fill={INK}>
+          <line x1={14} y1={answers.top} x2={196} y2={answers.top} stroke={c.line} strokeWidth={0.3} />
+          <text x={center} y={answers.top + 3.6} textAnchor="middle" fontSize={2.8 * f} fontWeight={700} fill={c.ink}>
             {t.answers} ({n(layout.questions)})
           </text>
         </>
@@ -244,7 +259,7 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
       {answers.columns.map((column, c) => (
         <g key={c}>
           {column.bubbles.map((bx, k) => (
-            <text key={k} x={bx} y={answers.headerY + 0.9} textAnchor="middle" fontSize={2.5 * f} fontWeight={700} fill={INK}>
+            <text key={k} x={bx} y={answers.headerY + 0.9} textAnchor="middle" fontSize={2.5 * f} fontWeight={700} fill={c.ink}>
               {optionLabels[info.lang][k]}
             </text>
           ))}
@@ -254,7 +269,7 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
               y1={answers.headerY - 2}
               x2={column.left - 1.5}
               y2={answers.firstRow + (answers.rows - 1) * layout.row + 3}
-              stroke="#ccc"
+              stroke={c.rule}
               strokeWidth={0.2}
             />
           )}
@@ -264,7 +279,7 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
         const column = answers.columns[Math.floor(q / answers.rows)]
         const y = answers.firstRow + (q % answers.rows) * layout.row
         return (
-          <text key={q} x={column.numberRight} y={y + 0.95 * f} textAnchor="end" fontSize={2.6 * f} fontWeight={600} fill={INK}>
+          <text key={q} x={column.numberRight} y={y + 0.95 * f} textAnchor="end" fontSize={2.6 * f} fontWeight={600} fill={c.ink}>
             {n(q + 1)}
           </text>
         )
@@ -281,9 +296,9 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
               : n(b.value)
         return (
           <g key={i}>
-            <circle cx={b.x} cy={b.y} r={r} fill={on ? "#000" : "#fff"} stroke={LINE} strokeWidth={0.25} />
+            <circle cx={b.x} cy={b.y} r={r} fill={on ? "#000" : "#fff"} stroke={c.line} strokeWidth={0.25} />
             {!on && (
-              <text x={b.x} y={b.y + 0.4 * r} textAnchor="middle" fontSize={r * 1.05} fill={HINT}>
+              <text x={b.x} y={b.y + 0.4 * r} textAnchor="middle" fontSize={r * 1.05} fill={c.hint}>
                 {label}
               </text>
             )}
@@ -304,6 +319,7 @@ function Instructions({
   height,
   t,
   r,
+  c,
 }: {
   x: number
   y: number
@@ -311,6 +327,7 @@ function Instructions({
   height: number
   t: (typeof text)["en"]
   r: number
+  c: Palette
 }) {
   const narrow = width < 60
   const size = narrow ? 1.9 : 2.5
@@ -323,24 +340,24 @@ function Instructions({
   const sample = (kind: "right" | "wrong", rowY: number) => {
     const cy = rowY - 0.8
     const startX = narrow ? x + 7 : x + width - 4 - 3 * (r * 2 + 1.6)
-    if (kind === "right") return <circle cx={narrow ? startX : x + width - 4} cy={cy} r={r} fill={INK} />
+    if (kind === "right") return <circle cx={narrow ? startX : x + width - 4} cy={cy} r={r} fill={c.ink} />
     return [0, 1, 2, 3].map((k) => {
       const cx = startX + k * (r * 2 + 1.6)
       return (
         <g key={k}>
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke={LINE} strokeWidth={0.25} />
-          {k === 0 && <line x1={cx - r * 0.7} y1={cy + r * 0.7} x2={cx + r * 0.7} y2={cy - r * 0.7} stroke={INK} strokeWidth={0.5} />}
-          {k === 1 && <path d={`M${cx - r * 0.6} ${cy} l${r * 0.45} ${r * 0.55} l${r * 0.85} ${-r * 1.1}`} fill="none" stroke={INK} strokeWidth={0.5} />}
-          {k === 2 && <circle cx={cx} cy={cy} r={r * 0.33} fill={INK} />}
-          {k === 3 && <path d={`M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy} Z`} fill={INK} />}
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={c.line} strokeWidth={0.25} />
+          {k === 0 && <line x1={cx - r * 0.7} y1={cy + r * 0.7} x2={cx + r * 0.7} y2={cy - r * 0.7} stroke={c.ink} strokeWidth={0.5} />}
+          {k === 1 && <path d={`M${cx - r * 0.6} ${cy} l${r * 0.45} ${r * 0.55} l${r * 0.85} ${-r * 1.1}`} fill="none" stroke={c.ink} strokeWidth={0.5} />}
+          {k === 2 && <circle cx={cx} cy={cy} r={r * 0.33} fill={c.ink} />}
+          {k === 3 && <path d={`M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy} Z`} fill={c.ink} />}
         </g>
       )
     })
   }
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill="none" stroke={LINE} strokeWidth={0.3} rx={1} />
-      <text x={x + 3} y={y + 5.5} fontSize={size + 0.4} fontWeight={700} fill={INK}>
+      <rect x={x} y={y} width={width} height={height} fill={c.tint} stroke={c.line} strokeWidth={0.3} rx={1} />
+      <text x={x + 3} y={y + 5.5} fontSize={size + 0.4} fontWeight={700} fill={c.ink}>
         {t.rules}
       </text>
       {rows.map((row, i) => {
@@ -348,7 +365,7 @@ function Instructions({
         return (
           <g key={i}>
             {row.text && (
-              <text x={x + 3} y={rowY} fontSize={size} fill={INK}>
+              <text x={x + 3} y={rowY} fontSize={size} fill={c.ink}>
                 {row.text}
               </text>
             )}

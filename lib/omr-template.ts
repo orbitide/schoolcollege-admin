@@ -371,6 +371,6 @@ export function specProblem(spec: OmrSpec) {
   }
   const layout = omrLayout(spec)
   if (layout.id.right > REGION.right - 3) return "The ID fields don't fit across the page; use fewer digits."
-  if (spec.questions > layout.capacity) return `${omrType(spec.type).name} sheets hold at most ${layout.capacity} questions; this subject has ${spec.questions}.`
+  if (spec.questions > layout.capacity) return `${omrType(spec.type).name} sheets hold at most ${layout.capacity} questions, not ${spec.questions}.`
   return null
 }

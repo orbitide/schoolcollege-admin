@@ -3,7 +3,7 @@
 import * as React from "react"
 import { CircleAlertIcon, PrinterIcon, TriangleAlertIcon } from "lucide-react"
 
-import { OmrSheet, type OmrSheetInfo } from "@/components/omr/omr-sheet"
+import { OmrSheet, omrColors, type OmrColor, type OmrSheetInfo } from "@/components/omr/omr-sheet"
 import { ExamReportFilterFields, useExamReportFilter } from "@/components/reports/exam-report-filter"
 import { PrintArea } from "@/components/reports/print-area"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { classStore, subjectStore } from "@/lib/academic-store"
 import {
   CUSTOM_LIMITS,
+  MAX_QUESTIONS,
   omrLayout,
   omrType,
   omrTypes,
@@ -56,12 +57,23 @@ export function OmrSheetPrint() {
   const section = f.examSections.find((s) => String(s.id) === f.param("section"))
   const mode = f.param("mode") === "blank" ? "blank" : "students"
   const lang = f.param("lang") === "en" ? "en" : "bn"
+  const color = (Object.keys(omrColors) as OmrColor[]).find((k) => k === f.param("color")) ?? "black"
   const type = (omrTypes.find((t) => t.id === f.param("sheet"))?.id ?? "standard") as OmrTypeId
   const [copies, setCopies] = React.useState(40)
   const [prefill, setPrefill] = React.useState(true)
   const [custom, setCustom] = React.useState<OmrFields>({ ...omrType("custom").fields })
 
-  const questions = exam && subjectRow ? mcqQuestionCount(exam, subjectRow.subjectId, papers) : 0
+  // The exam subject's count unless one is typed in; a different exam or
+  // subject goes back to its own count.
+  const examQuestions = exam && subjectRow ? mcqQuestionCount(exam, subjectRow.subjectId, papers) : 0
+  const [typed, setTyped] = React.useState<number | null>(null)
+  const scope = `${exam?.id}:${subjectRow?.subjectId}`
+  const [scopeOf, setScopeOf] = React.useState(scope)
+  if (scope !== scopeOf) {
+    setScopeOf(scope)
+    setTyped(null)
+  }
+  const questions = exam && subjectRow ? (typed ?? examQuestions) : 0
   const spec = specFor(type, questions || 1, custom)
   const problem = questions ? specProblem(spec) : null
   const layout = omrLayout(spec)
@@ -86,6 +98,7 @@ export function OmrSheetPrint() {
           subject: `${(lang === "bn" && subject.nameBn) || subject.name}${subject.code ? ` (${subject.code})` : ""}`,
           subjectCode: subject.code,
           lang,
+          color,
         }
       : null
   const sheets: OmrSheetInfo[] = base
@@ -161,6 +174,26 @@ export function OmrSheetPrint() {
             />
             <FieldDescription>{omrType(type).description}</FieldDescription>
           </div>
+          <Field>
+            <FieldLabel htmlFor="questions">Questions</FieldLabel>
+            <Input
+              id="questions"
+              type="number"
+              min={1}
+              max={MAX_QUESTIONS}
+              value={questions || ""}
+              onChange={(e) => setTyped(Math.min(MAX_QUESTIONS, Math.max(1, Math.floor(Number(e.target.value)) || 1)))}
+              disabled={!exam || !subjectRow}
+            />
+            {typed != null && typed !== examQuestions && (
+              <FieldDescription>
+                The exam subject has {examQuestions}.{" "}
+                <button type="button" className="underline underline-offset-4" onClick={() => setTyped(null)}>
+                  Use {examQuestions}
+                </button>
+              </FieldDescription>
+            )}
+          </Field>
           <FilterField
             label="Sheets"
             value={mode}
@@ -200,6 +233,12 @@ export function OmrSheetPrint() {
               { value: "bn", label: "বাংলা (ক খ গ ঘ)" },
               { value: "en", label: "English (A B C D)" },
             ]}
+          />
+          <FilterField
+            label="Colour"
+            value={color}
+            onChange={(v) => f.setParam({ color: v === "black" ? "" : v })}
+            options={Object.entries(omrColors).map(([value, c]) => ({ value, label: c.name }))}
           />
           {mode === "students" && (
             <Label className="flex items-center gap-2 self-end pb-2 font-normal">

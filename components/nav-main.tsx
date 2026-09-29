@@ -175,9 +175,11 @@ function useSavedMenu() {
 }
 
 export function NavMain({
+  label = "Main Menu",
   items,
   query = "",
 }: {
+  label?: string
   items: NavMainItem[]
   query?: string
 }) {
@@ -213,7 +215,7 @@ export function NavMain({
   return (
     <SidebarGroup>
       <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-sidebar-foreground/50 uppercase">
-        Main Menu
+        {label}
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu className="gap-0 divide-y divide-sidebar-border">
