@@ -34,12 +34,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
-  billingCycles,
   defaultConfiguration,
   defaultSettings,
   instituteTypes,
   managers,
-  plans,
   statuses,
   weekDays,
   type InstituteInput,
@@ -66,9 +64,7 @@ const emptyInstitute: InstituteInput = {
   eiin: "",
   type: "School",
   subdomain: "",
-  plan: "Basic",
   status: "Trial",
-  billingCycle: "Monthly",
   students: 0,
   teachers: 0,
   manager: "Unassigned",
@@ -517,23 +513,11 @@ function InstituteFormBody({
         <Card className="@4xl/main:col-span-2">
           <CardHeader>
             <CardTitle>Subscription</CardTitle>
-            <CardDescription>Plan, billing and account ownership</CardDescription>
+            <CardDescription>
+              Status, size and account ownership. Rates and invoices are managed under Subscriptions.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
-            <SelectField
-              name="plan"
-              label="Plan"
-              options={plans}
-              value={values.plan}
-              onChange={(value) => set("plan", value)}
-            />
-            <SelectField
-              name="billingCycle"
-              label="Billing cycle"
-              options={billingCycles}
-              value={values.billingCycle}
-              onChange={(value) => set("billingCycle", value)}
-            />
+          <CardContent className="grid gap-4 sm:grid-cols-2 @4xl/main:grid-cols-4">
             <SelectField
               name="status"
               label="Status"
@@ -542,7 +526,7 @@ function InstituteFormBody({
               onChange={(value) => set("status", value)}
             />
             <Field>
-              <FieldLabel htmlFor="students">Students</FieldLabel>
+              <FieldLabel htmlFor="students">Active students</FieldLabel>
               <Input
                 id="students"
                 type="number"

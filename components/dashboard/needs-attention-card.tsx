@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { BanIcon, CircleCheckIcon, GaugeIcon, LoaderIcon, MessageSquareWarningIcon } from "lucide-react"
+import { BanIcon, CircleCheckIcon, LoaderIcon, MessageSquareWarningIcon, ReceiptTextIcon } from "lucide-react"
 
 import {
   Card,
@@ -11,42 +11,49 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { planLimits, type Institute } from "@/lib/institutes"
+import { addDaysIso, formatTaka, isoDate } from "@/lib/billing"
+import { useOutstanding } from "@/lib/institute-billing"
+import type { Institute } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useSmsBalances, useSmsMessages } from "@/lib/sms-messages"
+import { useSubscriptions } from "@/lib/subscriptions"
 
 // SMS credit (Taka) below which an institute that sends SMS is warned.
 const LOW_SMS_BALANCE = 200
-// Share of the plan's student limit at which an institute should upgrade.
-const NEAR_LIMIT = 0.9
+// Trials ending within this many days are flagged.
+const TRIAL_WARNING_DAYS = 7
 const SHOWN = 6
 
 type Issue = { institute: Institute; reason: string; icon: React.ReactNode; order: number }
 
 // Institutes the platform team should act on: suspended ones, trials to
-// convert, institutes outgrowing their plan and ones running out of SMS
-// credit. Each row opens the institute.
+// convert, overdue invoices and institutes running out of SMS credit.
+// Each row opens the institute.
 export function NeedsAttentionCard() {
   const institutes = useInstitutes()
   const balances = useSmsBalances()
   const messages = useSmsMessages()
+  const outstanding = useOutstanding()
+  const subscriptions = useSubscriptions()
 
   const issues = React.useMemo(() => {
     const sendsSms = new Set(messages.map((m) => m.instituteId))
+    const today = isoDate()
+    const soon = addDaysIso(today, TRIAL_WARNING_DAYS)
     const list: Issue[] = []
     for (const institute of institutes) {
-      if (institute.status === "Suspended") {
-        list.push({ institute, reason: "Suspended", icon: <BanIcon className="text-destructive" />, order: 0 })
-        continue
-      }
-      const limit = planLimits[institute.plan].students
-      if (institute.students >= limit * NEAR_LIMIT) {
+      const owed = outstanding.get(institute.id)
+      if (owed?.overdueCount) {
         list.push({
           institute,
-          reason: `${institute.students.toLocaleString()} of ${limit.toLocaleString()} students on ${institute.plan}`,
-          icon: <GaugeIcon className="text-amber-500" />,
-          order: 1,
+          reason: `${formatTaka(owed.overdue)} overdue (${owed.overdueCount} ${owed.overdueCount === 1 ? "invoice" : "invoices"})`,
+          icon: <ReceiptTextIcon className="text-destructive" />,
+          order: 0,
         })
+      }
+      if (institute.status === "Suspended") {
+        list.push({ institute, reason: "Suspended", icon: <BanIcon className="text-destructive" />, order: 1 })
+        continue
       }
       const balance = balances[institute.id] ?? 0
       if (sendsSms.has(institute.id) && balance < LOW_SMS_BALANCE) {
@@ -57,12 +64,18 @@ export function NeedsAttentionCard() {
           order: 2,
         })
       }
-      if (institute.status === "Trial") {
-        list.push({ institute, reason: "On trial", icon: <LoaderIcon className="text-amber-500" />, order: 3 })
+      const trialEnds = subscriptions.find((s) => s.instituteId === institute.id)?.trialEndsAt
+      if (institute.status === "Trial" && trialEnds && trialEnds <= soon) {
+        list.push({
+          institute,
+          reason: trialEnds < today ? `Trial ended ${trialEnds}` : `Trial ends ${trialEnds}`,
+          icon: <LoaderIcon className="text-amber-500" />,
+          order: 3,
+        })
       }
     }
     return list.sort((a, b) => a.order - b.order || a.institute.name.localeCompare(b.institute.name))
-  }, [institutes, balances, messages])
+  }, [institutes, balances, messages, outstanding, subscriptions])
 
   return (
     <Card className="h-full">

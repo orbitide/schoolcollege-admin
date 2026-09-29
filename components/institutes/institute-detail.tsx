@@ -21,14 +21,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import {
   academicMediums,
   academicVersions,
   formatDate,
-  planLimits,
-  planPrices,
   type HolidayEvent,
   type Institute,
 } from "@/lib/institutes"
@@ -45,9 +42,13 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
+import { formatTaka, monthName, useBillingSettings } from "@/lib/billing"
 import { formatDateRange, holidayStore } from "@/lib/holidays"
+import { latestInvoices, useBillOf, useOutstanding } from "@/lib/institute-billing"
 import { useInstitute } from "@/lib/institutes-store"
+import { invoiceState, useSaasInvoices } from "@/lib/saas-invoices"
 import { useStudents } from "@/lib/students"
+import { useSubscription } from "@/lib/subscriptions"
 
 // Dummy activity feed until audit logs come from the API.
 function activityFor(institute: Institute) {
@@ -55,7 +56,6 @@ function activityFor(institute: Institute) {
     { label: "Monthly invoice paid", date: "2026-09-01" },
     { label: `${institute.principal} signed in`, date: "2026-08-28" },
     { label: "Exam results published", date: "2026-08-20" },
-    { label: `Upgraded to ${institute.plan} plan`, date: "2026-07-12" },
     { label: "Institute created", date: institute.joinedAt },
   ]
 }
@@ -75,6 +75,11 @@ export function InstituteDetail({ id }: { id: number }) {
   const grades = letterGradeStore.useList(id)
   const remarks = resultRemarkStore.useList(id)
   const nextHoliday = nextOccurrence(holidayStore.useList(id))
+  const billOf = useBillOf()
+  const settings = useBillingSettings()
+  const subscription = useSubscription(id)
+  const lastInvoice = latestInvoices(useSaasInvoices()).get(id)
+  const owed = useOutstanding().get(id)
 
   if (!institute) {
     return (
@@ -93,33 +98,33 @@ export function InstituteDetail({ id }: { id: number }) {
   const config = institute.configuration
   const houseLabels = kindLabels("houses", institute)
   const categoryLabels = kindLabels("categories", institute)
-  const limits = planLimits[institute.plan]
-  const monthly = planPrices[institute.plan]
-  const billed =
-    institute.billingCycle === "Yearly"
-      ? `$${(monthly * 10).toLocaleString()} / year`
-      : `$${monthly} / month`
+  const bill = billOf(institute)
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
       <div className="grid gap-4 @4xl/main:grid-cols-3">
         <Card className="@4xl/main:col-span-2">
           <CardHeader>
-            <CardTitle>Usage</CardTitle>
+            <CardTitle>Billing</CardTitle>
             <CardDescription>
-              Against the limits of the {institute.plan} plan
+              All features, charged per active student each month
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-5">
-            <UsageBar
-              label="Students"
-              used={institute.students}
-              limit={limits.students}
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <Figure label="Active students" value={bill.students.toLocaleString()} />
+            <Figure
+              label="Rate per student"
+              value={formatTaka(bill.rate)}
+              note={
+                bill.students < settings.threshold
+                  ? `Below ${settings.threshold.toLocaleString()} students`
+                  : `${settings.threshold.toLocaleString()} students or more`
+              }
             />
-            <UsageBar
-              label="Teachers"
-              used={institute.teachers}
-              limit={limits.teachers}
+            <Figure
+              label="This month (est.)"
+              value={institute.status === "Active" ? formatTaka(bill.amount) : "—"}
+              note={institute.status === "Active" ? "At today's count" : `Not billed while ${institute.status.toLowerCase()}`}
             />
           </CardContent>
         </Card>
@@ -128,14 +133,30 @@ export function InstituteDetail({ id }: { id: number }) {
           <CardHeader>
             <CardTitle>Subscription</CardTitle>
             <CardDescription>Billing details</CardDescription>
+            <CardAction>
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/subscriptions/${institute.id}`}>Manage</Link>
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-sm">
-            <Row label="Plan">
-              <Badge variant="outline">{institute.plan}</Badge>
+            <Row label="Rates">
+              {formatTaka(bill.rates.lowerRate)} / {formatTaka(bill.rates.upperRate)}
+              {bill.rates.custom && (
+                <Badge variant="outline" className="ml-1.5">Custom</Badge>
+              )}
             </Row>
-            <Row label="Billing cycle">{institute.billingCycle}</Row>
-            <Row label="Amount">{billed}</Row>
-            <Row label="Next invoice">Oct 1, 2026</Row>
+            {subscription?.trialEndsAt && institute.status === "Trial" && (
+              <Row label="Trial ends">{formatDate(subscription.trialEndsAt)}</Row>
+            )}
+            <Row label="Last invoice">
+              {lastInvoice
+                ? `${monthName(lastInvoice.month)} · ${invoiceState(lastInvoice)}`
+                : "None yet"}
+            </Row>
+            <Row label="Outstanding">
+              {owed ? formatTaka(owed.due + owed.overdue) : formatTaka(0)}
+            </Row>
             <Row label="Account manager">{institute.manager}</Row>
           </CardContent>
         </Card>
@@ -442,26 +463,12 @@ function withLabel(enabled: boolean, label: string) {
   return enabled ? (label ? `Yes (${label})` : "Yes") : "No"
 }
 
-function UsageBar({
-  label,
-  used,
-  limit,
-}: {
-  label: string
-  used: number
-  limit: number
-}) {
-  const percent = Math.min(100, Math.round((used / limit) * 100))
-
+function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground tabular-nums">
-          {used.toLocaleString()} / {limit.toLocaleString()} ({percent}%)
-        </span>
-      </div>
-      <Progress value={percent} />
+    <div className="grid gap-1">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-2xl font-semibold tabular-nums">{value}</span>
+      {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   )
 }

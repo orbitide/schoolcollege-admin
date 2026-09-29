@@ -93,6 +93,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { formatTaka } from "@/lib/billing"
+import { useBillOf } from "@/lib/institute-billing"
 import { managers, type Institute } from "@/lib/institutes"
 import { updateInstitute, useInstitutes } from "@/lib/institutes-store"
 import { GripVerticalIcon, CircleCheckIcon, BanIcon, LoaderIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
@@ -179,15 +181,10 @@ const columns = columnHelper.columns([
       </span>
     ),
   }),
-  columnHelper.accessor("plan", {
-    header: "Plan",
-    cell: ({ row }) => (
-      <div className="w-24">
-        <Badge variant="outline" className="px-1.5 text-muted-foreground">
-          {row.original.plan}
-        </Badge>
-      </div>
-    ),
+  columnHelper.display({
+    id: "bill",
+    header: () => <div className="w-full text-right">Est. monthly bill</div>,
+    cell: ({ row }) => <EstimatedBill institute={row.original} />,
   }),
   columnHelper.accessor("status", {
     header: "Status",
@@ -607,6 +604,16 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
+// What the institute would be billed if the month closed now.
+function EstimatedBill({ institute }: { institute: Institute }) {
+  const bill = useBillOf()(institute)
+  return (
+    <div className="text-right tabular-nums">
+      {institute.status === "Active" ? formatTaka(bill.amount) : "—"}
+    </div>
+  )
+}
+
 function TableCellViewer({ item }: { item: Institute }) {
   const isMobile = useIsMobile()
 
@@ -621,7 +628,7 @@ function TableCellViewer({ item }: { item: Institute }) {
         <DrawerHeader className="gap-1">
           <DrawerTitle>{item.name}</DrawerTitle>
           <DrawerDescription>
-            {item.subdomain}.sms.app · {item.plan} plan
+            {item.subdomain}.sms.app · {item.type}
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
@@ -688,8 +695,8 @@ function TableCellViewer({ item }: { item: Institute }) {
             <DrawerRow label="Principal">{item.principal || "—"}</DrawerRow>
             <DrawerRow label="Email">{item.email}</DrawerRow>
             <DrawerRow label="Phone">{item.phone || "—"}</DrawerRow>
-            <DrawerRow label="Plan">
-              {item.plan} · {item.billingCycle}
+            <DrawerRow label="Est. monthly bill">
+              <EstimatedBill institute={item} />
             </DrawerRow>
             <DrawerRow label="Status">{item.status}</DrawerRow>
             <DrawerRow label="Account manager">{item.manager}</DrawerRow>

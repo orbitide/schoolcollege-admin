@@ -7,9 +7,7 @@ export const instituteTypes = [
   "Madrasa",
   "Kindergarten",
 ] as const
-export const plans = ["Basic", "Standard", "Premium"] as const
 export const statuses = ["Active", "Trial", "Suspended"] as const
-export const billingCycles = ["Monthly", "Yearly"] as const
 export const managers = ["Rafiq Hasan", "Nusrat Jahan", "Tanvir Ahmed"] as const
 export const weekDays = [
   "Saturday",
@@ -22,9 +20,7 @@ export const weekDays = [
 ] as const
 
 export type InstituteType = (typeof instituteTypes)[number]
-export type Plan = (typeof plans)[number]
 export type InstituteStatus = (typeof statuses)[number]
-export type BillingCycle = (typeof billingCycles)[number]
 export type WeekDay = (typeof weekDays)[number]
 
 // Academic structure the institute uses.
@@ -55,9 +51,7 @@ export type Institute = InstituteSettings & {
   eiin: string
   type: InstituteType
   subdomain: string
-  plan: Plan
   status: InstituteStatus
-  billingCycle: BillingCycle
   students: number
   teachers: number
   manager: string
@@ -365,20 +359,6 @@ export const defaultConfiguration: InstituteConfiguration = {
 
 export type InstituteInput = Omit<Institute, "id" | "joinedAt">
 
-// Monthly price per plan in USD (dummy pricing until the billing API exists).
-export const planPrices: Record<Plan, number> = {
-  Basic: 49,
-  Standard: 99,
-  Premium: 199,
-}
-
-export const planLimits: Record<Plan, { students: number; teachers: number }> =
-  {
-    Basic: { students: 1000, teachers: 50 },
-    Standard: { students: 3000, teachers: 150 },
-    Premium: { students: 10000, teachers: 500 },
-  }
-
 export const defaultSettings: InstituteSettings = {
   startDayOfWeek: "Saturday",
   weekend: ["Friday"],
@@ -439,19 +419,12 @@ export const seedInstitutes: Institute[] = seed.map((row) => ({
   >),
 }))
 
-// Monthly revenue for one institute; yearly billing gets two months free.
-export function monthlyRevenue(institute: Institute) {
-  const price = planPrices[institute.plan]
-  return institute.billingCycle === "Yearly" ? (price * 10) / 12 : price
-}
-
 const csvColumns: [string, (i: Institute) => string | number][] = [
   ["Name", (i) => i.name],
   ["Short name", (i) => i.shortName],
   ["EIIN", (i) => i.eiin],
   ["Type", (i) => i.type],
   ["Subdomain", (i) => i.subdomain],
-  ["Plan", (i) => i.plan],
   ["Status", (i) => i.status],
   ["Students", (i) => i.students],
   ["Teachers", (i) => i.teachers],

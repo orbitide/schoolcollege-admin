@@ -26,19 +26,120 @@ export type AdminUser = {
   // institutes linked to them in User Institutes. What they may do there
   // (Admin / Manage / View) comes from the role, see lib/access.ts.
   role: UserRole
+  mobile: string
+  // A blocked user can't sign in; their links and history stay.
+  status: UserStatus
+  createdBy: string
+  createdAt: string
+  modifiedBy: string
+  modifiedAt: string
 }
 
-// Admin users until the users module and its API exist.
-export const adminUsers: AdminUser[] = [
-  { id: 1, name: "Super Admin", email: "admin@sms.app", role: "Super Admin" },
-  { id: 2, name: "Rafiq Hasan", email: "rafiq@sms.app", role: "Institute Admin" },
-  { id: 3, name: "Nusrat Jahan", email: "nusrat@sms.app", role: "Institute Admin" },
-  { id: 4, name: "Tanvir Ahmed", email: "tanvir@sms.app", role: "Institute Admin" },
-  { id: 5, name: "Farhana Akter", email: "farhana@sms.app", role: "Institute Manager" },
-  { id: 6, name: "Imran Hossain", email: "imran@sms.app", role: "Institute Viewer" },
+export const userStatuses = ["Active", "Blocked"] as const
+export type UserStatus = (typeof userStatuses)[number]
+
+export type AdminUserInput = Pick<AdminUser, "name" | "email" | "mobile" | "role">
+
+const userSeedStamp = {
+  status: "Active" as const,
+  createdBy: "Super Admin",
+  createdAt: "2026-01-05T09:00:00.000Z",
+  modifiedBy: "Super Admin",
+  modifiedAt: "2026-01-05T09:00:00.000Z",
+}
+
+// Admin-panel users (every role) until the users API exists.
+const seedAdminUsers: AdminUser[] = [
+  { id: 1, name: "Super Admin", email: "admin@sms.app", mobile: "01711000001", role: "Super Admin", ...userSeedStamp },
+  { id: 2, name: "Rafiq Hasan", email: "rafiq@sms.app", mobile: "01711000002", role: "Institute Admin", ...userSeedStamp },
+  { id: 3, name: "Nusrat Jahan", email: "nusrat@sms.app", mobile: "01711000003", role: "Institute Admin", ...userSeedStamp },
+  { id: 4, name: "Tanvir Ahmed", email: "tanvir@sms.app", mobile: "01711000004", role: "Institute Admin", ...userSeedStamp },
+  { id: 5, name: "Farhana Akter", email: "farhana@sms.app", mobile: "01711000005", role: "Institute Manager", ...userSeedStamp },
+  { id: 6, name: "Imran Hossain", email: "imran@sms.app", mobile: "01711000006", role: "Institute Viewer", ...userSeedStamp },
   // Signs in as teacher 1 (Teacher.userId).
-  { id: 7, name: "Abdul Karim", email: "abdul@school.edu.bd", role: "Teacher" },
+  { id: 7, name: "Abdul Karim", email: "abdul@school.edu.bd", mobile: "01711000007", role: "Teacher", ...userSeedStamp },
 ]
+
+let adminUsers = seedAdminUsers
+const userListeners = new Set<() => void>()
+
+function emitUsers(next: AdminUser[]) {
+  logChanges("AdminUser", adminUsers, next, (u) => u.email)
+  adminUsers = next
+  userListeners.forEach((listener) => listener())
+}
+
+function subscribeUsers(listener: () => void) {
+  userListeners.add(listener)
+  return () => userListeners.delete(listener)
+}
+
+export function getAdminUsers() {
+  return adminUsers
+}
+
+export function useAdminUsers() {
+  return React.useSyncExternalStore(subscribeUsers, () => adminUsers, () => seedAdminUsers)
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const USER_MOBILE_PATTERN = /^(88)?01[3-9]\d{8}$/
+
+export function adminUserErrors(input: AdminUserInput, exceptId?: number) {
+  const errors: Partial<Record<keyof AdminUserInput, string>> = {}
+  if (!input.name.trim()) errors.name = "Enter the user's name."
+  const email = input.email.trim().toLowerCase()
+  if (!EMAIL_PATTERN.test(email)) errors.email = "Enter a valid email address."
+  else if (adminUsers.some((u) => u.id !== exceptId && u.email.toLowerCase() === email))
+    errors.email = "Another user already has this email."
+  if (input.mobile.trim() && !USER_MOBILE_PATTERN.test(input.mobile.trim()))
+    errors.mobile = "Enter a mobile number like 01XXXXXXXXX."
+  return errors
+}
+
+export function addAdminUser(input: AdminUserInput, by: string) {
+  const now = new Date().toISOString()
+  const user: AdminUser = {
+    id: Math.max(0, ...adminUsers.map((u) => u.id)) + 1,
+    name: input.name.trim(),
+    email: input.email.trim().toLowerCase(),
+    mobile: input.mobile.trim(),
+    role: input.role,
+    status: "Active",
+    createdBy: by,
+    createdAt: now,
+    modifiedBy: by,
+    modifiedAt: now,
+  }
+  emitUsers([...adminUsers, user])
+  return user
+}
+
+function patchUser(id: number, changes: Partial<AdminUser>, by: string) {
+  emitUsers(
+    adminUsers.map((u) =>
+      u.id === id ? { ...u, ...changes, modifiedBy: by, modifiedAt: new Date().toISOString() } : u
+    )
+  )
+}
+
+export function updateAdminUser(id: number, input: AdminUserInput, by: string) {
+  patchUser(
+    id,
+    { name: input.name.trim(), email: input.email.trim().toLowerCase(), mobile: input.mobile.trim(), role: input.role },
+    by
+  )
+}
+
+export function setAdminUserStatus(id: number, status: UserStatus, by: string) {
+  patchUser(id, { status }, by)
+}
+
+// Deletes the user and their institute links.
+export function removeAdminUser(id: number) {
+  emitUsers(adminUsers.filter((u) => u.id !== id))
+  if (userInstitutes.some((u) => u.userId === id)) emit(userInstitutes.filter((u) => u.userId !== id))
+}
 
 // Which institutes a user can work with (legacy UserInstitute).
 export type UserInstitute = {

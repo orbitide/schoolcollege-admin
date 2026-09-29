@@ -1,19 +1,21 @@
 "use client"
 
-import { BuildingIcon, DollarSignIcon, GraduationCapIcon, LoaderIcon } from "lucide-react"
+import { BanknoteIcon, BuildingIcon, GraduationCapIcon, LoaderIcon } from "lucide-react"
 
 import { StatCard, StatGrid } from "@/components/dashboard/stat-card"
-import { monthlyRevenue, type Institute } from "@/lib/institutes"
+import { formatTaka } from "@/lib/billing"
+import { useBillOf, type InstituteBill } from "@/lib/institute-billing"
+import type { Institute } from "@/lib/institutes"
 import { useInstitutes } from "@/lib/institutes-store"
 
-function getSummary(institutes: Institute[]) {
+function getSummary(institutes: Institute[], billOf: (i: Institute) => InstituteBill) {
   const active = institutes.filter((i) => i.status === "Active")
   const trial = institutes.filter((i) => i.status === "Trial").length
   const suspended = institutes.filter((i) => i.status === "Suspended").length
   const month = new Date().toISOString().slice(0, 7)
 
   return {
-    mrr: Math.round(active.reduce((sum, i) => sum + monthlyRevenue(i), 0)),
+    billing: active.reduce((sum, i) => sum + billOf(i).amount, 0),
     paying: active.length,
     total: institutes.length,
     newThisMonth: institutes.filter((i) => i.joinedAt.startsWith(month)).length,
@@ -27,19 +29,20 @@ function getSummary(institutes: Institute[]) {
   }
 }
 
-// The platform dashboard's KPI row: revenue and tenants across every
+// The platform dashboard's KPI row: billing and tenants across every
 // institute.
 export function SectionCards() {
-  const summary = getSummary(useInstitutes())
+  const summary = getSummary(useInstitutes(), useBillOf())
 
   return (
     <StatGrid>
       <StatCard
-        label="Monthly Recurring Revenue"
-        value={`$${summary.mrr.toLocaleString()}`}
-        headline="From active subscriptions"
-        detail={`Across ${summary.paying} paying institutes`}
-        icon={<DollarSignIcon />}
+        label="This Month's Billing (est.)"
+        value={formatTaka(summary.billing)}
+        headline="At today's student counts"
+        detail={`Across ${summary.paying} active institutes`}
+        icon={<BanknoteIcon />}
+        href="/subscriptions"
       />
       <StatCard
         label="Total Institutes"

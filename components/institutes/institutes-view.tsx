@@ -23,7 +23,6 @@ import { toast } from "sonner"
 
 import { InstituteActions } from "@/components/institutes/institute-actions"
 import { StatusBadge } from "@/components/institutes/status-badge"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -47,12 +46,12 @@ import {
   exportInstitutesCsv,
   formatDate,
   instituteTypes,
-  monthlyRevenue,
-  plans,
   statuses,
   type Institute,
   type InstituteStatus,
 } from "@/lib/institutes"
+import { formatTaka } from "@/lib/billing"
+import { useBillOf, type InstituteBill } from "@/lib/institute-billing"
 import { useInstitutes } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
 
@@ -66,7 +65,6 @@ export function InstitutesView() {
   const institutes = useInstitutes()
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState(ALL)
-  const [plan, setPlan] = React.useState(ALL)
   const [type, setType] = React.useState(ALL)
   const [sort, setSort] = React.useState<Sort>({
     key: "joinedAt",
@@ -80,7 +78,6 @@ export function InstitutesView() {
     const rows = institutes.filter(
       (i) =>
         (status === ALL || i.status === status) &&
-        (plan === ALL || i.plan === plan) &&
         (type === ALL || i.type === type) &&
         (!query ||
           [
@@ -103,7 +100,7 @@ export function InstitutesView() {
           : String(x).localeCompare(String(y))) * factor
       )
     })
-  }, [institutes, search, status, plan, type, sort])
+  }, [institutes, search, status, type, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount - 1)
@@ -112,7 +109,7 @@ export function InstitutesView() {
     (currentPage + 1) * pageSize
   )
   const hasFilters =
-    search !== "" || status !== ALL || plan !== ALL || type !== ALL
+    search !== "" || status !== ALL || type !== ALL
 
   function withReset<T>(setter: (value: T) => void) {
     return (value: T) => {
@@ -124,7 +121,6 @@ export function InstitutesView() {
   function resetFilters() {
     setSearch("")
     setStatus(ALL)
-    setPlan(ALL)
     setType(ALL)
     setPage(0)
   }
@@ -137,7 +133,7 @@ export function InstitutesView() {
     )
   }
 
-  const stats = getStats(institutes)
+  const stats = getStats(institutes, useBillOf())
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
@@ -190,7 +186,7 @@ export function InstitutesView() {
           value={stats.count("Active")}
           icon={<CircleCheckIcon />}
           tone="emerald"
-          detail={`$${stats.revenue("Active").toLocaleString()} monthly recurring revenue`}
+          detail={`${formatTaka(stats.revenue("Active"))} billing this month (est.)`}
           percent={stats.share("Active")}
           selected={status === "Active"}
           onClick={() => withReset(setStatus)("Active")}
@@ -200,7 +196,7 @@ export function InstitutesView() {
           value={stats.count("Trial")}
           icon={<HourglassIcon />}
           tone="amber"
-          detail={`$${stats.revenue("Trial").toLocaleString()} potential MRR if converted`}
+          detail={`${formatTaka(stats.revenue("Trial"))} a month if converted`}
           percent={stats.share("Trial")}
           selected={status === "Trial"}
           onClick={() => withReset(setStatus)("Trial")}
@@ -236,13 +232,6 @@ export function InstitutesView() {
             onChange={withReset(setStatus)}
           />
           <FilterSelect
-            label="Plan"
-            allLabel="All plans"
-            value={plan}
-            options={plans}
-            onChange={withReset(setPlan)}
-          />
-          <FilterSelect
             label="Type"
             allLabel="All types"
             value={type}
@@ -270,7 +259,6 @@ export function InstitutesView() {
               <TableHead>Type</TableHead>
               <TableHead>EIIN</TableHead>
               <TableHead>City</TableHead>
-              <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">
                 <SortButton sort={sort} sortKey="students" onSort={toggleSort}>
@@ -278,6 +266,7 @@ export function InstitutesView() {
                 </SortButton>
               </TableHead>
               <TableHead className="text-right">Teachers</TableHead>
+              <TableHead className="text-right">Est. monthly bill</TableHead>
               <TableHead>
                 <SortButton sort={sort} sortKey="joinedAt" onSort={toggleSort}>
                   Joined
@@ -374,6 +363,7 @@ export function InstitutesView() {
 }
 
 function InstituteRow({ institute }: { institute: Institute }) {
+  const bill = useBillOf()(institute)
   return (
     <TableRow>
       <TableCell>
@@ -396,11 +386,6 @@ function InstituteRow({ institute }: { institute: Institute }) {
       <TableCell className="tabular-nums">{institute.eiin}</TableCell>
       <TableCell>{institute.city}</TableCell>
       <TableCell>
-        <Badge variant="outline" className="px-1.5 text-muted-foreground">
-          {institute.plan}
-        </Badge>
-      </TableCell>
-      <TableCell>
         <StatusBadge status={institute.status} />
       </TableCell>
       <TableCell className="text-right tabular-nums">
@@ -408,6 +393,9 @@ function InstituteRow({ institute }: { institute: Institute }) {
       </TableCell>
       <TableCell className="text-right tabular-nums">
         {institute.teachers.toLocaleString()}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {institute.status === "Active" ? formatTaka(bill.amount) : "—"}
       </TableCell>
       <TableCell className="text-muted-foreground">
         {formatDate(institute.joinedAt)}
@@ -438,7 +426,7 @@ function InstituteLogo({ institute }: { institute: Institute }) {
   )
 }
 
-function getStats(institutes: Institute[]) {
+function getStats(institutes: Institute[], billOf: (i: Institute) => InstituteBill) {
   const total = institutes.length
   const withStatus = (status: InstituteStatus) =>
     institutes.filter((i) => i.status === status)
@@ -452,8 +440,12 @@ function getStats(institutes: Institute[]) {
     count: (status: InstituteStatus) => withStatus(status).length,
     share: (status: InstituteStatus) =>
       total ? Math.round((withStatus(status).length / total) * 100) : 0,
+    // What the institutes would be billed this month if all were active.
     revenue: (status: InstituteStatus) =>
-      Math.round(sum(withStatus(status), monthlyRevenue)),
+      sum(withStatus(status), (i) => {
+        const bill = billOf(i)
+        return bill.students * bill.rate
+      }),
     studentsIn: (status: InstituteStatus) =>
       sum(withStatus(status), (i) => i.students),
   }

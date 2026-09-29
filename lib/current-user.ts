@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { adminUsers, useUserInstitutes, type AdminUser } from "@/lib/global-settings"
+import { getAdminUsers, useAdminUsers, useUserInstitutes, type AdminUser } from "@/lib/global-settings"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useTeachers } from "@/lib/teachers"
 
@@ -19,12 +19,14 @@ export function isPlatformAdmin(user: Pick<AdminUser, "role">) {
 }
 
 export function useCurrentUser() {
-  return getCurrentUser()
+  const users = useAdminUsers()
+  return users.find((user) => user.id === currentUserId) ?? users[0]
 }
 
 // The same user outside React, for stores that stamp what they write.
 export function getCurrentUser() {
-  return adminUsers.find((user) => user.id === currentUserId) ?? adminUsers[0]
+  const users = getAdminUsers()
+  return users.find((user) => user.id === currentUserId) ?? users[0]
 }
 
 // The teacher the current user signs in as (legacy

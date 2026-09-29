@@ -66,9 +66,10 @@ export function newCampaignName(userId: number, at = new Date()) {
 
 // ---- Seed ----
 // Built on first use, once students, attendance and templates exist: the
-// absence SMS sent for the last school day before today (so "Skip already
-// sent" has something to skip) and a notice to Class Ten last week, two of
-// which failed.
+// absence SMS sent for every school day before today (so "Skip already
+// sent" has something to skip and the platform dashboard's SMS usage has a
+// history), every 15th of which failed, and a notice to Class Ten last
+// week, two of which failed.
 
 const seedUser = "Super Admin"
 
@@ -76,7 +77,6 @@ function seedMessages(): SmsMessage[] {
   const messages: SmsMessage[] = []
   const today = todayIso()
   const records = getStudentAttendance().filter((r) => r.instituteId === 1 && r.date < today)
-  const lastDay = records.reduce((latest, r) => (r.date > latest ? r.date : latest), "")
   const students = new Map(getStudents().map((s) => [s.id, s]))
   const className = new Map(classStore.getList(1).map((c) => [c.id, c.name]))
   const templates = getSmsTemplates()
@@ -99,18 +99,20 @@ function seedMessages(): SmsMessage[] {
     }
   }
 
-  if (lastDay && absentTemplate) {
-    const at = `${lastDay}T10:30:00`
-    for (const r of records.filter((r) => r.date === lastDay && !r.isPresent)) {
+  if (absentTemplate) {
+    let n = 0
+    for (const r of records) {
+      if (r.isPresent) continue
       const student = students.get(r.studentId)
       const mobile = student && normalizeMobile(student.fatherMobile)
       if (!mobile) continue
+      const failed = n++ % 15 === 14
       push({
         instituteId: 1,
         branchId: null,
-        campaignName: `${lastDay.replaceAll("-", "")}_103000_000_1`,
+        campaignName: `${r.date.replaceAll("-", "")}_103000_000_1`,
         mobile,
-        message: fillTemplate(absentTemplate.message, valuesFor(r.studentId, lastDay)),
+        message: fillTemplate(absentTemplate.message, valuesFor(r.studentId, r.date)),
         studentId: r.studentId,
         numberType: "Father",
         smsType: "Attendance",
@@ -118,15 +120,15 @@ function seedMessages(): SmsMessage[] {
         attendanceType: "Absence",
         examId: null,
         subjectId: null,
-        attendanceDate: lastDay,
+        attendanceDate: r.date,
         isTest: false,
-        status: "Sent",
-        tryCount: 1,
+        status: failed ? "Failed" : "Sent",
+        tryCount: failed ? 3 : 1,
         createdBy: seedUser,
-        createdAt: at,
-        sentAt: `${lastDay}T10:31:00`,
-        responseCode: "1900",
-        responseId: String(48120000 + messages.length * 7),
+        createdAt: `${r.date}T10:30:00`,
+        sentAt: failed ? null : `${r.date}T10:31:00`,
+        responseCode: failed ? "1908" : "1900",
+        responseId: failed ? null : String(48120000 + messages.length * 7),
       })
     }
   }

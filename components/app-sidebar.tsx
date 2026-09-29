@@ -183,7 +183,7 @@ const data = {
         { title: "Common Log", url: "/basic-actions/common-log", permission: "common-log.manage" },
       ],
     },
-    { title: "Plans", url: "/plans", icon: <PackageIcon />, tone: "orange", platform: true },
+    { title: "Pricing", url: "/plans", icon: <PackageIcon />, tone: "orange", platform: true },
     { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose", platform: true },
     { title: "Users", url: "/users", icon: <UsersIcon />, tone: "sky", platform: true },
   ] satisfies NavMainItem[],
@@ -192,7 +192,7 @@ const data = {
     { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
   ],
   documents: [
-    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const, platform: true },
+    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
     { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const, platform: true },
   ],
 }

@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { FieldError } from "@/components/ui/field"
 import { useAccessibleInstitutes, useCurrentUser } from "@/lib/current-user"
 import {
-  adminUsers,
+  useAdminUsers,
   saveInstituteUsers,
   saveUserInstitutes,
   useUserInstitutes,
@@ -35,6 +35,7 @@ export function UserWiseInstituteForm({ initialUserId }: { initialUserId?: numbe
   const currentUser = useCurrentUser()
   const institutes = useAccessibleInstitutes()
   const links = useUserInstitutes()
+  const adminUsers = useAdminUsers()
   // ?user= (the list's "Edit user's institutes") opens with that user picked.
   const [userId, setUserId] = React.useState(() =>
     adminUsers.some((u) => u.id === initialUserId) ? String(initialUserId) : ""
@@ -105,6 +106,7 @@ export function InstituteWiseUserForm({ initialInstituteId }: { initialInstitute
   const currentUser = useCurrentUser()
   const institutes = useAccessibleInstitutes()
   const links = useUserInstitutes()
+  const adminUsers = useAdminUsers()
   // ?institute= opens with that institute picked.
   const [instituteId, setInstituteId] = React.useState(() =>
     institutes.some((i) => i.id === initialInstituteId) ? String(initialInstituteId) : ""

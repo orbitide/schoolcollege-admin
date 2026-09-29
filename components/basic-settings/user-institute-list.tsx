@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/table"
 import { useCurrentUser } from "@/lib/current-user"
 import {
-  adminUsers,
+  useAdminUsers,
   removeUserInstitute,
   toggleUserInstituteStatus,
   useUserInstitutes,
@@ -62,6 +62,7 @@ const BASE = "/basic-settings/user-institutes"
 export function UserInstituteList() {
   const currentUser = useCurrentUser()
   const links = useUserInstitutes()
+  const adminUsers = useAdminUsers()
   const institutes = useInstitutes()
   const [userFilter, setUserFilter] = React.useState("")
   const [query, setQuery] = React.useState("")

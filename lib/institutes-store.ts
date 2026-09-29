@@ -4,8 +4,11 @@ import * as React from "react"
 
 import { removeInstituteRecords } from "@/lib/academic-store"
 import { logChanges } from "@/lib/common-log"
+import { getCurrentUser } from "@/lib/current-user"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteHolidays } from "@/lib/holidays"
+import { removeInstituteInvoices } from "@/lib/saas-invoices"
+import { addSubscription, removeInstituteSubscription } from "@/lib/subscriptions"
 import { removeInstituteMenuView } from "@/lib/menu-views"
 import { removeInstituteSmsTemplates } from "@/lib/sms-templates"
 import { removeInstituteStudents } from "@/lib/students"
@@ -54,6 +57,7 @@ export function addInstitute(input: InstituteInput) {
     joinedAt: new Date().toISOString().slice(0, 10),
   }
   emit([institute, ...institutes])
+  addSubscription(institute, getCurrentUser().name)
   return institute
 }
 
@@ -82,4 +86,6 @@ export function deleteInstitute(id: number) {
   removeInstituteTeachers(id)
   removeInstituteSmsTemplates(id)
   removeInstituteMenuView(id)
+  removeInstituteSubscription(id)
+  removeInstituteInvoices(id)
 }

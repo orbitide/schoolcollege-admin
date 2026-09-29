@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { adminUsers, useUserInstitutes } from "@/lib/global-settings"
+import { useAdminUsers, useUserInstitutes } from "@/lib/global-settings"
 import { useInstitutes } from "@/lib/institutes-store"
 
 const LIST_HREF = "/basic-settings/user-institutes"
@@ -30,6 +30,7 @@ const LIST_HREF = "/basic-settings/user-institutes"
 // user and every institute linked to them.
 export function UserInstituteDetail({ id }: { id: number }) {
   const links = useUserInstitutes()
+  const adminUsers = useAdminUsers()
   const institutes = useInstitutes()
   const link = links.find((l) => l.id === id)
   const user = adminUsers.find((u) => u.id === link?.userId)
