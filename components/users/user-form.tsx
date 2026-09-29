@@ -19,18 +19,14 @@ import {
   updateAdminUser,
   useAdminUsers,
   userGenders,
-  userRoles,
   type AdminUser,
   type AdminUserInput,
   type UserGender,
   type UserRole,
 } from "@/lib/global-settings"
+import { SUPER_ADMIN_ROLE, useUserRoleNames } from "@/lib/user-roles"
 
 const LIST_HREF = "/users"
-
-// The roles a user who isn't a super admin can hold; Is Superadmin grants
-// the other one.
-const instituteRoles = userRoles.filter((r) => r !== "Super Admin")
 
 // Legacy UserViewModel's default birth date: 20 years ago today.
 function defaultDateOfBirth() {
@@ -66,6 +62,9 @@ type Errors = ReturnType<typeof adminUserErrors>
 
 function FormBody({ existing }: { existing?: AdminUser }) {
   const router = useRouter()
+  // The roles a user who isn't a super admin can hold (Manage User Roles);
+  // Is Superadmin grants the other one.
+  const instituteRoles = useUserRoleNames().filter((r) => r !== SUPER_ADMIN_ROLE)
   const me = useCurrentUser()
   const [userName, setUserName] = React.useState(existing?.userName ?? "")
   const [name, setName] = React.useState(existing?.name ?? "")
@@ -110,7 +109,7 @@ function FormBody({ existing }: { existing?: AdminUser }) {
       emailConfirmed,
       mobile,
       mobileConfirmed,
-      role: superAdmin ? "Super Admin" : role || "Institute Admin",
+      role: superAdmin ? SUPER_ADMIN_ROLE : role || "Institute Admin",
       twoFactorEnabled,
       forcePasswordChange,
     }

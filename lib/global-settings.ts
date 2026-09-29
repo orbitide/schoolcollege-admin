@@ -9,6 +9,8 @@ import type { RecordStatus } from "@/lib/institutes"
 // Institute). Districts live in lib/districts.ts. In-memory dummy stores like
 // the rest of admin; replace with API calls once the backend endpoints exist.
 
+// The built-in roles. Roles are managed in lib/user-roles.ts (Manage User
+// Roles); pick from useUserRoleNames() there, which includes custom ones.
 export const userRoles = [
   "Super Admin",
   "Institute Admin",
@@ -16,7 +18,8 @@ export const userRoles = [
   "Institute Viewer",
   "Teacher",
 ] as const
-export type UserRole = (typeof userRoles)[number]
+// A role's name (lib/user-roles.ts).
+export type UserRole = string
 
 export const userGenders = ["Male", "Female", "Unknown"] as const
 export type UserGender = (typeof userGenders)[number]
@@ -259,6 +262,14 @@ export function resetAdminUserPassword(id: number, by: string) {
 
 export function setAdminUserRole(id: number, role: UserRole, by: string) {
   patchUser(id, { role }, by)
+}
+
+// Moves every user of role `from` to role `to` (a role renamed or deleted
+// in Manage User Roles).
+export function reassignUsersRole(from: UserRole, to: UserRole, by: string) {
+  if (from === to || !adminUsers.some((u) => u.role === from)) return
+  const now = new Date().toISOString()
+  emitUsers(adminUsers.map((u) => (u.role === from ? { ...u, role: to, modifiedBy: by, modifiedAt: now } : u)))
 }
 
 // Legacy ExtraPermissionOperation / ExtraDenyOperation: allowing a code

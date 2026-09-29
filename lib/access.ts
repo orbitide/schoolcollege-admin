@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { useCurrentUser } from "@/lib/current-user"
 import type { AdminUser, UserRole } from "@/lib/global-settings"
+import { roleNameAllows, useUserRoles } from "@/lib/user-roles"
 
 // The three ways into a resource (legacy ManageAdmin / Manage / ManageView,
 // ezducms AccessSurface). Each is its own permission; a role just bundles
@@ -34,33 +35,26 @@ export const surfaceHref = (baseUrl: string, surface: AccessSurface) =>
 export const permissionCode = (resource: string, surface: AccessSurface) =>
   `${resource}.${surface.toLowerCase()}`
 
-// What each role may do until the API sends the caller's permission set.
-const roleGrants: Record<UserRole, (code: string) => boolean> = {
-  "Super Admin": () => true,
-  "Institute Admin": () => true,
-  "Institute Manager": (code) => code.endsWith(".manage") || code.endsWith(".view"),
-  "Institute Viewer": (code) => code.endsWith(".view"),
-  // A teacher works only on their own pages (e.g. Take Attendance), never
-  // the admin surfaces.
-  Teacher: () => false,
-}
-
 // The role's grant as adjusted by the user's Extra Permission: a deny always
 // wins, an allow adds. A super admin holds everything (legacy superadmins
 // bypass permission checks).
 export function grants(user: Pick<AdminUser, "role" | "extraAllow" | "extraDeny">, code: string) {
   if (user.role === "Super Admin") return true
   if (user.extraDeny.includes(code)) return false
-  return user.extraAllow.includes(code) || roleGrants[user.role](code)
+  return user.extraAllow.includes(code) || roleNameAllows(user.role, code)
 }
 
+// What a role gives, before any user's Extra Permission (Manage User Roles).
 export function roleGrantsCode(role: UserRole, code: string) {
-  return roleGrants[role](code)
+  return roleNameAllows(role, code)
 }
 
 export function useCan() {
   const user = useCurrentUser()
-  return React.useCallback((code: string) => grants(user, code), [user])
+  // Re-checks when a role's permissions change (Manage User Roles).
+  const roles = useUserRoles()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return React.useCallback((code: string) => grants(user, code), [user, roles])
 }
 
 // The surfaces of a resource the current user holds, Admin first.

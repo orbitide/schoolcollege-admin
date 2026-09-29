@@ -7,10 +7,14 @@ export const metadata: Metadata = {
   title: "Users · SMS Admin",
 }
 
-export default function Page() {
+// ?searchKey= opens the list searched, as legacy Users/Index does (e.g. a
+// role's users from Manage User Roles).
+export default async function Page({ searchParams }: PageProps<"/users">) {
+  const { searchKey } = await searchParams
+  const key = (Array.isArray(searchKey) ? searchKey[0] : searchKey)?.trim() ?? ""
   return (
     <RequirePlatform>
-      <UserList />
+      <UserList key={key} initialSearch={key} />
     </RequirePlatform>
   )
 }

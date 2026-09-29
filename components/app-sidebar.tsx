@@ -193,6 +193,7 @@ const data = {
       items: [
         { title: "New User", url: "/users/new" },
         { title: "Manage Users", url: "/users" },
+        { title: "Manage User Roles", url: "/users/roles" },
       ],
     },
   ] satisfies NavMainItem[],

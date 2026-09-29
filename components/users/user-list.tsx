@@ -53,7 +53,6 @@ import {
   setAdminUserStatus,
   useAdminUsers,
   useOnlineUserIds,
-  userRoles,
   userSessionStatus,
   type AdminUser,
   type UserRole,
@@ -61,6 +60,7 @@ import {
 } from "@/lib/global-settings"
 import { cn } from "@/lib/utils"
 import { useTeachers } from "@/lib/teachers"
+import { useUserRoleNames } from "@/lib/user-roles"
 
 // Legacy Users/Index (Manage Users): search, bulk operations and a role
 // operation on the ticked users.
@@ -87,13 +87,14 @@ function matches(user: AdminUser, key: string) {
   )
 }
 
-export function UserList() {
+export function UserList({ initialSearch = "" }: { initialSearch?: string }) {
   const me = useCurrentUser()
   const users = useAdminUsers()
   const online = useOnlineUserIds()
   const teachers = useTeachers()
-  const [draft, setDraft] = React.useState("")
-  const [searchKey, setSearchKey] = React.useState("")
+  const roleNames = useUserRoleNames()
+  const [draft, setDraft] = React.useState(initialSearch)
+  const [searchKey, setSearchKey] = React.useState(initialSearch)
   const [picked, setPicked] = React.useState<ReadonlySet<number>>(new Set())
   const [operation, setOperation] = React.useState<BulkOperation | "">("")
   const [role, setRole] = React.useState<UserRole | "">("")
@@ -367,7 +368,7 @@ export function UserList() {
             <SelectValue placeholder="Set role of selected users" />
           </SelectTrigger>
           <SelectContent>
-            {userRoles.map((r) => (
+            {roleNames.map((r) => (
               <SelectItem key={r} value={r}>
                 {r}
               </SelectItem>

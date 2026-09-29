@@ -70,6 +70,7 @@ const tables = new Set<string>([
   "Institute",
   "LetterGrade",
   "MonthlyAttendanceFine",
+  "NccPermission",
   "ResultRemarks",
   "SaasInvoice",
   "Section",
