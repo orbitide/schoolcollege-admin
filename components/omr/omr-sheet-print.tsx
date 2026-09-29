@@ -10,21 +10,39 @@ import { FilterField } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { classStore, subjectStore } from "@/lib/academic-store"
-import { omrLayout, ROLL_DIGITS } from "@/lib/omr-template"
-import { mcqQuestionCount, useGeneratedPapers } from "@/lib/question-papers"
-import { useStudents } from "@/lib/students"
+import {
+  CUSTOM_LIMITS,
+  omrLayout,
+  omrType,
+  omrTypes,
+  specFor,
+  specProblem,
+  type OmrFields,
+  type OmrTypeId,
+} from "@/lib/omr-template"
+import { mcqQuestionCount, paperFor, useGeneratedPapers } from "@/lib/question-papers"
+import { useStudents, type Student } from "@/lib/students"
 import { examStudents, takesSubject } from "@/lib/term-exam-marks"
 
 const MAX_BLANK = 200
 
-// Term Exam › OMR Sheet: A4 MCQ answer sheets for an exam subject, in the
-// layout OMR Scan reads. Blank ones to hand out, or one per student of a
-// section with the name and roll printed (and the roll bubbles filled, so
-// only the set and the answers are left). Prints from this tab.
+// A student's board registration number, most recent exam first.
+function registrationOf(student: Student) {
+  const results = Object.values(student.board ?? {}).filter((r) => r?.registrationNo)
+  results.sort((a, b) => Number(b!.passingYear) - Number(a!.passingYear))
+  return results[0]?.registrationNo ?? ""
+}
+
+// Term Exam › OMR Sheet: MCQ answer sheets for an exam subject, in any of
+// the sheet types OMR Scan reads (Standard, Board Style, Class Test,
+// Junior, Admission Test, or Custom fields). Blank ones to hand out, or one
+// per student of a section with the name and roll printed (and the roll and
+// registration bubbles filled, so only the set and the answers are left).
+// Class Test sheets print two to an A4 page. Prints from this tab.
 export function OmrSheetPrint() {
   const f = useExamReportFilter({ meritList: false })
   const exam = f.chosen
@@ -38,21 +56,27 @@ export function OmrSheetPrint() {
   const section = f.examSections.find((s) => String(s.id) === f.param("section"))
   const mode = f.param("mode") === "blank" ? "blank" : "students"
   const lang = f.param("lang") === "en" ? "en" : "bn"
+  const type = (omrTypes.find((t) => t.id === f.param("sheet"))?.id ?? "standard") as OmrTypeId
   const [copies, setCopies] = React.useState(40)
   const [prefill, setPrefill] = React.useState(true)
+  const [custom, setCustom] = React.useState<OmrFields>({ ...omrType("custom").fields })
 
   const questions = exam && subjectRow ? mcqQuestionCount(exam, subjectRow.subjectId, papers) : 0
-  const layout = omrLayout(questions || 1)
+  const spec = specFor(type, questions || 1, custom)
+  const problem = questions ? specProblem(spec) : null
+  const layout = omrLayout(spec)
+  const paper = exam && subjectRow ? paperFor(exam.id, subjectRow.subjectId, "MCQ", papers) : undefined
+  const fiveOptions = !!paper?.questions.some((q) => q.items.some((i) => i.options.length > 4))
   const candidates =
     exam && subjectRow
       ? examStudents(exam, students)
-          .filter(
-            ({ enrolment }) =>
-              (!section || enrolment.sectionId === section.id) && takesSubject(enrolment, subjectRow.subjectId)
+          .filter(({ enrolment }) => (!section || enrolment.sectionId === section.id) && takesSubject(enrolment, subjectRow.subjectId))
+          .sort(
+            (a, b) =>
+              Number(a.enrolment.classRoll) - Number(b.enrolment.classRoll) || a.enrolment.classRoll.localeCompare(b.enrolment.classRoll)
           )
-          .sort((a, b) => Number(a.enrolment.classRoll) - Number(b.enrolment.classRoll) || a.enrolment.classRoll.localeCompare(b.enrolment.classRoll))
       : []
-  const longRolls = candidates.filter((c) => c.enrolment.classRoll.trim().length > ROLL_DIGITS).length
+  const longRolls = candidates.filter((c) => c.enrolment.classRoll.trim().length > spec.roll).length
 
   const base: Omit<OmrSheetInfo, "student"> | null =
     exam && subject
@@ -60,6 +84,7 @@ export function OmrSheetPrint() {
           institute: f.institute?.name ?? "",
           exam: exam.fullName,
           subject: `${(lang === "bn" && subject.nameBn) || subject.name}${subject.code ? ` (${subject.code})` : ""}`,
+          subjectCode: subject.code,
           lang,
         }
       : null
@@ -68,16 +93,35 @@ export function OmrSheetPrint() {
       ? Array.from({ length: Math.min(MAX_BLANK, Math.max(1, copies)) }, () => base)
       : candidates.map(({ student, enrolment }) => ({
           ...base,
-          prefillRoll: prefill,
+          prefill,
           student: {
             name: student.name,
             roll: enrolment.classRoll.trim(),
+            registration: registrationOf(student),
             className: classes.find((c) => c.id === enrolment.classId)?.name ?? "",
             section: f.sections.find((s) => s.id === enrolment.sectionId)?.name ?? "",
           },
         }))
     : []
-  const ready = sheets.length > 0 && questions > 0
+  const ready = sheets.length > 0 && questions > 0 && !problem
+  // Class Test sheets go two to an A4 page, one above the other.
+  const pages: OmrSheetInfo[][] = layout.half
+    ? Array.from({ length: Math.ceil(sheets.length / 2) }, (_, i) => sheets.slice(i * 2, i * 2 + 2))
+    : sheets.map((s) => [s])
+  const setCustomField = <K extends keyof OmrFields>(key: K, value: OmrFields[K]) => setCustom((c) => ({ ...c, [key]: value }))
+  const digitsInput = (key: "roll" | "registration" | "subject", label: string) => (
+    <Field>
+      <FieldLabel htmlFor={`custom-${key}`}>{label}</FieldLabel>
+      <Input
+        id={`custom-${key}`}
+        type="number"
+        min={CUSTOM_LIMITS[key].min}
+        max={CUSTOM_LIMITS[key].max}
+        value={custom[key]}
+        onChange={(e) => setCustomField(key, Math.floor(Number(e.target.value)) || 0)}
+      />
+    </Field>
+  )
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
@@ -86,7 +130,7 @@ export function OmrSheetPrint() {
           <div className="flex flex-col gap-1">
             <CardTitle className="text-lg">OMR Sheet</CardTitle>
             <CardDescription>
-              MCQ answer sheets that OMR Scan can read. Print at 100% (actual size) on A4; don&apos;t fit to page.
+              MCQ answer sheets that OMR Scan reads; it tells the sheet types apart by the code squares along the top edge. Print at 100% (actual size) on A4; don&apos;t fit to page.
             </CardDescription>
           </div>
           <Button size="sm" onClick={() => window.print()} disabled={!ready}>
@@ -108,6 +152,15 @@ export function OmrSheetPrint() {
             placeholder={exam && !mcqSubjects.length ? "No MCQ subject" : "Select subject"}
             disabled={!exam}
           />
+          <div className="flex flex-col gap-2">
+            <FilterField
+              label="Sheet type"
+              value={type}
+              onChange={(v) => f.setParam({ sheet: v === "standard" ? "" : v })}
+              options={omrTypes.map((t) => ({ value: t.id, label: t.name }))}
+            />
+            <FieldDescription>{omrType(type).description}</FieldDescription>
+          </div>
           <FilterField
             label="Sheets"
             value={mode}
@@ -151,8 +204,28 @@ export function OmrSheetPrint() {
           {mode === "students" && (
             <Label className="flex items-center gap-2 self-end pb-2 font-normal">
               <Checkbox checked={prefill} onCheckedChange={(on) => setPrefill(on === true)} />
-              Fill in the roll bubbles
+              Fill in the roll{spec.registration ? " and registration" : ""} bubbles
             </Label>
+          )}
+          {type === "custom" && (
+            <div className="grid gap-4 rounded-lg border bg-muted/30 p-4 sm:col-span-2 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-5">
+              {digitsInput("roll", `Roll digits (${CUSTOM_LIMITS.roll.min}–${CUSTOM_LIMITS.roll.max})`)}
+              {digitsInput("registration", `Registration digits (0–${CUSTOM_LIMITS.registration.max})`)}
+              {digitsInput("subject", `Subject code digits (0–${CUSTOM_LIMITS.subject.max})`)}
+              <FilterField
+                label="Options per question"
+                value={String(custom.options)}
+                onChange={(v) => setCustomField("options", v === "5" ? 5 : 4)}
+                options={[
+                  { value: "4", label: "4 (A–D)" },
+                  { value: "5", label: "5 (A–E)" },
+                ]}
+              />
+              <Label className="flex items-center gap-2 self-end pb-2 font-normal">
+                <Checkbox checked={custom.set} onCheckedChange={(on) => setCustomField("set", on === true)} />
+                Set code
+              </Label>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -162,7 +235,12 @@ export function OmrSheetPrint() {
           <CircleAlertIcon className="size-4 shrink-0" />
           Select the exam and an MCQ subject.
         </p>
-      ) : !ready ? (
+      ) : problem ? (
+        <p className="flex items-center gap-2 text-sm text-destructive">
+          <CircleAlertIcon className="size-4 shrink-0" />
+          {problem}
+        </p>
+      ) : !sheets.length ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <CircleAlertIcon className="size-4 shrink-0" />
           No student of this exam takes the subject{section ? ` in ${section.name}` : ""}.
@@ -171,13 +249,26 @@ export function OmrSheetPrint() {
         <>
           <div className="flex flex-col gap-1 text-sm text-muted-foreground">
             <span>
-              {questions} questions · {sheets.length} sheet{sheets.length === 1 ? "" : "s"}
+              {omrType(type).name} · {questions} questions · {spec.options} options · {sheets.length} sheet{sheets.length === 1 ? "" : "s"}
+              {layout.half && ` on ${pages.length} A4 page${pages.length === 1 ? "" : "s"} (cut each in half)`}
               {sheets.length > 1 && " · the first one is shown"}
             </span>
-            {longRolls > 0 && (
+            {fiveOptions && spec.options === 4 && (
               <span className="flex items-center gap-2 text-amber-600">
                 <TriangleAlertIcon className="size-4 shrink-0" />
-                {longRolls} roll{longRolls === 1 ? " is" : "s are"} longer than {ROLL_DIGITS} digits and can&apos;t be bubbled.
+                The generated paper has questions with an option E; use Admission Test or Custom with 5 options.
+              </span>
+            )}
+            {mode === "students" && longRolls > 0 && (
+              <span className="flex items-center gap-2 text-amber-600">
+                <TriangleAlertIcon className="size-4 shrink-0" />
+                {longRolls} roll{longRolls === 1 ? " is" : "s are"} longer than {spec.roll} digits and can&apos;t be bubbled.
+              </span>
+            )}
+            {!spec.set && paper && paper.sets.length > 1 && (
+              <span className="flex items-center gap-2 text-amber-600">
+                <TriangleAlertIcon className="size-4 shrink-0" />
+                The paper has {paper.sets.length} sets but this sheet has no set code.
               </span>
             )}
           </div>
@@ -187,9 +278,20 @@ export function OmrSheetPrint() {
             </div>
           </div>
           <PrintArea pageSize="210mm 297mm" margin="0">
-            {sheets.map((info, i) => (
-              <div key={i} style={{ breakAfter: i < sheets.length - 1 ? "page" : "auto", width: "210mm", height: "297mm", overflow: "hidden" }}>
-                <OmrSheet layout={layout} info={info} />
+            {pages.map((page, i) => (
+              <div
+                key={i}
+                style={{ breakAfter: i < pages.length - 1 ? "page" : "auto", width: "210mm", height: "297mm", overflow: "hidden", position: "relative" }}
+              >
+                {page.map((info, k) => (
+                  <OmrSheet key={k} layout={layout} info={info} />
+                ))}
+                {layout.half && (
+                  <div
+                    style={{ position: "absolute", left: 0, right: 0, top: "148.5mm", borderTop: "0.2mm dashed #999", height: 0 }}
+                    aria-hidden
+                  />
+                )}
               </div>
             ))}
           </PrintArea>

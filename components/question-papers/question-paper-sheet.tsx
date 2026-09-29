@@ -147,7 +147,7 @@ function McqLine({ line, look }: { line: PaperLine; look: PaperLook }) {
         <span className="shrink-0 font-semibold tabular-nums">{paperNumber(line.serial, bangla)}.</span>
         <QuestionContent html={item.text[lang]} className="min-w-0 flex-1" />
       </div>
-      <div className={cn("grid gap-x-[1em] pl-[1.6em]", short ? "grid-cols-4" : "grid-cols-2")}>
+      <div className={cn("grid gap-x-[1em] pl-[1.6em]", short ? (item.options.length > 4 ? "grid-cols-5" : "grid-cols-4") : "grid-cols-2")}>
         {line.optionOrder.map((original, at) => (
           <div
             key={at}

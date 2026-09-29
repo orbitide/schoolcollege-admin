@@ -1,13 +1,20 @@
 import {
-  ANSWER_VALUES,
-  BUBBLE_RADIUS,
+  A4,
+  codeCells,
+  CODE_SIZE,
+  decodeSpec,
+  HALF_A4,
   MARKER_SIZE,
-  MARKERS,
+  markersFor,
+  omrLayout,
+  omrType,
+  OPTION_VALUES,
   ORIENTATION,
   ORIENTATION_SIZE,
-  ROLL_DIGITS,
   type OmrBubble,
-  type OmrLayout,
+  type OmrField,
+  type OmrSpec,
+  type PageSize,
   type Point,
 } from "@/lib/omr-template"
 
@@ -16,11 +23,14 @@ import {
 //   1. find the four corner squares (dark, square, solid blobs nearest the
 //      image's corners) on a grey image thresholded with Otsu's method;
 //   2. map the template onto the image with a perspective transform, trying
-//      the four ways the page could be turned until the orientation square
-//      is where it should be;
-//   3. for every bubble, compare the ink inside it with the paper just
+//      the four ways the page could be turned (and A4 or half page, by the
+//      corner squares' proportions) until the orientation square is where
+//      it should be;
+//   3. read the code squares along the top edge: the sheet's type, fields
+//      and question count, so its layout can be drawn up exactly;
+//   4. for every bubble, compare the ink inside it with the paper just
 //      around it, so shadows and uneven light matter less;
-//   4. per roll digit, set and question, a clearly darker bubble is the
+//   5. per ID digit, set and question, a clearly darker bubble is the
 //      mark; two or more are a multiple mark; faint ones are flagged.
 // Everything read is only a proposal: the scan page shows it for review.
 
@@ -222,10 +232,14 @@ export const FAINT = 0.2
 
 export type BubbleReading = OmrBubble & { score: number; marked: boolean; at: Point }
 
-export type OmrFlag = { field: "roll" | "set" | "answer"; index: number; reason: "multiple" | "faint" | "blank" }
+export type OmrFlag = { field: OmrField; index: number; reason: "multiple" | "faint" | "blank" }
 
 export type OmrReading = {
+  spec: OmrSpec
+  typeName: string
   roll: string
+  registration: string
+  subjectCode: string
   setCode: string
   // One entry per question: a letter, several letters for a multiple mark,
   // or "" when blank.
@@ -236,9 +250,9 @@ export type OmrReading = {
   corners: Point[]
 }
 
-type Group = { field: OmrFlag["field"]; index: number; bubbles: BubbleReading[] }
+type Group = { field: OmrField; index: number; bubbles: BubbleReading[] }
 
-// The value a group of bubbles (a roll digit, the set, a question) holds.
+// The value a group of bubbles (an ID digit, the set, a question) holds.
 function readGroup(group: Group, flags: OmrFlag[], blankIsFlagged: boolean) {
   const marked = group.bubbles.filter((b) => b.score >= FILLED)
   const faint = group.bubbles.filter((b) => b.score >= FAINT && b.score < FILLED)
@@ -256,48 +270,93 @@ function readGroup(group: Group, flags: OmrFlag[], blankIsFlagged: boolean) {
 // the page's top-left square, and so on round.
 const turns = [0, 1, 2, 3].map((t) => [0, 1, 2, 3].map((i) => (i + t) % 4))
 
-export function readOmrSheet(image: GrayImage, layout: OmrLayout): OmrReading {
+const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
+
+// The page size whose corner squares have the proportions found (height
+// over width between their centres), for one way of turning the page.
+function pageFor(ordered: Point[]): PageSize {
+  const across = (distance(ordered[0], ordered[1]) + distance(ordered[3], ordered[2])) / 2
+  const down = (distance(ordered[0], ordered[3]) + distance(ordered[1], ordered[2])) / 2
+  const ratio = down / across
+  const ratioOf = (page: PageSize) => {
+    const m = markersFor(page)
+    return (m[3].y - m[0].y) / (m[1].x - m[0].x)
+  }
+  return Math.abs(Math.log(ratio / ratioOf(A4))) < Math.abs(Math.log(ratio / ratioOf(HALF_A4))) ? A4 : HALF_A4
+}
+
+// Digits read from the left or the right; blank columns are skipped and
+// leading zeros dropped. A column with two marks shows as "?".
+function joinDigits(digits: string[], dropZeros: boolean) {
+  if (digits.some((d) => d.length > 1)) return digits.map((d) => (d.length > 1 ? "?" : d)).join("")
+  const joined = digits.join("")
+  return dropZeros ? joined.replace(/^0+(?=d)/, "") : joined
+}
+
+// Reads a sheet. `questions` stands in when a sheet's code leaves the
+// count out.
+export function readOmrSheet(image: GrayImage, questions?: number): OmrReading {
   const corners = findCornerMarkers(image)
   if (!corners) throw new Error("Couldn't find the four corner squares. Scan the whole sheet on a plain, light background.")
 
-  // Pick the turn whose orientation square is dark.
-  let best: { h: Homography; order: number[]; score: number } | null = null
+  // Pick the turn (and page size) whose orientation square is dark.
+  let best: { h: Homography; order: number[]; page: PageSize; score: number } | null = null
   for (const order of turns) {
-    const h = homography(MARKERS, order.map((i) => corners[i]))
+    const ordered = order.map((i) => corners[i])
+    const page = pageFor(ordered)
+    const h = homography(markersFor(page), ordered)
     const score = fillScore(image, h, ORIENTATION.x, ORIENTATION.y, ORIENTATION_SIZE / 2)
-    if (!best || score > best.score) best = { h, order, score }
+    if (!best || score > best.score) best = { h, order, page, score }
   }
-  if (!best || best.score < 0.3) throw new Error("Couldn't tell which way up the sheet is. Is it our OMR sheet?")
-  const { h } = best
+  if (!best || best.score < 0.3) throw new Error("Couldn't tell which way up the sheet is. Is it one of our OMR sheets?")
+  const { h, page } = best
+  const markers = markersFor(page)
 
-  // A sanity check that the page isn't tiny or folded: the corner squares
-  // should come out about as big as printed.
-  const scale = Math.hypot(project(h, MARKERS[1].x, MARKERS[1].y).x - project(h, MARKERS[0].x, MARKERS[0].y).x, project(h, MARKERS[1].x, MARKERS[1].y).y - project(h, MARKERS[0].x, MARKERS[0].y).y) / (MARKERS[1].x - MARKERS[0].x)
+  // A sanity check that the page isn't tiny: the corner squares should come
+  // out about as big as printed.
+  const scale = distance(project(h, markers[0].x, markers[0].y), project(h, markers[1].x, markers[1].y)) / (markers[1].x - markers[0].x)
   if (scale * MARKER_SIZE < 6) throw new Error("The sheet is too small in the picture. Scan it at 150 dpi or more.")
+
+  const bits = codeCells.map((c) => (fillScore(image, h, c.x, c.y, CODE_SIZE / 2) >= 0.4 ? 1 : 0))
+  const decoded = decodeSpec(bits)
+  if (!decoded) throw new Error("Couldn't read the sheet type code along the top edge. Keep the top of the sheet clean and in view.")
+  const layout = omrLayout({ ...decoded, questions: decoded.questions || questions || 1 })
+  if (layout.page.height !== page.height) {
+    throw new Error(
+      layout.half
+        ? "This is a Class Test sheet still joined to its pair. Cut the page in half and scan each sheet on its own."
+        : "The sheet's corners don't match its type. Scan the whole sheet."
+    )
+  }
 
   const bubbles: BubbleReading[] = layout.bubbles.map((b) => ({
     ...b,
-    score: fillScore(image, h, b.x, b.y, BUBBLE_RADIUS),
+    score: fillScore(image, h, b.x, b.y, layout.r),
     marked: false,
     at: project(h, b.x, b.y),
   }))
   const flags: OmrFlag[] = []
-  const group = (field: Group["field"], index: number): Group => ({
+  const group = (field: OmrField, index: number): Group => ({
     field,
     index,
     bubbles: bubbles.filter((b) => b.field === field && b.index === index),
   })
+  const digits = (field: OmrField, count: number) =>
+    Array.from({ length: count }, (_, i) => readGroup(group(field, i), flags, false))
 
-  const digits = Array.from({ length: ROLL_DIGITS }, (_, i) => readGroup(group("roll", i), flags, false))
-  // A roll is written from the left or the right; blank columns are skipped
-  // and leading zeros dropped. A column with two marks spoils the roll.
-  const roll = digits.some((d) => d.length > 1) ? digits.map((d) => (d.length > 1 ? "?" : d)).join("") : digits.join("").replace(/^0+(?=\d)/, "")
-  const setCode = readGroup(group("set", 0), flags, true)
+  const roll = joinDigits(digits("roll", layout.spec.roll), true)
+  const registration = joinDigits(digits("registration", layout.spec.registration), false)
+  const subjectCode = joinDigits(digits("subject", layout.spec.subject), false)
+  const setCode = layout.spec.set ? readGroup(group("set", 0), flags, true) : ""
   const answers = Array.from({ length: layout.questions }, (_, q) => readGroup(group("answer", q), flags, false))
   return {
+    spec: layout.spec,
+    typeName: omrType(layout.spec.type).name,
     roll,
+    registration,
+    subjectCode,
     setCode,
-    answers: answers.map((a) => a.split("").filter((c) => (ANSWER_VALUES as readonly string[]).includes(c)).join("")),
+    answers: answers.map((a) => a.split("").filter((c) => (OPTION_VALUES as readonly string[]).includes(c)).join("")),
     flags,
     bubbles,
     corners: best.order.map((i) => corners[i]),

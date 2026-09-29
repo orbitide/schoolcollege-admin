@@ -259,7 +259,7 @@ function unitFor(q: Question, random: () => number): PaperUnit {
     questionId: q.id,
     itemOrder,
     optionOrders: q.items.map((item) =>
-      q.type === "MCQ" && item.shuffleOptions ? shuffle([0, 1, 2, 3], random) : q.type === "MCQ" ? [0, 1, 2, 3] : []
+      q.type !== "MCQ" ? [] : item.shuffleOptions ? shuffle(item.options.map((_, i) => i), random) : item.options.map((_, i) => i)
     ),
   }
 }
@@ -400,7 +400,7 @@ export function paperLines(paper: GeneratedPaper, set: PaperSet): PaperLine[] {
         serial,
         question,
         itemIndex,
-        optionOrder: unit.optionOrders[itemIndex] ?? [0, 1, 2, 3],
+        optionOrder: unit.optionOrders[itemIndex] ?? question.items[itemIndex].options.map((_, i) => i),
         startsGroup: k === 0,
         groupRange: [first, last],
       })

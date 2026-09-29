@@ -25,6 +25,7 @@ import {
   emptyBilingual,
   MAX_CQ_ITEMS,
   MAX_MCQ_GROUP,
+  MCQ_MIN_OPTIONS,
   MCQ_OPTIONS,
   questionChapterStore,
   questionErrors,
@@ -410,7 +411,7 @@ export function QuestionForm({
                       Options — tick the correct one<span className="text-destructive">*</span>
                     </legend>
                     <div className="grid gap-3 md:grid-cols-2">
-                      {MCQ_OPTIONS.map((letter, o) => (
+                      {MCQ_OPTIONS.slice(0, item.options.length).map((letter, o) => (
                         <div key={letter} className="flex items-start gap-2">
                           <label
                             className={cn(
@@ -449,6 +450,24 @@ export function QuestionForm({
                       ))}
                     </div>
                     {e("answer") && <p className="text-sm text-destructive">{e("answer")}</p>}
+                    <Label className="flex items-center gap-2 font-normal">
+                      <Checkbox
+                        checked={item.options.length > MCQ_MIN_OPTIONS}
+                        onCheckedChange={(on) =>
+                          setItem(
+                            index,
+                            on === true
+                              ? { options: [...item.options.slice(0, MCQ_MIN_OPTIONS), emptyBilingual()] }
+                              : {
+                                  options: item.options.slice(0, MCQ_MIN_OPTIONS),
+                                  answer: item.answer === MCQ_OPTIONS[MCQ_MIN_OPTIONS] ? "" : item.answer,
+                                },
+                            `option.${MCQ_MIN_OPTIONS}`
+                          )
+                        }
+                      />
+                      A fifth option ({optionLabels[shown][MCQ_MIN_OPTIONS]}) — needs an Admission Test or 5-option OMR sheet
+                    </Label>
                     <Label className="flex items-center gap-2 font-normal">
                       <Checkbox
                         checked={item.shuffleOptions}

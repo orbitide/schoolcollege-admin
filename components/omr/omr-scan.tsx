@@ -33,7 +33,6 @@ import { subjectStore } from "@/lib/academic-store"
 import { useCurrentUser } from "@/lib/current-user"
 import { checkOmrRows, type CheckedOmrRow } from "@/lib/omr-check"
 import { FAINT, readOmrSheet, toGray, type OmrReading } from "@/lib/omr-scan"
-import { omrLayout } from "@/lib/omr-template"
 import { mcqQuestionCount, useGeneratedPapers } from "@/lib/question-papers"
 import { useStudents } from "@/lib/students"
 import { saveAnswerKeys, useTermExamAnswers } from "@/lib/term-exam-answers"
@@ -56,6 +55,8 @@ type ScanRow = {
   error?: string
   roll: string
   setCode: string
+  registration: string
+  subjectCode: string
   answers: string
   // Flags the teacher hasn't dealt with: cleared once the row is edited.
   flagged: boolean
@@ -76,13 +77,15 @@ async function readFile(file: File, questions: number): Promise<Omit<ScanRow, "i
   context.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
   const image = canvas.toDataURL("image/jpeg", 0.8)
-  const base = { fileName: file.name, image, width, height, roll: "", setCode: "", answers: "", flagged: false }
+  const base = { fileName: file.name, image, width, height, roll: "", registration: "", subjectCode: "", setCode: "", answers: "", flagged: false }
   try {
-    const reading = readOmrSheet(toGray(context.getImageData(0, 0, width, height).data, width, height), omrLayout(questions))
+    const reading = readOmrSheet(toGray(context.getImageData(0, 0, width, height).data, width, height), questions)
     return {
       ...base,
       reading,
       roll: reading.roll,
+      registration: reading.registration,
+      subjectCode: reading.subjectCode,
       setCode: reading.setCode,
       answers: reading.answers.join(","),
       flagged: reading.flags.some((f) => f.reason !== "blank" || f.field === "set"),
@@ -135,8 +138,15 @@ export function OmrScan() {
           subjectRow.subjectId,
           rows.map((r) =>
             r.error
-              ? { roll: "", setCode: "", answers: [], flagged: false }
-              : { roll: r.roll, setCode: r.setCode, answers: splitAnswers(r.answers, questions), flagged: r.flagged }
+              ? { roll: "", registration: "", subjectCode: "", setCode: "", answers: [], flagged: false }
+              : {
+                  roll: r.roll,
+                  registration: r.registration,
+                  subjectCode: r.subjectCode,
+                  setCode: r.setCode,
+                  answers: splitAnswers(r.answers, questions),
+                  flagged: r.flagged,
+                }
           ),
           students,
           keys
@@ -358,7 +368,16 @@ export function OmrScan() {
                               className="h-8 font-mono"
                             />
                           </TableCell>
-                          <TableCell className="text-sm">{c?.studentName ?? "—"}</TableCell>
+                          <TableCell className="text-sm">
+                            {c?.studentName ?? "—"}
+                            {row.reading && (
+                              <span className="block text-xs text-muted-foreground">
+                                {row.reading.typeName}
+                                {row.registration && ` · Reg ${row.registration}`}
+                                {row.subjectCode && ` · Subject ${row.subjectCode}`}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Input
                               value={row.setCode}
@@ -451,7 +470,7 @@ function FlagList({ reading }: { reading: OmrReading }) {
   const flags = reading.flags.filter((f) => f.reason !== "blank" || f.field === "set")
   if (!flags.length) return null
   const label = (f: OmrReading["flags"][number]) =>
-    `${f.field === "answer" ? `Q${f.index + 1}` : f.field === "roll" ? `roll digit ${f.index + 1}` : "set"} ${
+    `${f.field === "answer" ? `Q${f.index + 1}` : f.field === "set" ? "set" : `${f.field === "subject" ? "subject code" : f.field} digit ${f.index + 1}`} ${
       f.reason === "multiple" ? "two marks" : f.reason === "faint" ? "faint" : "blank"
     }`
   return (
@@ -486,7 +505,7 @@ function KeySheet({
     ? row.error
     : !/^[ABCD]$/.test(setCode)
       ? "Fill in one set code (A–D)."
-      : answers.some((a) => !/^[ABCD]{0,1}$/.test(a))
+      : answers.some((a) => !/^[A-E]?$/.test(a))
         ? "A key question has more than one mark; correct it below (use A|B in Manage Correct Answer for either)."
         : null
   return (

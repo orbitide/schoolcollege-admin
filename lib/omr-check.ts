@@ -1,6 +1,7 @@
 "use client"
 
-import { mcqMarksPerQuestion, paperFor, getGeneratedPapers } from "@/lib/question-papers"
+import { getGeneratedPapers, mcqMarksPerQuestion, paperFor } from "@/lib/question-papers"
+import { subjectStore } from "@/lib/academic-store"
 import { getStudents, type Student } from "@/lib/students"
 import { getTermExamAnswers, type TermExamAnswer } from "@/lib/term-exam-answers"
 import { examStudents, scoreMcq, takesSubject, type MarkUpload } from "@/lib/term-exam-marks"
@@ -9,12 +10,18 @@ import type { TermExam } from "@/lib/term-exams"
 // Checks OMR Scan's readings (after the teacher's corrections) the way the
 // legacy OMR API checked a scanner's upload (ApiController
 // TermExamMarksUpload): the roll must be a student of the exam who takes the
-// subject, once; the set must have an answer key. A good sheet is scored
+// subject, once; the set must have an answer key (a sheet without a set
+// code takes the subject's only key, when there is one). A registration no.
+// or subject code on the sheet must match the student's and the subject's
+// where they are known. A good sheet is scored
 // against its set's key (scoreMcq, as Marks Recalculation does) and becomes
 // a mark upload with the answer string, set code and MCQ counts.
 
 export type OmrSheetRow = {
   roll: string
+  // "" when the sheet type has no such field.
+  registration: string
+  subjectCode: string
   setCode: string
   // One entry per question: "", a letter, or letters for a multiple mark.
   answers: string[]
@@ -34,7 +41,7 @@ export type CheckedOmrRow = {
   upload?: MarkUpload
 }
 
-const ANSWER = /^[ABCD]{0,4}$/
+const ANSWER = /^[A-E]{0,5}$/
 
 // Marks per correct answer: the generated paper's setting when there is
 // one, else the class-year subject's.
@@ -52,6 +59,8 @@ export function checkOmrRows(
   const examSubject = exam.subjects.find((s) => s.subjectId === subjectId)
   const byRoll = new Map(examStudents(exam, students).map((s) => [s.enrolment.classRoll.trim(), s]))
   const perCorrect = omrMarksPerCorrect(exam, subjectId)
+  const subjectCode = subjectStore.getListWithDeleted(exam.instituteId).find((s) => s.id === subjectId)?.code.trim() ?? ""
+  const subjectKeys = keys.filter((k) => k.termExamId === exam.id && k.subjectId === subjectId)
   const rollCount = new Map<string, number>()
   for (const row of rows) rollCount.set(row.roll.trim(), (rollCount.get(row.roll.trim()) ?? 0) + 1)
 
@@ -73,17 +82,30 @@ export function checkOmrRows(
     if (!takesSubject(found.enrolment, subjectId)) return stop("Student didn't taken this subject", { studentName })
     if ((rollCount.get(roll) ?? 0) > 1) return stop("Duplicate Roll", { studentName })
 
-    const setCode = row.setCode.trim().toUpperCase()
+    const readCode = row.subjectCode.trim()
+    if (readCode.includes("?")) return stop("Subject code has two marks in a column", { studentName })
+    if (readCode && /^d+$/.test(subjectCode) && Number(readCode) !== Number(subjectCode))
+      return stop(`Subject code ${readCode} isn't this subject's (${subjectCode})`, { studentName })
+
+    const registration = row.registration.trim()
+    if (registration) {
+      const known = Object.values(found.student.board ?? {})
+        .map((b) => b?.registrationNo?.trim())
+        .filter(Boolean)
+      if (registration.includes("?")) messages.push("Registration no. has two marks in a column")
+      else if (known.length && !known.includes(registration)) messages.push(`Registration no. ${registration} isn't the student's`)
+    }
+
+    const onlyKey = subjectKeys.length === 1 ? subjectKeys[0] : undefined
+    const setCode = row.setCode.trim().toUpperCase() || (onlyKey ? onlyKey.setCode.trim().toUpperCase() : "")
     if (!setCode) return stop("No set code", { studentName })
     if (setCode.length > 1) return stop("Set code has more than one mark", { studentName })
-    const key = keys.find(
-      (k) => k.termExamId === exam.id && k.subjectId === subjectId && k.setCode.trim().toUpperCase() === setCode
-    )
+    const key = subjectKeys.find((k) => k.setCode.trim().toUpperCase() === setCode)
     if (!key) return stop(`No answer key for set ${setCode}`, { studentName })
 
     const answers = row.answers.map((a) => a.trim().toUpperCase())
     const bad = answers.findIndex((a) => !ANSWER.test(a))
-    if (bad >= 0) return stop(`Question ${bad + 1}: use A–D only`, { studentName, key })
+    if (bad >= 0) return stop(`Question ${bad + 1}: use A–E only`, { studentName, key })
 
     const sheet = answers.join(",")
     const score: OmrScore = scoreMcq(key.answer, sheet, examSubject.mcqMarks, perCorrect) ?? {

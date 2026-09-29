@@ -15,5 +15,5 @@ export const paperNumber = (value: string | number, bangla: boolean) =>
 export const cqLabels = { bn: ["ক", "খ", "গ", "ঘ"], en: ["a", "b", "c", "d"] } as const
 
 // MCQ option labels as the paper prints them; the answer keys and OMR data
-// stay A–D whatever the language.
-export const optionLabels = { bn: ["ক", "খ", "গ", "ঘ"], en: ["A", "B", "C", "D"] } as const
+// stay A–E whatever the language.
+export const optionLabels = { bn: ["ক", "খ", "গ", "ঘ", "ঙ"], en: ["A", "B", "C", "D", "E"] } as const

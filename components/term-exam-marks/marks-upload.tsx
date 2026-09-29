@@ -692,8 +692,9 @@ type CheckedRow = {
   upload?: MarkUpload
 }
 
-// Legacy isValidAnswerString: only A–D and commas, at most four letters an answer.
-const validAnswer = (answer: string) => /^[,ABCD]*$/.test(answer) && answer.split(",").every((a) => a.length <= 4)
+// Legacy isValidAnswerString: only A–D and commas, at most four letters an
+// answer; E too, for five-option sheets (Admission Test).
+const validAnswer = (answer: string) => /^[,A-E]*$/.test(answer) && answer.split(",").every((a) => a.length <= 5)
 
 // Legacy MarksUpload (POST), with every row checked up front. Problems that
 // stop a row (legacy errorRowList "false") skip it; the others are saved

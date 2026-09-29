@@ -88,8 +88,10 @@ export type QuestionLevel = (typeof questionLevels)[number]
 export const questionStatuses = ["Draft", "Approved", "Retired", "Deleted"] as const
 export type QuestionStatus = (typeof questionStatuses)[number]
 
-// Legacy options A–D; the OMR sheet and answer keys use the same four.
-export const MCQ_OPTIONS = ["A", "B", "C", "D"] as const
+// Options A–D as in the legacy system, or A–E for a question that needs a
+// fifth (admission tests; the Admission Test OMR sheet has five bubbles).
+export const MCQ_OPTIONS = ["A", "B", "C", "D", "E"] as const
+export const MCQ_MIN_OPTIONS = 4
 // A CQ has up to four sub-questions (ক, খ, গ, ঘ).
 export const MAX_CQ_ITEMS = 4
 // An MCQ stimulus groups a few questions.
@@ -100,9 +102,9 @@ export type Bilingual = { bn: string; en: string }
 
 export type QuestionItem = {
   text: Bilingual
-  // MCQ: the four options, in A–D order; CQ: none.
+  // MCQ: four or five options, in A–E order; CQ: none.
   options: Bilingual[]
-  // MCQ: the correct option, "A"–"D"; CQ: "".
+  // MCQ: the correct option, "A"–"E"; CQ: "".
   answer: string
   solution: Bilingual
   // CQ: the sub-question's marks. MCQ marks are set per paper.
@@ -143,7 +145,7 @@ export const emptyBilingual = (): Bilingual => ({ bn: "", en: "" })
 export function blankItem(type: QuestionType, index = 0): QuestionItem {
   return {
     text: emptyBilingual(),
-    options: type === "MCQ" ? MCQ_OPTIONS.map(() => emptyBilingual()) : [],
+    options: type === "MCQ" ? MCQ_OPTIONS.slice(0, MCQ_MIN_OPTIONS).map(() => emptyBilingual()) : [],
     answer: "",
     solution: emptyBilingual(),
     marks: type === "CQ" ? [1, 2, 3, 4][index] ?? 1 : 1,
@@ -523,11 +525,13 @@ export function questionErrors(input: QuestionInput): QuestionErrors {
     const missing = languages.find((l) => !hasContent(item.text[l]))
     if (missing) errors[key("text")] = `Write the question in ${languageName[missing]}.`
     if (input.type === "MCQ") {
+      if (item.options.length < MCQ_MIN_OPTIONS || item.options.length > MCQ_OPTIONS.length) errors[key("answer")] = "An MCQ has 4 or 5 options."
       item.options.forEach((option, o) => {
         const blank = languages.find((l) => !hasContent(option[l]))
         if (blank) errors[key(`option.${o}`)] = `Option ${MCQ_OPTIONS[o]} is blank in ${languageName[blank]}.`
       })
-      if (!MCQ_OPTIONS.includes(item.answer as (typeof MCQ_OPTIONS)[number])) errors[key("answer")] = "Pick the correct option."
+      if (!MCQ_OPTIONS.slice(0, item.options.length).includes(item.answer as (typeof MCQ_OPTIONS)[number]))
+        errors[key("answer")] = "Pick the correct option."
     } else if (!(item.marks > 0)) {
       errors[key("marks")] = "Marks must be more than 0."
     }
