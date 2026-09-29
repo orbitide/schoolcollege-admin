@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon, FileQuestionIcon } from "lucide-react"
+import { BrandMark } from "@/components/brand-mark"
 
 const data = {
   // The sidebar menu, as labelled groups: the school core first, then the
@@ -384,7 +385,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <Link href="/dashboard">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/30 [&_svg]:size-5!">
-                  <GraduationCapIcon />
+                  <BrandMark />
                 </span>
                 <span className="grid flex-1 leading-tight">
                   <span className="text-base font-bold tracking-tight">SMS Admin</span>

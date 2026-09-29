@@ -8,7 +8,6 @@ import {
   CircleAlertIcon,
   EyeIcon,
   EyeOffIcon,
-  GraduationCapIcon,
   LockIcon,
   MailIcon,
   ReceiptTextIcon,
@@ -20,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { DEMO_PASSWORD, signIn, useSessionUserId } from "@/lib/current-user"
 import { passwordOf, useAdminUsers, type AdminUser } from "@/lib/global-settings"
 import { cn } from "@/lib/utils"
+import { BrandMark } from "@/components/brand-mark"
 
 // Where to go after signing in: the page that sent the user here, when it
 // is one of ours, else the dashboard.
@@ -60,7 +60,7 @@ function Logo({ className }: { className?: string }) {
         className
       )}
     >
-      <GraduationCapIcon className="size-5" />
+      <BrandMark />
     </span>
   )
 }
