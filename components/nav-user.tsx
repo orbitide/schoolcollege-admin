@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sidebar"
 import { EllipsisVerticalIcon, CircleUserRoundIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
 
+import { permissionCode, useCan } from "@/lib/access"
 import { signOut } from "@/lib/current-user"
 
 // "Rafiq Hasan" -> "RH".
@@ -45,6 +46,11 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const can = useCan()
+  // Platform admins hold every permission, so they always see Billing.
+  const billingHref = (["Manage", "View"] as const).some((s) => can(permissionCode("institute-billing", s)))
+    ? "/billing"
+    : null
 
   return (
     <SidebarMenu>
@@ -96,11 +102,14 @@ export function NavUser({
                   Account
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
+              {billingHref && (
+                <DropdownMenuItem asChild>
+                  <Link href={billingHref}>
+                    <CreditCardIcon />
+                    Billing
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem>
                 <BellIcon
                 />

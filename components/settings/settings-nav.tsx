@@ -10,6 +10,8 @@ const pages = [
   { title: "General", href: "/settings" },
   { title: "Email & SMS", href: "/settings/email-sms" },
   { title: "Maintenance Mode", href: "/settings/maintenance" },
+  // Not in legacy (single site): who bills the institutes.
+  { title: "Billing", href: "/settings/billing" },
 ]
 
 export function SettingsNav() {

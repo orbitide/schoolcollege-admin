@@ -75,6 +75,80 @@ export function updateBillingSettings(input: BillingSettingsInput, user: string)
   listeners.forEach((listener) => listener())
 }
 
+// ---- Platform billing details ----
+// Who bills the institutes: the "From" on every invoice, with how to pay
+// by hand. Edited in Settings › Billing. Invoices copy it when issued.
+
+export type PlatformBillingInfo = {
+  id: number
+  companyName: string
+  address: string
+  // Bangladesh VAT registration (BIN).
+  bin: string
+  email: string
+  phone: string
+  // Bank / bKash details for paying outside the online checkout.
+  paymentInstructions: string
+  // Printed at the foot of every invoice.
+  invoiceFooter: string
+  modifiedBy: string
+  modifiedAt: string
+}
+
+export type PlatformBillingInput = Omit<PlatformBillingInfo, "id" | "modifiedBy" | "modifiedAt">
+
+const platformSeed: PlatformBillingInfo = {
+  id: 1,
+  companyName: "SMS Platform Ltd.",
+  address: "House 12, Road 7, Dhanmondi, Dhaka 1205",
+  bin: "",
+  email: "billing@sms.app",
+  phone: "01711000000",
+  paymentInstructions:
+    "Pay online from Billing, or by bank transfer to SMS Platform Ltd., A/C 1234567890, Dutch-Bangla Bank, Dhanmondi branch. Write the invoice number as the reference.",
+  invoiceFooter: "Thank you for choosing SMS. This is a computer-generated invoice and needs no signature.",
+  modifiedBy: "Super Admin",
+  modifiedAt: "2026-01-01T00:00:00.000Z",
+}
+
+let platformInfo = platformSeed
+const platformListeners = new Set<() => void>()
+
+function subscribePlatform(listener: () => void) {
+  platformListeners.add(listener)
+  return () => platformListeners.delete(listener)
+}
+
+export function getPlatformBillingInfo() {
+  return platformInfo
+}
+
+export function usePlatformBillingInfo() {
+  return React.useSyncExternalStore(subscribePlatform, () => platformInfo, () => platformSeed)
+}
+
+const BILLING_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const BILLING_PHONE = /^(?:\+?88)?01[3-9]\d{8}$/
+
+export function platformBillingErrors(input: PlatformBillingInput) {
+  const errors: Partial<Record<keyof PlatformBillingInput, string>> = {}
+  if (!input.companyName.trim()) errors.companyName = "Company name is required."
+  if (!input.address.trim()) errors.address = "Address is required."
+  if (!BILLING_EMAIL.test(input.email.trim())) errors.email = "Enter a valid email address."
+  if (input.phone.trim() && !BILLING_PHONE.test(input.phone.trim())) errors.phone = "Enter a mobile number like 01XXXXXXXXX."
+  return errors
+}
+
+export function updatePlatformBillingInfo(input: PlatformBillingInput, user: string) {
+  const trimmed = Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [key, value.trim()])
+  ) as PlatformBillingInput
+  const next = { ...platformInfo, ...trimmed, modifiedBy: user, modifiedAt: new Date().toISOString() }
+  logChanges("PlatformBillingInfo", [platformInfo], [next])
+  platformInfo = next
+  platformListeners.forEach((listener) => listener())
+}
+
 // ---- Pricing ----
 
 export type Rates = { lowerRate: number; upperRate: number }

@@ -1,8 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { PrinterIcon } from "lucide-react"
 import { toast } from "sonner"
 
+import { PrintArea } from "@/components/reports/print-area"
+import { InvoiceSheet } from "@/components/subscriptions/invoice-sheet"
 import { InvoiceStateBadge } from "@/components/subscriptions/invoice-state-badge"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
@@ -20,7 +23,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { formatTaka, isoDate, monthName, useBillingSettings } from "@/lib/billing"
 import { useCurrentUser } from "@/lib/current-user"
 import { formatDate, type Institute } from "@/lib/institutes"
-import { invoiceState, markInvoicePaid, type SaasInvoice } from "@/lib/saas-invoices"
+import { invoiceState, type SaasInvoice } from "@/lib/saas-invoices"
+import { recordManualPayment, saasPaymentMethods, type SaasPaymentMethod } from "@/lib/saas-payments"
 import {
   customRatesErrors,
   extendTrial,
@@ -198,7 +202,8 @@ function MarkPaidForm({
   const onOpenChange = (open: boolean) => !open && close()
   const user = useCurrentUser()
   const [paidAt, setPaidAt] = React.useState(isoDate())
-  const [note, setNote] = React.useState("")
+  const [method, setMethod] = React.useState<SaasPaymentMethod>("Bank transfer")
+  const [reference, setReference] = React.useState("")
   const [error, setError] = React.useState("")
 
   function save(event: React.FormEvent) {
@@ -211,11 +216,11 @@ function MarkPaidForm({
       setError("The payment date can't be in the future.")
       return
     }
-    if (!markInvoicePaid(invoice.id, { paidAt, note }, user.name)) {
+    if (!recordManualPayment(invoice.id, { paidAt, method, reference }, user.name)) {
       toast.error("Only a due invoice can be marked paid.")
       return
     }
-    toast.success(`${invoice.invoiceNo} marked paid`)
+    toast.success(`${invoice.invoiceNo} marked paid. Receipt issued.`)
     onOpenChange(false)
   }
 
@@ -232,13 +237,19 @@ function MarkPaidForm({
         <Input id="paid-at" type="date" value={paidAt} max={isoDate()} onChange={(e) => setPaidAt(e.target.value)} />
         <FieldError>{error}</FieldError>
       </Field>
+      <FilterField
+        label="Method"
+        value={method}
+        onChange={(v) => setMethod(v as SaasPaymentMethod)}
+        options={saasPaymentMethods.map((m) => ({ value: m, label: m }))}
+      />
       <Field>
-        <FieldLabel htmlFor="paid-note">Payment reference</FieldLabel>
+        <FieldLabel htmlFor="paid-note">Reference</FieldLabel>
         <Input
           id="paid-note"
-          placeholder="e.g. bKash TrxID, bank transfer ref."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. bKash TrxID, bank ref., cheque no."
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
         />
       </Field>
       <DialogFooter>
@@ -251,74 +262,40 @@ function MarkPaidForm({
   )
 }
 
-// An invoice as the institute would receive it.
+// An invoice as the institute receives it, with a Print button (one A4
+// page, printed from this tab since the data lives in its memory).
 export function InvoiceDialog({
   invoice,
-  institute,
   open,
   onOpenChange,
-}: DialogProps & { invoice: SaasInvoice; institute: Institute | undefined }) {
+}: DialogProps & { invoice: SaasInvoice }) {
   const state = invoiceState(invoice)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {invoice.invoiceNo} <InvoiceStateBadge state={state} />
           </DialogTitle>
           <DialogDescription>Platform subscription for {monthName(invoice.month)}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 text-sm">
-          <div className="grid gap-0.5">
-            <span className="font-medium">{institute?.name ?? `Institute #${invoice.instituteId}`}</span>
-            {institute && (
-              <span className="text-muted-foreground">
-                {institute.address || institute.city} · {institute.email}
-              </span>
-            )}
-          </div>
-          <div className="overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-left">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Description</th>
-                  <th className="px-3 py-2 text-right font-medium">Students</th>
-                  <th className="px-3 py-2 text-right font-medium">Rate</th>
-                  <th className="px-3 py-2 text-right font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t">
-                  <td className="px-3 py-2">All features plan, active students at month end</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{invoice.studentCount.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatTaka(invoice.rate)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatTaka(invoice.amount)}</td>
-                </tr>
-                <tr className="border-t bg-muted/40 font-semibold">
-                  <td className="px-3 py-2" colSpan={3}>
-                    Total
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatTaka(invoice.amount)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <dt className="text-muted-foreground">Issued</dt>
-            <dd>{formatDate(invoice.issuedAt)}</dd>
-            <dt className="text-muted-foreground">Due</dt>
-            <dd>{formatDate(invoice.dueDate)}</dd>
-            {invoice.paidAt && (
-              <>
-                <dt className="text-muted-foreground">Paid</dt>
-                <dd>
-                  {formatDate(invoice.paidAt)}
-                  {invoice.paymentNote && ` · ${invoice.paymentNote}`}
-                </dd>
-              </>
-            )}
-          </dl>
+        <div className="overflow-hidden rounded-md border">
+          <InvoiceSheet invoice={invoice} />
         </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button onClick={() => window.print()}>
+            <PrinterIcon data-icon="inline-start" />
+            Print
+          </Button>
+        </DialogFooter>
+        {open && (
+          <PrintArea pageSize="A4 portrait" margin="10mm">
+            <InvoiceSheet invoice={invoice} />
+          </PrintArea>
+        )}
       </DialogContent>
     </Dialog>
   )

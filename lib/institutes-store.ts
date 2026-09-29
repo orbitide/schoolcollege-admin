@@ -11,6 +11,7 @@ import { logChanges } from "@/lib/common-log"
 import { getCurrentUser } from "@/lib/current-user"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteHolidays } from "@/lib/holidays"
+import { removeInstituteBillingProfile } from "@/lib/billing-profiles"
 import { removeInstituteInvoices } from "@/lib/saas-invoices"
 import { addSubscription, removeInstituteSubscription } from "@/lib/subscriptions"
 import { removeInstituteMenuView } from "@/lib/menu-views"
@@ -92,6 +93,7 @@ export function deleteInstitute(id: number) {
   removeInstituteMenuView(id)
   removeInstituteSubscription(id)
   removeInstituteInvoices(id)
+  removeInstituteBillingProfile(id)
   removeInstitutePosts(id)
   removeInstituteCategories(id)
   removeInstituteTags(id)

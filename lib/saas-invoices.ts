@@ -10,8 +10,11 @@ import {
   monthEnd,
   monthOf,
   perStudentRate,
+  getPlatformBillingInfo,
   ratesFor,
+  type PlatformBillingInput,
 } from "@/lib/billing"
+import { billToOf, getBillingProfile, type BillTo } from "@/lib/billing-profiles"
 import { logChanges } from "@/lib/common-log"
 import { seedInstitutes, type Institute } from "@/lib/institutes"
 import { getSubscriptions } from "@/lib/subscriptions"
@@ -40,10 +43,21 @@ export type SaasInvoice = {
   dueDate: string
   paidAt: string | null
   paymentNote: string
+  // Both parties as they stood when the invoice was issued.
+  billFrom: InvoiceFrom
+  billTo: BillTo
   createdBy: string
   createdAt: string
   modifiedBy: string
   modifiedAt: string
+}
+
+// What an invoice prints under "From".
+export type InvoiceFrom = PlatformBillingInput
+
+function invoiceFrom(): InvoiceFrom {
+  const { companyName, address, bin, email, phone, paymentInstructions, invoiceFooter } = getPlatformBillingInfo()
+  return { companyName, address, bin, email, phone, paymentInstructions, invoiceFooter }
 }
 
 export function invoiceState(invoice: Pick<SaasInvoice, "status" | "dueDate">, today = isoDate()): InvoiceState {
@@ -70,7 +84,8 @@ function draft(
   month: string,
   studentCount: number,
   user: string,
-  at: string
+  at: string,
+  billTo: BillTo
 ): SaasInvoice {
   const settings = getBillingSettings()
   const rates = ratesFor(
@@ -92,6 +107,8 @@ function draft(
     dueDate: addDaysIso(issuedAt, settings.invoiceDueDays),
     paidAt: null,
     paymentNote: "",
+    billFrom: invoiceFrom(),
+    billTo,
     createdBy: user,
     createdAt: at,
     modifiedBy: user,
@@ -110,7 +127,7 @@ function seedInvoices(): SaasInvoice[] {
     const month = monthOf(-back)
     for (const institute of unbilledInstitutes(month, seedInstitutes, all)) {
       const count = Math.round(institute.students * (1 - 0.015 * back))
-      const invoice = draft(all, institute, month, count, "System", `${addDaysIso(monthEnd(month), 1)}T00:05:00.000Z`)
+      const invoice = draft(all, institute, month, count, "System", `${addDaysIso(monthEnd(month), 1)}T00:05:00.000Z`, billToOf(institute, undefined))
       const unpaid = (back === 1 && institute.id % 3 === 0) || (back === 2 && institute.id % 8 === 7)
       all.push(
         unpaid
@@ -142,6 +159,10 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+export function getSaasInvoices() {
+  return invoices
+}
+
 export function useSaasInvoices() {
   return React.useSyncExternalStore(subscribe, () => invoices, () => seed)
 }
@@ -152,7 +173,7 @@ export function generateInvoices(month: string, institutes: Institute[], user: s
   const at = new Date().toISOString()
   const next = [...invoices]
   for (const institute of unbilledInstitutes(month, institutes, next)) {
-    next.push(draft(next, institute, month, billableStudents(institute), user, at))
+    next.push(draft(next, institute, month, billableStudents(institute), user, at, billToOf(institute, getBillingProfile(institute.id))))
   }
   const added = next.length - invoices.length
   if (added) emit(next)
@@ -167,6 +188,8 @@ function patch(id: number, changes: Partial<SaasInvoice>, user: string) {
   )
 }
 
+// Settles a due invoice. Payments go through lib/saas-payments.ts, which
+// records the payment and its receipt and calls this.
 export function markInvoicePaid(id: number, payment: { paidAt: string; note: string }, user: string) {
   const invoice = invoices.find((i) => i.id === id)
   if (!invoice || invoice.status !== "Due") return false

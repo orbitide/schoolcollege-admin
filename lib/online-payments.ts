@@ -13,6 +13,7 @@ import {
   type OnlineGateway,
 } from "@/lib/fee-payments"
 import { getFeeInvoices } from "@/lib/fee-invoices"
+import { SANDBOX_PIN } from "@/lib/sandbox-gateway"
 
 // Online fee payments through bKash, Nagad or SSLCommerz, as a SANDBOX: no
 // real gateway is called. The flow follows the plan's rules
@@ -35,7 +36,7 @@ export type OnlinePaymentStatus = (typeof onlinePaymentStatuses)[number]
 
 export const REQUEST_MINUTES = 30
 // Sandbox checkout: this PIN / OTP pays, anything else is declined.
-export const SANDBOX_PIN = "12345"
+export { SANDBOX_PIN }
 
 export type OnlinePayment = {
   id: number

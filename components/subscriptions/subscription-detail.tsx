@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 
+import { BillingProfileCard } from "@/components/billing/billing-profile-card"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { InvoiceList } from "@/components/subscriptions/invoice-list"
 import { SubscriptionActions } from "@/components/subscriptions/subscription-actions"
@@ -141,6 +142,8 @@ export function SubscriptionDetail({ instituteId }: { instituteId: number }) {
           </CardContent>
         </Card>
       </div>
+
+      <BillingProfileCard institute={institute} editable />
 
       <div className="grid gap-3">
         <h3 className="text-lg font-semibold">Invoices</h3>

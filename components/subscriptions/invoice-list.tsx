@@ -250,7 +250,6 @@ function InvoiceActions({ invoice, institute }: { invoice: SaasInvoice; institut
       </DropdownMenu>
       <InvoiceDialog
         invoice={invoice}
-        institute={institute}
         open={open === "view"}
         onOpenChange={(o) => setOpen(o ? "view" : null)}
       />
