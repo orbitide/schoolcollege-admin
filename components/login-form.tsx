@@ -17,7 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { DEMO_PASSWORD, signIn, useSessionUserId } from "@/lib/current-user"
-import { passwordOf, useAdminUsers, type AdminUser } from "@/lib/global-settings"
+import type { AdminUser } from "@/lib/global-settings"
+import { httpClient } from "@/lib/http-client"
 import { cn } from "@/lib/utils"
 import { BrandMark } from "@/components/brand-mark"
 
@@ -44,6 +45,21 @@ const roleBadge: Record<AdminUser["role"], string> = {
   "Institute Manager": "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
   "Institute Viewer": "bg-amber-500/10 text-amber-600 dark:text-amber-300",
   Teacher: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
+}
+
+// An active account the API offers for one-click demo sign-in
+// (GET /auth/demo-users, which only answers in Development).
+type DemoUser = { id: number; name: string; email: string; role: string }
+
+function useDemoUsers() {
+  const [users, setUsers] = React.useState<DemoUser[]>([])
+  React.useEffect(() => {
+    httpClient
+      .get<DemoUser[]>("/auth/demo-users")
+      .then(setUsers)
+      .catch(() => setUsers([]))
+  }, [])
+  return users
 }
 
 const highlights = [
@@ -120,7 +136,7 @@ function BrandPanel() {
 // one click on a user to try the panel in that role.
 export function LoginForm() {
   const router = useRouter()
-  const users = useAdminUsers()
+  const users = useDemoUsers()
   const signedIn = useSessionUserId() != null
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -132,12 +148,19 @@ export function LoginForm() {
     if (signedIn) router.replace(returnUrl())
   }, [signedIn, router])
 
-  function submit(event: React.FormEvent) {
+  const [pending, setPending] = React.useState(false)
+
+  async function submit(event: React.FormEvent) {
     event.preventDefault()
+    if (pending) return
+    setPending(true)
+    setError(null)
     try {
-      signIn(email, password)
+      await signIn(email, password)
     } catch (reason) {
       setError((reason as Error).message)
+    } finally {
+      setPending(false)
     }
   }
 
@@ -145,10 +168,10 @@ export function LoginForm() {
 
   // Fills the form with a demo user's email and password; Sign in
   // (or Enter) then signs in as them.
-  function fillDemoUser(user: AdminUser) {
+  function fillDemoUser(user: DemoUser) {
     setError(null)
     setEmail(user.email)
-    setPassword(passwordOf(user.id) ?? DEMO_PASSWORD)
+    setPassword(DEMO_PASSWORD)
     submitRef.current?.focus()
   }
 
@@ -227,17 +250,16 @@ export function LoginForm() {
                   <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">{DEMO_PASSWORD}</code>
                 </p>
               </Field>
-              <Button ref={submitRef} type="submit" size="lg" className="h-10 w-full">
-                Sign in
+              <Button ref={submitRef} type="submit" size="lg" className="h-10 w-full" disabled={pending}>
+                {pending ? "Signing in…" : "Sign in"}
               </Button>
             </FieldGroup>
           </form>
 
-          <FieldSeparator className="my-8">Or pick a demo user</FieldSeparator>
+          {users.length > 0 && <FieldSeparator className="my-8">Or pick a demo user</FieldSeparator>}
 
           <div className="grid gap-2 sm:grid-cols-2">
             {users
-              .filter((u) => u.status === "Active")
               .map((u) => (
                 <button
                   key={u.id}
@@ -249,7 +271,7 @@ export function LoginForm() {
                   <span
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                      roleBadge[u.role]
+                      roleBadge[u.role as AdminUser["role"]] ?? "bg-muted text-muted-foreground"
                     )}
                   >
                     {initials(u.name)}
@@ -263,7 +285,7 @@ export function LoginForm() {
           </div>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Demo mode — the session stays in this browser.
+            Demo users are seeded for development; each signs in with the demo password.
           </p>
         </div>
       </div>

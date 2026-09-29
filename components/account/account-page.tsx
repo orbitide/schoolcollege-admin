@@ -184,16 +184,25 @@ const blankPasswords = { oldPassword: "", newPassword: "", confirmPassword: "" }
 function PasswordForm() {
   const user = useCurrentUser()
   const [draft, setDraft] = React.useState(blankPasswords)
-  const [errors, setErrors] = React.useState<ReturnType<typeof changeOwnPassword>>({})
+  const [errors, setErrors] = React.useState<Awaited<ReturnType<typeof changeOwnPassword>>>({})
+  const [pending, setPending] = React.useState(false)
   const set = (key: keyof typeof draft) => (value: string) => setDraft((d) => ({ ...d, [key]: value }))
 
-  function save(event: React.FormEvent) {
+  async function save(event: React.FormEvent) {
     event.preventDefault()
-    const found = changeOwnPassword(draft)
-    setErrors(found)
-    if (Object.keys(found).length) return
-    setDraft(blankPasswords)
-    toast.success("Your password has been changed.")
+    if (pending) return
+    setPending(true)
+    try {
+      const found = await changeOwnPassword(draft)
+      setErrors(found)
+      if (Object.keys(found).length) return
+      setDraft(blankPasswords)
+      toast.success("Your password has been changed.")
+    } catch (reason) {
+      toast.error((reason as Error).message)
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -233,7 +242,7 @@ function PasswordForm() {
           />
         </CardContent>
         <CardFooter className="flex justify-end border-t">
-          <Button type="submit" disabled={!draft.oldPassword && !draft.newPassword && !draft.confirmPassword}>
+          <Button type="submit" disabled={pending || (!draft.oldPassword && !draft.newPassword && !draft.confirmPassword)}>
             Update Password
           </Button>
         </CardFooter>

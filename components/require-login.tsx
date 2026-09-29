@@ -26,7 +26,8 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
   const wasSignedIn = React.useRef(false)
 
   React.useEffect(() => {
-    if (!hydrated) return
+    // Wait for the API to say whose session this is.
+    if (!hydrated || userId === undefined) return
     if (allowed) {
       wasSignedIn.current = true
       // A session restored after a refresh is live again.

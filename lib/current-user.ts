@@ -5,96 +5,92 @@ import * as React from "react"
 import {
   getAdminUsers,
   markSignedIn,
-  passwordError,
-  passwordOf,
   setOwnPassword,
   setUserOnline,
   useAdminUsers,
   useUserInstitutes,
   type AdminUser,
 } from "@/lib/global-settings"
+import { ApiError, httpClient, onUnauthorized } from "@/lib/http-client"
 import { useInstitutes } from "@/lib/institutes-store"
 import { useTeachers } from "@/lib/teachers"
 
-// ---- Dummy session ----
-// Who is using the admin panel: the user signed in on the login page, kept
-// in localStorage so a refresh stays signed in. Every active user signs in with
-// DEMO_PASSWORD unless Users/CreateEdit set their own. Replace with the auth
-// API once the backend exists.
+// ---- Session ----
+// Who is using the admin panel. The session is the API's httpOnly cookie
+// (SchoolCollege AuthController); this module only remembers whose it is.
+// The users themselves are still the in-memory list in lib/global-settings,
+// whose seed ids and emails match the API's development seed.
 
+// The API's development seed password (DevelopmentSeeder).
 export const DEMO_PASSWORD = "123456"
 
-const SESSION_KEY = "sms-admin-session"
 const sessionListeners = new Set<() => void>()
-// undefined: not read from localStorage yet; null: signed out.
+// undefined: not asked the API yet (or still asking); null: signed out.
 let sessionUserId: number | null | undefined
-
-function readSession() {
-  if (sessionUserId === undefined) {
-    try {
-      const stored = Number(localStorage.getItem(SESSION_KEY))
-      sessionUserId = stored > 0 ? stored : null
-    } catch {
-      sessionUserId = null
-    }
-  }
-  return sessionUserId
-}
+let sessionRequest: Promise<void> | undefined
 
 function setSession(userId: number | null) {
   sessionUserId = userId
-  try {
-    if (userId == null) localStorage.removeItem(SESSION_KEY)
-    else localStorage.setItem(SESSION_KEY, String(userId))
-  } catch {
-    // Storage blocked (private window): the session lasts until a refresh.
-  }
   sessionListeners.forEach((listener) => listener())
 }
 
+// Asks the API once per page load whose cookie this browser holds.
+function loadSession() {
+  sessionRequest ??= httpClient
+    .get<AdminUser | null>("/auth/session")
+    .then((user) => setSession(user?.id ?? null))
+    .catch(() => setSession(null))
+}
+
 function subscribeSession(listener: () => void) {
+  loadSession()
   sessionListeners.add(listener)
   return () => sessionListeners.delete(listener)
 }
 
-// The signed-in user's id, or null. On the server nobody is signed in.
+// A 401 from any call means the session ended (expired, blocked, forced out).
+onUnauthorized(() => {
+  if (sessionUserId != null) setSession(null)
+})
+
+// The signed-in user's id; null when signed out, undefined while the API
+// hasn't answered yet (and on the server).
 export function useSessionUserId() {
-  return React.useSyncExternalStore(subscribeSession, readSession, () => null)
+  return React.useSyncExternalStore(subscribeSession, () => sessionUserId, () => undefined)
 }
 
-// Signs in an active user by email and their password. Throws with the
-// message to show when that isn't possible.
-export function signIn(email: string, password: string) {
-  const user = getAdminUsers().find(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-  )
-  if (!user || password !== (passwordOf(user.id) ?? DEMO_PASSWORD)) throw new Error("Invalid email or password.")
-  if (user.status !== "Active") throw new Error("This user is blocked and can't sign in.")
+// Signs in by email (or user name) and password. Throws an ApiError with
+// the message to show when that isn't possible.
+export async function signIn(email: string, password: string) {
+  const user = await httpClient.post<AdminUser>("/auth/login", { login: email.trim(), password })
   markSignedIn(user.id)
   setSession(user.id)
   return user
 }
 
-// Legacy ChangePasswordBackend for the signed-in user. Returns the errors
-// to show; none means the password was changed.
-export function changeOwnPassword(input: { oldPassword: string; newPassword: string; confirmPassword: string }) {
+type PasswordChange = { oldPassword: string; newPassword: string; confirmPassword: string }
+
+// Legacy ChangePasswordBackend for the signed-in user. Resolves to the
+// errors to show per field; none means the password was changed. Anything
+// else (server down) rejects with an ApiError.
+export async function changeOwnPassword(input: PasswordChange): Promise<Partial<Record<keyof PasswordChange, string>>> {
+  try {
+    await httpClient.post("/auth/change-password", input)
+  } catch (error) {
+    if (error instanceof ApiError && Object.keys(error.fieldErrors).length) return error.fieldErrors
+    throw error
+  }
+  // Keep the in-memory row (Force Password Change, demo sign-in) in step.
   const user = getCurrentUser()
-  const errors: Partial<Record<keyof typeof input, string>> = {}
-  if (!input.oldPassword) errors.oldPassword = "Current password is required."
-  else if (input.oldPassword !== (passwordOf(user.id) ?? DEMO_PASSWORD)) errors.oldPassword = "Incorrect password."
-  const weak = passwordError(input.newPassword)
-  if (!input.newPassword) errors.newPassword = "New password is required."
-  else if (weak) errors.newPassword = weak
-  if (input.newPassword !== input.confirmPassword)
-    errors.confirmPassword = "The new password and confirmation password do not match."
-  if (!Object.keys(errors).length) setOwnPassword(user.id, input.newPassword, user.name)
-  return errors
+  setOwnPassword(user.id, input.newPassword, user.name)
+  return {}
 }
 
 export function signOut() {
-  const userId = readSession()
-  if (userId != null) setUserOnline(userId, false)
+  if (sessionUserId != null) setUserOnline(sessionUserId, false)
   setSession(null)
+  // Ends the cookie; failing here (server down) still leaves this tab signed out.
+  httpClient.post("/auth/logout").catch(() => {})
 }
 
 // The SaaS owner's staff, who work across every institute (platform
@@ -114,7 +110,7 @@ export function useCurrentUser() {
 // The same user outside React, for stores that stamp what they write.
 export function getCurrentUser() {
   const users = getAdminUsers()
-  const userId = typeof window === "undefined" ? null : readSession()
+  const userId = typeof window === "undefined" ? null : sessionUserId
   return users.find((user) => user.id === userId) ?? users[0]
 }
 
