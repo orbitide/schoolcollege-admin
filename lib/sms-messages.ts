@@ -394,6 +394,18 @@ export function sendPendingSms(ids: number[], rateOf: (instituteId: number) => n
   return { sent, failed }
 }
 
+// Queues the SMS and tries them at once, for messages that shouldn't wait
+// for Re-send (a payment receipt, a due reminder sent on the spot). Those
+// the balance can't pay for stay pending for Re-send.
+export function queueAndSendSms(info: SmsBatchInfo, drafts: SmsDraft[], user: string, rate: number) {
+  const before = Math.max(0, ...getSmsMessages().map((m) => m.id))
+  const parts = queueSms(info, drafts, user)
+  const ids = getSmsMessages()
+    .filter((m) => m.id > before)
+    .map((m) => m.id)
+  return { parts, ...sendPendingSms(ids, () => rate) }
+}
+
 // Legacy Re-send's "Archive As Success" / "Archive As Failed": closes the
 // pending SMS without trying them again. Returns how many were closed.
 export function archivePendingSms(ids: number[], status: "Sent" | "Failed") {

@@ -47,9 +47,9 @@ const seedRoles: UserRoleRecord[] = [
   { id: 2, name: "Institute Admin", group: "Institute", description: "Everything inside their institutes, including deleting records.", rank: 2, permissions: ["*"], ...seedStamp },
   { id: 3, name: "Institute Manager", group: "Institute", description: "Adds and edits records, and sees every page, but can't delete.", rank: 3, permissions: ["*.manage", "*.view"], ...seedStamp },
   { id: 4, name: "Institute Viewer", group: "Institute", description: "Read-only access to the view pages.", rank: 4, permissions: ["*.view"], ...seedStamp },
-  // A teacher works only on their own pages (e.g. Take Attendance), never
-  // the admin surfaces.
-  { id: 5, name: "Teacher", group: "Teacher", description: "Signs in as a teacher to take attendance for their sections.", rank: 5, permissions: [], ...seedStamp },
+  // A teacher works only on their own pages (e.g. Take Attendance, My
+  // Post), never the admin surfaces.
+  { id: 5, name: "Teacher", group: "Teacher", description: "Signs in as a teacher to take attendance for their sections, see their routine and the notice board, and write blog posts.", rank: 5, permissions: ["blog-author.manage", "blog-my-comment.manage", "teacher-routine.view", "notice-board.view"], ...seedStamp },
 ]
 
 let roles = seedRoles

@@ -44,7 +44,7 @@ export function RecordDetail({
   const returnTo = useSearchParams().get("returnTo")
   const base = `/institutes/${instituteId}/${config.segment}`
   const listHref =
-    returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/")
+    returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/")
       ? returnTo
       : base
 

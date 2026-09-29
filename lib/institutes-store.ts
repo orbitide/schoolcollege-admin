@@ -3,6 +3,10 @@
 import * as React from "react"
 
 import { removeInstituteRecords } from "@/lib/academic-store"
+import { removeInstituteCategories } from "@/lib/blog-categories"
+import { removeInstituteComments } from "@/lib/blog-comments"
+import { removeInstitutePosts } from "@/lib/blog-posts"
+import { removeInstituteTags } from "@/lib/blog-tags"
 import { logChanges } from "@/lib/common-log"
 import { getCurrentUser } from "@/lib/current-user"
 import { removeInstituteUsers } from "@/lib/global-settings"
@@ -88,4 +92,9 @@ export function deleteInstitute(id: number) {
   removeInstituteMenuView(id)
   removeInstituteSubscription(id)
   removeInstituteInvoices(id)
+  removeInstitutePosts(id)
+  removeInstituteCategories(id)
+  removeInstituteTags(id)
+  removeInstituteComments(id)
+  void import("@/lib/institute-module-cleanup").then((m) => m.removeInstituteModuleData(id))
 }

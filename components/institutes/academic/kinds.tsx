@@ -36,6 +36,17 @@ import {
   type InstituteSettings,
 } from "@/lib/institutes"
 import { plansUsingRoom } from "@/lib/exam-seat-plans"
+import { feeFrequencies, feeHeadStore } from "@/lib/fee-heads"
+import { feeHeadBilled } from "@/lib/fee-invoices"
+import { feeHeadInUse } from "@/lib/fee-setup"
+import {
+  overlappingPeriod,
+  periodInUse,
+  periodStore,
+  periodTime,
+  TIME_PATTERN,
+  type RoutinePeriod,
+} from "@/lib/routine"
 import type { Enrolment, Student } from "@/lib/students"
 
 // Any per-institute record; extra fields are described by the kind's `fields`.
@@ -60,6 +71,7 @@ export type FieldDef = {
     | "integer"
     | "decimal"
     | "date"
+    | "time"
     | "select"
     | "checkbox"
     | "record"
@@ -1016,6 +1028,90 @@ export const academicKinds = {
       },
     ],
     store: asEditable(dashboardMenuStore),
+  },
+  // Fees › Fee Head, under the Fees menu rather than Basic Settings, so it
+  // has no institute tab (academicKindOrder).
+  feeHeads: {
+    segment: "fee-heads",
+    singular: "Fee Head",
+    plural: "Fee Heads",
+    description: "What the institute charges for, and how often each can be billed.",
+    fields: [
+      { key: "nameBn", label: "Name (Bangla)", type: "text" },
+      {
+        key: "frequency",
+        label: "Frequency",
+        type: "select",
+        options: feeFrequencies,
+        required: true,
+        description:
+          "Monthly: each month. Occasional: when picked, once a month. Yearly: once a year. One Time: once ever. Per Absent Day: times the days fined.",
+      },
+      { key: "description", label: "Description", type: "textarea" },
+    ],
+    columns: [
+      { label: "Bangla name", render: (r) => String(r.nameBn || "—") },
+      { label: "Frequency", render: (r) => <Badge variant="outline">{String(r.frequency)}</Badge> },
+    ],
+    softDelete: true,
+    inUse: (record) =>
+      feeHeadBilled(record.id)
+        ? "Dues have been billed on it."
+        : feeHeadInUse(record.id)
+          ? "Fee Setup gives it an amount."
+          : undefined,
+    store: asEditable(feeHeadStore),
+  },
+  // Class Routine › Period: the day's periods, for one shift or all.
+  routinePeriods: {
+    segment: "periods",
+    singular: "Period",
+    plural: "Periods",
+    description: "The periods of a school day with their times; breaks hold no class.",
+    fields: [
+      { key: "startTime", label: "Start time", type: "time", required: true },
+      { key: "endTime", label: "End time", type: "time", required: true },
+      {
+        key: "shiftId",
+        label: "Shift",
+        type: "record",
+        source: asEditable(shiftStore),
+        allLabel: "All shifts",
+        showWhen: (institute) => institute.enableShift,
+      },
+      { key: "isBreak", label: "Break (tiffin, assembly): no class is put in it", type: "checkbox" },
+    ],
+    columns: [
+      {
+        label: "Time",
+        render: (r) => periodTime({ startTime: String(r.startTime), endTime: String(r.endTime) }),
+      },
+      {
+        label: "Shift",
+        showWhen: (institute) => institute.enableShift,
+        render: (r) => <RecordName store={asEditable(shiftStore)} id={r.shiftId} fallback="All shifts" />,
+      },
+      { label: "Break", render: (r) => (r.isBreak ? <Badge variant="secondary">Break</Badge> : "—") },
+    ],
+    softDelete: true,
+    ranked: false,
+    validate: (values, { siblings }) => {
+      const startTime = String(values.startTime)
+      const endTime = String(values.endTime)
+      if (!TIME_PATTERN.test(startTime)) return { startTime: "Enter the time as HH:MM." }
+      if (!TIME_PATTERN.test(endTime)) return { endTime: "Enter the time as HH:MM." }
+      if (endTime <= startTime) return { endTime: "The period must end after it starts." }
+      const shiftId = values.shiftId == null ? null : Number(values.shiftId)
+      const clash = overlappingPeriod(
+        { startTime, endTime, shiftId },
+        siblings as unknown as RoutinePeriod[]
+      )
+      return clash
+        ? { startTime: `Overlaps ${clash.name} (${periodTime(clash)}).` }
+        : {}
+    },
+    inUse: (record) => periodInUse(record.id),
+    store: asEditable(periodStore),
   },
 } satisfies Record<string, KindConfig>
 

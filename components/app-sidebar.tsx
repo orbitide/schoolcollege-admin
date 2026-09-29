@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, CircleHelpIcon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -68,6 +68,17 @@ const data = {
       ],
     },
     {
+      title: "Class Routine",
+      icon: <CalendarClockIcon />,
+      tone: "blue",
+      items: [
+        { title: "Manage Period", url: "/routine/periods", resource: "routine-period" },
+        { title: "Class Routine", url: "/routine", permission: "class-routine.manage" },
+        { title: "View Class Routine", url: "/routine/view", permission: "class-routine.view" },
+        { title: "Teacher Routine", url: "/routine/teacher", permission: "teacher-routine.view" },
+      ],
+    },
+    {
       title: "Term Exam",
       icon: <ClipboardListIcon />,
       tone: "amber",
@@ -95,6 +106,24 @@ const data = {
       ],
     },
     {
+      title: "Fees",
+      icon: <BanknoteIcon />,
+      tone: "emerald",
+      items: [
+        { title: "Fee Collection", url: "/fees/collect", permission: "fee-collection.manage" },
+        { title: "Fee Head", url: "/fees/heads", resource: "fee-head" },
+        { title: "Fee Setup", url: "/fees/setup", permission: "fee-setup.manage" },
+        { title: "Student Waiver", url: "/fees/waivers", permission: "fee-waiver.manage" },
+        { title: "Generate Dues", url: "/fees/generate", permission: "fee-generate.manage" },
+        { title: "Manage Dues", url: "/fees/invoices", permission: "fee-invoice.view" },
+        { title: "Receipts", url: "/fees/payments", permission: "fee-payment.view" },
+        { title: "Online Payments", url: "/fees/online-payments", permission: "online-payment.view" },
+        { title: "Due SMS", url: "/fees/due-sms", permission: "fee-due-sms.manage" },
+        { title: "Collection Report", url: "/fees/reports/collection", permission: "fee-collection-report.view" },
+        { title: "Due Report", url: "/fees/reports/dues", permission: "fee-due-report.view" },
+      ],
+    },
+    {
       title: "SMS",
       icon: <MessageSquareTextIcon />,
       tone: "sky",
@@ -104,6 +133,15 @@ const data = {
         { title: "SMS Summary", url: "/sms/summary", permission: "sms-summary.view" },
         { title: "SMS History", url: "/sms/history", permission: "sms-history.view" },
         { title: "Manage SMS Template", url: "/sms/templates", resource: "sms-template" },
+      ],
+    },
+    {
+      title: "Notice",
+      icon: <MegaphoneIcon />,
+      tone: "amber",
+      items: [
+        { title: "Manage Notice", url: "/notices", resource: "notice" },
+        { title: "Notice Board", url: "/notices/board", permission: "notice-board.view" },
       ],
     },
     {
@@ -176,6 +214,21 @@ const data = {
       ],
     },
     {
+      title: "Blog",
+      icon: <NewspaperIcon />,
+      tone: "violet",
+      items: [
+        { title: "Manage Post", url: "/blog/posts", resource: "blog-post" },
+        { title: "New Post", url: "/blog/posts/new", permission: "blog-post.manage" },
+        { title: "My Post", url: "/blog/my-posts", permission: "blog-author.manage" },
+        { title: "Create Post", url: "/blog/my-posts/new", permission: "blog-author.manage" },
+        { title: "Category", url: "/blog/categories", resource: "blog-category" },
+        { title: "Tags", url: "/blog/tags", resource: "blog-tag" },
+        { title: "Manage Comments", url: "/blog/comments", resource: "blog-comment" },
+        { title: "My Comments", url: "/blog/my-comments", permission: "blog-my-comment.manage" },
+      ],
+    },
+    {
       title: "Basic Actions",
       icon: <HistoryIcon />,
       tone: "slate",
@@ -198,7 +251,7 @@ const data = {
     },
   ] satisfies NavMainItem[],
   navSecondary: [
-    { title: "Settings", url: "/settings", icon: <Settings2Icon /> },
+    { title: "Settings", url: "/settings", icon: <Settings2Icon />, platform: true },
     { title: "Get Help", url: "#", icon: <CircleHelpIcon /> },
   ],
   documents: [
@@ -270,12 +323,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     () => data.documents.filter((item) => !item.platform || platform),
     [platform]
   )
+  const navSecondary = React.useMemo(
+    () => data.navSecondary.filter((item) => !item.platform || platform),
+    [platform]
+  )
   const [query, setQuery] = React.useState("")
   const nothingFound =
     query.trim() !== "" &&
     filterNavItems(navMain, query).length === 0 &&
     !documents.some((item) => matchesQuery(item.name, query)) &&
-    !data.navSecondary.some((item) => matchesQuery(item.title, query))
+    !navSecondary.some((item) => matchesQuery(item.title, query))
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -316,7 +373,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </p>
           </div>
         )}
-        <NavSecondary items={data.navSecondary} query={query} className="mt-auto" />
+        <NavSecondary items={navSecondary} query={query} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <NavUser user={{ name: user.name, email: user.email, avatar: "" }} />

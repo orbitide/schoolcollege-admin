@@ -90,6 +90,14 @@ const resourceCapabilities: Record<string, Partial<Record<AccessSurface, Partial
   "settings.classes": { Manage: { reorder: false } },
   "settings.class-subjects": { Manage: { reorder: false } },
   "settings.grades": { Manage: { reorder: false } },
+  // Legacy Blog pages have no Rank; comments come from readers, not the
+  // Comments page.
+  "blog-post": { Admin: { reorder: false }, Manage: { reorder: false } },
+  "blog-category": { Admin: { reorder: false }, Manage: { reorder: false } },
+  "blog-tag": { Admin: { create: false, reorder: false }, Manage: { create: false, reorder: false } },
+  "blog-comment": { Admin: { create: false, reorder: false }, Manage: { create: false, reorder: false } },
+  // Notices are ordered by pin and publish date, not rank.
+  notice: { Admin: { reorder: false }, Manage: { reorder: false } },
 }
 
 export type CapabilityOptions = {

@@ -12,7 +12,9 @@ import { logChanges } from "@/lib/common-log"
 // dummy store for the browser session; replace with API calls once the
 // backend endpoints exist.
 
-export const smsTypes = ["Notice", "Result", "Admission", "Attendance", "Exam Attendance"] as const
+// "Fee Due" and "Fee Payment" go from the Fees menu (Due SMS, and the
+// receipt SMS of a collection), not from Send SMS.
+export const smsTypes = ["Notice", "Result", "Admission", "Attendance", "Exam Attendance", "Fee Due", "Fee Payment"] as const
 export type SmsType = (typeof smsTypes)[number]
 
 export const smsResultTypes = ["Pass", "Fail", "All"] as const
@@ -70,6 +72,10 @@ const keywordsByType: Record<SmsType, SmsKeyword[]> = {
   ].map((label) => ({ label })),
   Attendance: ["Class", "Name", "Roll", "NickName", "AttendanceDate"].map((label) => ({ label })),
   "Exam Attendance": ["Class", "Name", "Roll", "Section", "Exam", "Subject Name"].map((label) => ({ label })),
+  "Fee Due": ["Class", "Name", "Roll", "StudentId", "DueAmount", "DueMonths", "DueDate"].map((label) => ({ label })),
+  "Fee Payment": ["Class", "Name", "Roll", "StudentId", "PaidAmount", "ReceiptNo", "PaymentDate", "PaymentMethod", "DueAmount"].map(
+    (label) => ({ label })
+  ),
 }
 
 export function smsKeywords(type: SmsType | "") {
@@ -122,6 +128,14 @@ export const sampleKeywordValues: Record<string, string> = {
   "Application End Date": "31 Oct 2026",
   AdmissionSerial: "A-0142",
   AttendanceDate: "28 Sep 2026",
+  StudentId: "26001",
+  DueAmount: "৳2,150",
+  DueMonths: "Aug 2026, Sep 2026",
+  DueDate: "15 Sep 2026",
+  PaidAmount: "৳1,100",
+  ReceiptNo: "RC-26-000321",
+  PaymentDate: "29 Sep 2026",
+  PaymentMethod: "bKash",
 }
 
 // Fills the keywords it has values for; the rest stay as written.
@@ -298,6 +312,20 @@ const seed: SmsTemplate[] = [
     "Notice",
     "Dear guardian, the school is closed for Eid from 28 Mar to 8 Apr 2025. - DRMS",
     { status: "Deleted", modifiedAt: "2026-01-15T08:30:00.000Z" }
+  ),
+  seedTemplate(
+    15,
+    1,
+    "Fee due reminder",
+    "Fee Due",
+    "Dear guardian, [{Name}] ([{Class}], Roll [{Roll}]) has [{DueAmount}] fee due for [{DueMonths}]. Please pay by [{DueDate}] at the counter or online. - DRMS"
+  ),
+  seedTemplate(
+    16,
+    1,
+    "Fee received",
+    "Fee Payment",
+    "Received [{PaidAmount}] for [{Name}] ([{Class}], Roll [{Roll}]) by [{PaymentMethod}] on [{PaymentDate}]. Receipt [{ReceiptNo}]. Due now: [{DueAmount}]. - DRMS"
   ),
   seedTemplate(
     13,

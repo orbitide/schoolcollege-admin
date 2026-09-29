@@ -68,7 +68,7 @@ const ALL = "__all"
 // all-institutes admin list the form was opened from (`?returnTo=`).
 function useListHref(instituteId: number, segment: string) {
   const returnTo = useSearchParams().get("returnTo")
-  return returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/")
+  return returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/")
     ? returnTo
     : `/institutes/${instituteId}/${segment}`
 }
@@ -570,7 +570,7 @@ function RecordField({
     control = (
       <Input
         id={id}
-        type={numeric ? "number" : field.type === "date" ? "date" : "text"}
+        type={numeric ? "number" : field.type === "date" || field.type === "time" ? field.type : "text"}
         step={field.type === "decimal" ? "0.01" : numeric ? "1" : undefined}
         min={field.min}
         max={field.max}
