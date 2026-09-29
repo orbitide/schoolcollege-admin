@@ -4,7 +4,8 @@ import * as React from "react"
 
 import { logChanges } from "@/lib/common-log"
 import { holidayStore } from "@/lib/holidays"
-import { seedInstitutes, type HolidayEvent, type Institute } from "@/lib/institutes"
+import type { HolidayEvent, Institute } from "@/lib/institutes"
+import { getLoadedInstitutes } from "@/lib/loaded-institutes"
 import { fitsPlace, getStudents, type Enrolment, type EnrolmentPlace, type Student } from "@/lib/students"
 import { getTeachers, type Teacher } from "@/lib/teachers"
 
@@ -127,7 +128,7 @@ function absenceRate(studentId: number) {
 }
 
 function seedAttendance(): StudentAttendance[] {
-  const institute = seedInstitutes.find((i) => i.id === 1)
+  const institute = getLoadedInstitutes().find((i) => i.id === 1)
   if (!institute) return []
   const holidays = holidayStore.getList(institute.id)
   const today = todayIso()
@@ -174,16 +175,24 @@ function seedAttendance(): StudentAttendance[] {
   return records
 }
 
-const seed = seedAttendance()
-
 // ---- Store ----
 
-let attendance: StudentAttendance[] = seed
+// null until first used; seeded only once the institutes have arrived (after
+// RequireLogin), since the demo attendance follows institute 1's days off.
+let stored: StudentAttendance[] | null = null
+const noAttendance: StudentAttendance[] = []
+
+function current() {
+  if (stored) return stored
+  if (!getLoadedInstitutes().length) return noAttendance
+  return (stored = seedAttendance())
+}
+
 const listeners = new Set<() => void>()
 
 function emit(next: StudentAttendance[]) {
-  logChanges("StudentAttendance", attendance, next)
-  attendance = next
+  logChanges("StudentAttendance", current(), next)
+  stored = next
   listeners.forEach((listener) => listener())
 }
 
@@ -193,14 +202,14 @@ function subscribe(listener: () => void) {
 }
 
 export function getStudentAttendance() {
-  return attendance
+  return current()
 }
 
 export function useStudentAttendance() {
   return React.useSyncExternalStore(
     subscribe,
-    () => attendance,
-    () => seed
+    current,
+    () => noAttendance
   )
 }
 
@@ -257,11 +266,11 @@ export function saveAttendance(
 
   const now = new Date().toISOString().slice(0, 19)
   const existing = new Map(
-    attendance
+    current()
       .filter((r) => r.sectionId === input.sectionId && r.date === input.date)
       .map((r) => [r.studentId, r])
   )
-  let nextId = Math.max(0, ...attendance.map((r) => r.id)) + 1
+  let nextId = Math.max(0, ...current().map((r) => r.id)) + 1
   let added = 0
   let updated = 0
   const changed = new Map<number, StudentAttendance>()
@@ -297,7 +306,7 @@ export function saveAttendance(
     }
   }
 
-  if (added || updated) emit([...attendance.map((r) => changed.get(r.id) ?? r), ...fresh])
+  if (added || updated) emit([...current().map((r) => changed.get(r.id) ?? r), ...fresh])
   return { added, updated }
 }
 
@@ -306,8 +315,8 @@ export function saveAttendance(
 // rows they took; here a section can have several teachers, so the whole
 // day goes rather than leaving it half taken. Returns how many were removed.
 export function resetAttendance(input: { sectionId: number; date: string }) {
-  const keep = attendance.filter((r) => !(r.sectionId === input.sectionId && r.date === input.date))
-  const removed = attendance.length - keep.length
+  const keep = current().filter((r) => !(r.sectionId === input.sectionId && r.date === input.date))
+  const removed = current().length - keep.length
   if (removed) emit(keep)
   return removed
 }

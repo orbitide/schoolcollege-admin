@@ -3,7 +3,8 @@
 import * as React from "react"
 
 import { classStore, resultRemarkStore } from "@/lib/academic-store"
-import { seedInstitutes, type Institute } from "@/lib/institutes"
+import type { Institute } from "@/lib/institutes"
+import { getLoadedInstitutes } from "@/lib/loaded-institutes"
 import {
   examLetterGrades,
   examStudents,
@@ -192,7 +193,7 @@ export function calculateMeritList(exam: TermExam, institute: Institute): MeritR
 let lists: MeritList[] | null = null
 const getLists = () =>
   (lists ??= getTermExams().flatMap((exam) => {
-    const institute = seedInstitutes.find((i) => i.id === exam.instituteId)
+    const institute = getLoadedInstitutes().find((i) => i.id === exam.instituteId)
     if (!institute || exam.status !== "Active" || !isPassRegenerated(exam.id)) return []
     const at = `${exam.resultPublish}T09:00:00.000Z`
     return [{ termExamId: exam.id, generatedBy: "Super Admin", generatedAt: at, results: calculateMeritList(exam, institute) }]

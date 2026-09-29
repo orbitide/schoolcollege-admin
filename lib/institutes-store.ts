@@ -21,6 +21,7 @@ import { removeInstituteStudents } from "@/lib/students"
 import { removeInstituteTeachers } from "@/lib/teachers"
 import { removeInstituteTermExams } from "@/lib/term-exams"
 import type { AccessSurface } from "@/lib/access"
+import { setLoadedInstitutes } from "@/lib/loaded-institutes"
 import type { Institute, InstituteConfiguration, InstituteInput, InstituteStatus } from "@/lib/institutes"
 
 // Institutes, kept by the API (api/v1/institutes). The list holds the
@@ -37,6 +38,8 @@ let version = 0
 
 function notify() {
   version++
+  // For the stores still in memory, which read institutes outside React.
+  setLoadedInstitutes(institutes)
   listeners.forEach((listener) => listener())
 }
 

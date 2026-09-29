@@ -16,7 +16,8 @@ import {
 } from "@/lib/billing"
 import { billToOf, getBillingProfile, type BillTo } from "@/lib/billing-profiles"
 import { logChanges } from "@/lib/common-log"
-import { seedInstitutes, type Institute } from "@/lib/institutes"
+import type { Institute } from "@/lib/institutes"
+import { getLoadedInstitutes } from "@/lib/loaded-institutes"
 import { getSubscriptions } from "@/lib/subscriptions"
 
 // The platform's monthly bill to an institute (SaaS billing, separate from
@@ -117,7 +118,8 @@ function draft(
 }
 
 // ---- Seed ----
-// Six closed months of invoices for today's active institutes, their
+// Six closed months of invoices for the institutes the API returned (built
+// on first use, after RequireLogin has loaded them), their
 // student counts growing a little each month. Older ones are paid; a few
 // recent ones are still due, and one is overdue.
 
@@ -125,7 +127,7 @@ function seedInvoices(): SaasInvoice[] {
   const all: SaasInvoice[] = []
   for (let back = 6; back >= 1; back--) {
     const month = monthOf(-back)
-    for (const institute of unbilledInstitutes(month, seedInstitutes, all)) {
+    for (const institute of unbilledInstitutes(month, getLoadedInstitutes(), all)) {
       const count = Math.round(institute.students * (1 - 0.015 * back))
       const invoice = draft(all, institute, month, count, "System", `${addDaysIso(monthEnd(month), 1)}T00:05:00.000Z`, billToOf(institute, undefined))
       const unpaid = (back === 1 && institute.id % 3 === 0) || (back === 2 && institute.id % 8 === 7)
@@ -144,13 +146,21 @@ function seedInvoices(): SaasInvoice[] {
   return all
 }
 
-const seed = seedInvoices()
-let invoices = seed
+// null until first used; seeded only once the institutes have arrived.
+let stored: SaasInvoice[] | null = null
+const noInvoices: SaasInvoice[] = []
+
+function current() {
+  if (stored) return stored
+  if (!getLoadedInstitutes().length) return noInvoices
+  return (stored = seedInvoices())
+}
+
 const listeners = new Set<() => void>()
 
 function emit(next: SaasInvoice[]) {
-  logChanges("SaasInvoice", invoices, next, (i) => i.invoiceNo)
-  invoices = next
+  logChanges("SaasInvoice", current(), next, (i) => i.invoiceNo)
+  stored = next
   listeners.forEach((listener) => listener())
 }
 
@@ -160,29 +170,29 @@ function subscribe(listener: () => void) {
 }
 
 export function getSaasInvoices() {
-  return invoices
+  return current()
 }
 
 export function useSaasInvoices() {
-  return React.useSyncExternalStore(subscribe, () => invoices, () => seed)
+  return React.useSyncExternalStore(subscribe, current, () => noInvoices)
 }
 
 // Bills the month for every institute not billed yet; running it again
 // adds nothing. Returns how many invoices were issued.
 export function generateInvoices(month: string, institutes: Institute[], user: string) {
   const at = new Date().toISOString()
-  const next = [...invoices]
+  const next = [...current()]
   for (const institute of unbilledInstitutes(month, institutes, next)) {
     next.push(draft(next, institute, month, billableStudents(institute), user, at, billToOf(institute, getBillingProfile(institute.id))))
   }
-  const added = next.length - invoices.length
+  const added = next.length - current().length
   if (added) emit(next)
   return added
 }
 
 function patch(id: number, changes: Partial<SaasInvoice>, user: string) {
   emit(
-    invoices.map((i) =>
+    current().map((i) =>
       i.id === id ? { ...i, ...changes, modifiedBy: user, modifiedAt: new Date().toISOString() } : i
     )
   )
@@ -191,21 +201,21 @@ function patch(id: number, changes: Partial<SaasInvoice>, user: string) {
 // Settles a due invoice. Payments go through lib/saas-payments.ts, which
 // records the payment and its receipt and calls this.
 export function markInvoicePaid(id: number, payment: { paidAt: string; note: string }, user: string) {
-  const invoice = invoices.find((i) => i.id === id)
+  const invoice = current().find((i) => i.id === id)
   if (!invoice || invoice.status !== "Due") return false
   patch(id, { status: "Paid", paidAt: payment.paidAt, paymentNote: payment.note.trim() }, user)
   return true
 }
 
 export function voidInvoice(id: number, user: string) {
-  const invoice = invoices.find((i) => i.id === id)
+  const invoice = current().find((i) => i.id === id)
   if (!invoice || invoice.status !== "Due") return false
   patch(id, { status: "Void" }, user)
   return true
 }
 
 export function removeInstituteInvoices(instituteId: number) {
-  if (invoices.some((i) => i.instituteId === instituteId)) {
-    emit(invoices.filter((i) => i.instituteId !== instituteId))
+  if (current().some((i) => i.instituteId === instituteId)) {
+    emit(current().filter((i) => i.instituteId !== instituteId))
   }
 }

@@ -1,5 +1,3 @@
-import seed from "@/lib/data/institutes.json"
-
 export const instituteTypes = [
   "School",
   "College",
@@ -393,49 +391,8 @@ export const defaultSettings: InstituteSettings = {
   classRollLabel: "",
 }
 
-// A couple of seed institutes use the optional structures so those screens have data.
-const seedSettings: Record<number, Partial<InstituteSettings>> = {
-  1: {
-    enableBranch: true,
-    enableShift: true,
-    enableGroup: true,
-    enableStudentHouse: true,
-    studentHouseLabel: "House",
-    enableStudentCategory: true,
-    enableAutoIncrementStudentId: true,
-    autoIncrementStudentIdStartFrom: 26001,
-    studentIdLabel: "Student ID",
-    showClassRoll: true,
-    classRollLabel: "Class Roll",
-  },
-  2: { enableShift: true },
-}
-
-// Seed rows only carry the SaaS fields; fill in the rest with defaults.
-export const seedInstitutes: Institute[] = seed.map((row) => ({
-  ...defaultSettings,
-  ...seedSettings[row.id],
-  shortName: row.subdomain.toUpperCase(),
-  eiin: String(100000 + row.id * 1111),
-  otherEmails: "",
-  logoUrl: "",
-  principalSignatureUrl: "",
-  configuration: defaultConfiguration,
-  recordStatus: "Active" as const,
-  rank: row.id,
-  ...(row as Omit<
-    Institute,
-    | keyof InstituteSettings
-    | "shortName"
-    | "eiin"
-    | "otherEmails"
-    | "logoUrl"
-    | "principalSignatureUrl"
-    | "configuration"
-    | "recordStatus"
-    | "rank"
-  >),
-}))
+// The demo institutes and their settings are seeded by the API (migration
+// AddInstitutes); the admin loads them through lib/institutes-store.ts.
 
 const csvColumns: [string, (i: Institute) => string | number][] = [
   ["Name", (i) => i.name],

@@ -4,7 +4,8 @@ import * as React from "react"
 
 import { addDaysIso, getBillingSettings, isoDate } from "@/lib/billing"
 import { logChanges } from "@/lib/common-log"
-import { seedInstitutes, type Institute } from "@/lib/institutes"
+import type { Institute } from "@/lib/institutes"
+import { getLoadedInstitutes } from "@/lib/loaded-institutes"
 
 // An institute's subscription to the platform: when it started, when its
 // trial ends, and any rates agreed for it alone (null keeps the platform's
@@ -34,9 +35,11 @@ const seedRates: Record<number, Pick<Subscription, "customLowerRate" | "customUp
   12: { customLowerRate: 18, customUpperRate: 13, notes: "Group discount with sister institutes." },
 }
 
+// One per institute the API returned, built on first use (after RequireLogin
+// has loaded them).
 function seedSubscriptions(): Subscription[] {
   const today = isoDate()
-  return seedInstitutes.map((institute, index) => ({
+  return getLoadedInstitutes().map((institute, index) => ({
     id: index + 1,
     instituteId: institute.id,
     startedAt: institute.joinedAt,
@@ -50,12 +53,19 @@ function seedSubscriptions(): Subscription[] {
   }))
 }
 
-const seed = seedSubscriptions()
-let subscriptions = seed
+// null until first used; seeded only once the institutes have arrived.
+let subscriptions: Subscription[] | null = null
+const noSubscriptions: Subscription[] = []
 const listeners = new Set<() => void>()
 
+function all() {
+  if (subscriptions) return subscriptions
+  if (!getLoadedInstitutes().length) return noSubscriptions
+  return (subscriptions = seedSubscriptions())
+}
+
 function emit(next: Subscription[]) {
-  logChanges("Subscription", subscriptions, next)
+  logChanges("Subscription", all(), next)
   subscriptions = next
   listeners.forEach((listener) => listener())
 }
@@ -66,11 +76,11 @@ function subscribe(listener: () => void) {
 }
 
 export function getSubscriptions() {
-  return subscriptions
+  return all()
 }
 
 export function useSubscriptions() {
-  return React.useSyncExternalStore(subscribe, () => subscriptions, () => seed)
+  return React.useSyncExternalStore(subscribe, all, () => noSubscriptions)
 }
 
 export function useSubscription(instituteId: number) {
@@ -79,7 +89,7 @@ export function useSubscription(instituteId: number) {
 
 function patch(instituteId: number, changes: Partial<Subscription>, user: string) {
   emit(
-    subscriptions.map((s) =>
+    all().map((s) =>
       s.instituteId === instituteId
         ? { ...s, ...changes, modifiedBy: user, modifiedAt: new Date().toISOString() }
         : s
@@ -92,9 +102,9 @@ function patch(instituteId: number, changes: Partial<Subscription>, user: string
 export function addSubscription(institute: Pick<Institute, "id" | "status" | "joinedAt">, user: string) {
   const now = new Date().toISOString()
   emit([
-    ...subscriptions,
+    ...all(),
     {
-      id: Math.max(0, ...subscriptions.map((s) => s.id)) + 1,
+      id: Math.max(0, ...all().map((s) => s.id)) + 1,
       instituteId: institute.id,
       startedAt: institute.joinedAt,
       trialEndsAt:
@@ -111,8 +121,8 @@ export function addSubscription(institute: Pick<Institute, "id" | "status" | "jo
 }
 
 export function removeInstituteSubscription(instituteId: number) {
-  if (subscriptions.some((s) => s.instituteId === instituteId)) {
-    emit(subscriptions.filter((s) => s.instituteId !== instituteId))
+  if (all().some((s) => s.instituteId === instituteId)) {
+    emit(all().filter((s) => s.instituteId !== instituteId))
   }
 }
 
@@ -133,7 +143,7 @@ export function setCustomRates(instituteId: number, input: CustomRatesInput, use
 
 // Push the trial's end back by `days` (from today if it has already ended).
 export function extendTrial(instituteId: number, days: number, user: string) {
-  const sub = subscriptions.find((s) => s.instituteId === instituteId)
+  const sub = all().find((s) => s.instituteId === instituteId)
   const today = isoDate()
   const from = sub?.trialEndsAt && sub.trialEndsAt > today ? sub.trialEndsAt : today
   patch(instituteId, { trialEndsAt: addDaysIso(from, days) }, user)

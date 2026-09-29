@@ -4,7 +4,8 @@ import * as React from "react"
 
 import { letterGradeStore } from "@/lib/academic-store"
 import { logChanges } from "@/lib/common-log"
-import { seedInstitutes, type Institute, type LetterGrade } from "@/lib/institutes"
+import type { Institute, LetterGrade } from "@/lib/institutes"
+import { getLoadedInstitutes } from "@/lib/loaded-institutes"
 import { getStudents, type Enrolment, type Student } from "@/lib/students"
 import { getTermExamAnswers } from "@/lib/term-exam-answers"
 import { classYearExamSubjects, getTermExams, type TermExam, type TermExamSubject } from "@/lib/term-exams"
@@ -228,7 +229,7 @@ function seedMarks(): TermExamStudentMark[] {
   return getTermExams()
     .filter((exam) => exam.status === "Active" && exam.resultPublish <= today)
     .reduce((all, exam) => {
-      const institute = seedInstitutes.find((i) => i.id === exam.instituteId)
+      const institute = getLoadedInstitutes().find((i) => i.id === exam.instituteId)
       return institute ? withPassStatus(all, exam, institute).marks : all
     }, marks)
 }
