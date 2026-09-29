@@ -50,7 +50,7 @@ export function SectionCards() {
         headline={`${summary.newThisMonth} new this month`}
         detail={`${summary.trial} on trial, ${summary.suspended} suspended`}
         icon={<BuildingIcon />}
-        href="/institutes"
+        href="/institutes/platform"
       />
       <StatCard
         label="Total Students"

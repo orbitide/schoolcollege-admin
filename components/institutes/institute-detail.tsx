@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {
   CalendarIcon,
+  ListOrderedIcon,
   GlobeIcon,
   MailIcon,
   MapPinIcon,
@@ -185,6 +186,9 @@ export function InstituteDetail({ id }: { id: number }) {
             </ContactLine>
             <ContactLine icon={<CalendarIcon />}>
               Joined {formatDate(institute.joinedAt)}
+            </ContactLine>
+            <ContactLine icon={<ListOrderedIcon />}>
+              Rank {institute.rank} · {institute.recordStatus}
             </ContactLine>
           </CardContent>
         </Card>

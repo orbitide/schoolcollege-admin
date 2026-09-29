@@ -65,6 +65,16 @@ export type Institute = InstituteSettings & {
   principalSignatureUrl: string
   configuration: InstituteConfiguration
   joinedAt: string
+  // Legacy record status, separate from the SaaS `status`: Active / Inactive
+  // (Status Update), or Deleted (soft delete: Admin can retrieve it).
+  recordStatus: RecordStatus | "Deleted"
+  // Display order in the institute lists (legacy Rank).
+  rank: number
+  // Audit stamps, as the API returns them.
+  createdBy?: string
+  createdAt?: string
+  modifiedBy?: string
+  modifiedAt?: string
 }
 
 export const roles = ["Teacher", "Class Teacher", "Head Teacher"] as const
@@ -357,7 +367,11 @@ export const defaultConfiguration: InstituteConfiguration = {
   isUserRegistration: false,
 }
 
-export type InstituteInput = Omit<Institute, "id" | "joinedAt">
+// The institute form's fields; the API keeps rank, record status and stamps.
+export type InstituteInput = Omit<
+  Institute,
+  "id" | "joinedAt" | "recordStatus" | "rank" | "createdBy" | "createdAt" | "modifiedBy" | "modifiedAt"
+>
 
 export const defaultSettings: InstituteSettings = {
   startDayOfWeek: "Saturday",
@@ -407,6 +421,8 @@ export const seedInstitutes: Institute[] = seed.map((row) => ({
   logoUrl: "",
   principalSignatureUrl: "",
   configuration: defaultConfiguration,
+  recordStatus: "Active" as const,
+  rank: row.id,
   ...(row as Omit<
     Institute,
     | keyof InstituteSettings
@@ -416,6 +432,8 @@ export const seedInstitutes: Institute[] = seed.map((row) => ({
     | "logoUrl"
     | "principalSignatureUrl"
     | "configuration"
+    | "recordStatus"
+    | "rank"
   >),
 }))
 

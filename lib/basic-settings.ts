@@ -10,7 +10,8 @@ export const basicSettingsMenu: {
   kind?: AcademicKind
   surfaces?: boolean
 }[] = [
-  { title: "Institutes", segment: "institutes" },
+  // Legacy Institute Manage Admin / Manage / View (/institutes/admin, /institutes, /institutes/view).
+  { title: "Institutes", segment: "institutes", surfaces: true },
   { title: "Branches", segment: "branches", kind: "branches" },
   { title: "Shifts", segment: "shifts", kind: "shifts" },
   { title: "Academic Years", segment: "years", kind: "years" },

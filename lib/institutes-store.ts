@@ -20,6 +20,7 @@ import { removeInstituteSmsTemplates } from "@/lib/sms-templates"
 import { removeInstituteStudents } from "@/lib/students"
 import { removeInstituteTeachers } from "@/lib/teachers"
 import { removeInstituteTermExams } from "@/lib/term-exams"
+import type { AccessSurface } from "@/lib/access"
 import type { Institute, InstituteConfiguration, InstituteInput, InstituteStatus } from "@/lib/institutes"
 
 // Institutes, kept by the API (api/v1/institutes). The list holds the
@@ -31,7 +32,11 @@ let loading: Promise<void> | undefined
 const listeners = new Set<() => void>()
 const noInstitutes: Institute[] = []
 
+// Bumped on every change, so open surface lists fetch again.
+let version = 0
+
 function notify() {
+  version++
   listeners.forEach((listener) => listener())
 }
 
@@ -69,6 +74,37 @@ export function useInstitute(id: number) {
   return useInstitutes().find((institute) => institute.id === id)
 }
 
+// Fetches the app list again (after a change that moves other rows, e.g. rank).
+function reloadInstitutes() {
+  loading = undefined
+  return loadInstitutes()
+}
+
+// A legacy surface's list (Institute Manage Admin / Manage / View), in rank
+// order; deleted institutes only on Admin with `withDeleted`. Refetches after
+// every change made through this store. `rows` is undefined while loading.
+export function useInstituteSurface(surface: AccessSurface, withDeleted: boolean) {
+  const changes = React.useSyncExternalStore(subscribe, () => version, () => 0)
+  const [state, setState] = React.useState<{ key: string; rows?: Institute[]; error?: string }>({ key: "" })
+  const key = `${surface}|${withDeleted}|${changes}`
+
+  React.useEffect(() => {
+    let active = true
+    httpClient
+      .get<Institute[]>("/institutes", { params: { surface, withDeleted } })
+      .then(
+        (rows) => active && setState({ key, rows }),
+        (error: Error) => active && setState({ key, error: error.message })
+      )
+    return () => {
+      active = false
+    }
+  }, [key, surface, withDeleted])
+
+  // Keeps showing the previous rows while a refetch is on its way.
+  return state
+}
+
 function replace(institute: Institute) {
   emit(institutes.map((i) => (i.id === institute.id ? institute : i)))
   return institute
@@ -98,15 +134,48 @@ export async function updateInstituteFinePeriod(id: number, period: { dayFrom: n
   return replace(await httpClient.put<Institute>(`/institutes/${id}/fine-period`, period))
 }
 
-// Super admin.
+// Super admin: the SaaS lifecycle (Active / Trial / Suspended).
 export async function setInstituteStatus(id: number, status: InstituteStatus) {
   return replace(await httpClient.put<Institute>(`/institutes/${id}/status`, { status }))
 }
 
-// Super admin. The API removes the institute and its User Institutes links;
-// the modules still held in memory drop their rows for it here.
+// Legacy Status Update: Active <-> Inactive (Admin / Manage surface).
+export async function toggleInstituteRecordStatus(id: number) {
+  return replace(await httpClient.put<Institute>(`/institutes/${id}/record-status`))
+}
+
+// Legacy GetMaxRank, for the rank form.
+export function getInstituteMaxRank(id: number) {
+  return httpClient.get<number>(`/institutes/${id}/max-rank`)
+}
+
+// Legacy UpdateRank: `currentRank` is the rank shown, so the API refuses if
+// someone moved it meanwhile. Institutes in between shift, so the list reloads.
+export async function setInstituteRank(id: number, newRank: number, currentRank: number) {
+  const institute = await httpClient.put<Institute>(`/institutes/${id}/rank`, { newRank, currentRank })
+  await reloadInstitutes()
+  return institute
+}
+
+// Super admin, legacy Delete: the institute is marked Deleted and leaves the
+// app's lists; Admin can retrieve it, so nothing else is cleared yet.
 export async function deleteInstitute(id: number) {
   await httpClient.delete(`/institutes/${id}`)
+  emit(institutes.filter((i) => i.id !== id))
+}
+
+// Super admin, legacy Retrieve: back to Active.
+export async function retrieveInstitute(id: number) {
+  const institute = await httpClient.put<Institute>(`/institutes/${id}/retrieve`)
+  await reloadInstitutes()
+  return institute
+}
+
+// Super admin, legacy Permanent Delete (only a deleted institute). The API
+// removes it and its User Institutes links; the modules still held in memory
+// drop their rows for it here.
+export async function deleteInstitutePermanently(id: number) {
+  await httpClient.delete(`/institutes/${id}/permanent`)
   emit(institutes.filter((i) => i.id !== id))
   removeInstituteRecords(id)
   removeInstituteUsers(id)

@@ -61,7 +61,7 @@ export function InstituteActions({
   async function remove() {
     try {
       await deleteInstitute(institute.id)
-      toast.success(`${institute.name} deleted`)
+      toast.success("Institute deleted successfully")
       onDeleted?.()
     } catch (error) {
       toast.error((error as Error).message)
@@ -138,7 +138,7 @@ export function InstituteActions({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {dialog === "delete"
-                ? "This permanently removes the institute and all of its data. This cannot be undone."
+                ? "The institute leaves every list and its users can't work in it. You can retrieve it later from Institute Manage Admin › With deleted."
                 : isSuspended
                   ? "Students, teachers and staff will regain access to the institute portal."
                   : "Students, teachers and staff will lose access to the institute portal until it is activated again."}
