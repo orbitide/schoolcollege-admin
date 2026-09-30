@@ -11,7 +11,7 @@ import { logChanges } from "@/lib/common-log"
 import { getCurrentUser } from "@/lib/current-user"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteHolidays } from "@/lib/holidays"
-import { httpClient } from "@/lib/http-client"
+import { httpClient, type PagedList } from "@/lib/http-client"
 import { removeInstituteBillingProfile } from "@/lib/billing-profiles"
 import { removeInstituteInvoices } from "@/lib/saas-invoices"
 import { addSubscription, removeInstituteSubscription } from "@/lib/subscriptions"
@@ -54,11 +54,14 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+// API max; enough for today's institutes.
+const LIST_PAGE_SIZE = 100
+
 // Loads the list once per page load. Rejects when the API can't be reached.
 export function loadInstitutes() {
-  loading ??= httpClient.get<Institute[]>("/institutes").then(
-    (list) => {
-      institutes = list
+  loading ??= httpClient.get<PagedList<Institute>>("/institutes", { params: { pageSize: LIST_PAGE_SIZE } }).then(
+    (page) => {
+      institutes = page.items
       notify()
     },
     (error) => {
@@ -94,9 +97,11 @@ export function useInstituteSurface(surface: AccessSurface, withDeleted: boolean
   React.useEffect(() => {
     let active = true
     httpClient
-      .get<Institute[]>("/institutes", { params: { surface, withDeleted } })
+      .get<PagedList<Institute>>("/institutes", {
+        params: { withDeleted: surface === "Admin" && withDeleted, pageSize: LIST_PAGE_SIZE },
+      })
       .then(
-        (rows) => active && setState({ key, rows }),
+        (page) => active && setState({ key, rows: page.items }),
         (error: Error) => active && setState({ key, error: error.message })
       )
     return () => {

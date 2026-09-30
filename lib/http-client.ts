@@ -9,6 +9,14 @@ import axios, { type AxiosError, type AxiosRequestConfig } from "axios"
 // Successful responses arrive as { data } (Framework/Api/ApiResponse.cs).
 type ApiEnvelope<T> = { data: T }
 
+export type PagedList<T> = {
+  items: T[]
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}
+
 // Failures arrive as RFC 7807 problem details (Framework/Api/ApiExceptionHandler.cs).
 type ProblemDetails = {
   title?: string
