@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { RotateCwIcon } from "lucide-react"
 
+import { PageLoader } from "@/components/page-loader"
 import { Button } from "@/components/ui/button"
 import { setUserOnline } from "@/lib/global-settings"
 import { loadInstitutes } from "@/lib/institutes-store"
@@ -80,5 +81,9 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return user ? <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider> : null
+  return user ? (
+    <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider>
+  ) : (
+    <PageLoader fullScreen label="Loading your workspace" />
+  )
 }

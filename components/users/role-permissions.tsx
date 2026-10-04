@@ -6,6 +6,7 @@ import { ArrowLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react"
 import { Collapsible } from "radix-ui"
 import { toast } from "sonner"
 
+import { PageLoader } from "@/components/page-loader"
 import { usePermissionMenus } from "@/lib/permission-menus"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,7 +33,7 @@ export function RolePermissions({ roleId }: { roleId: number }) {
   const role = roles.find((r) => r.id === roleId)
   // The editor starts from the ticks the menus give, so it waits for them.
   const menusLoaded = usePermissionMenus().length > 0
-  if (!loaded || !menusLoaded) return null
+  if (!loaded || !menusLoaded) return <PageLoader />
   if (!role) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">

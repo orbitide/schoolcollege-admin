@@ -7,6 +7,7 @@ import { PlusIcon, SearchIcon } from "lucide-react"
 
 import { InstituteSurfaceActions } from "@/components/institutes/institute-surface-actions"
 import { NoAccess } from "@/components/no-access"
+import { PageLoader } from "@/components/page-loader"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { FilterField, stamp } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
@@ -73,6 +74,7 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
   const columnCount = 11
 
   if (denied) return <NoAccess />
+  if (!all && !error) return <PageLoader label="Loading institutes" />
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
