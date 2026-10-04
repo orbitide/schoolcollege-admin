@@ -29,6 +29,7 @@ import {
   type InstituteConfiguration,
 } from "@/lib/institutes"
 import {
+  getInstituteConfiguration,
   updateInstituteConfiguration,
   useInstitute,
 } from "@/lib/institutes-store"
@@ -87,6 +88,21 @@ export function ConfigurationFormBody({
     ...initial,
   })
   const [errors, setErrors] = React.useState<Errors>({})
+
+  // Institute responses never carry the SMS gateway key; Institute
+  // Configurations' own endpoint does.
+  React.useEffect(() => {
+    let active = true
+    getInstituteConfiguration(id).then(
+      (saved) => {
+        if (active) setValues((current) => ({ ...current, smsApiKey: saved.smsApiKey }))
+      },
+      () => {}
+    )
+    return () => {
+      active = false
+    }
+  }, [id])
 
   function set<K extends keyof Config>(key: K, value: Config[K]) {
     setValues((current) => ({ ...current, [key]: value }))

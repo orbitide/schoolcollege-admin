@@ -6,8 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PlusIcon, SearchIcon } from "lucide-react"
 
 import { InstituteSurfaceActions } from "@/components/institutes/institute-surface-actions"
+import { NoAccess } from "@/components/no-access"
 import { StatusBadge } from "@/components/institutes/status-badge"
-import { SurfaceTabs } from "@/components/surface-tabs"
 import { FilterField, stamp } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,8 +17,6 @@ import { capabilitiesFor, type AccessSurface, type Capabilities } from "@/lib/ac
 import { isPlatformAdmin, useCurrentUser } from "@/lib/current-user"
 import { useInstituteSurface } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
-
-export const INSTITUTES_RESOURCE = "settings.institutes"
 
 const titles: Record<AccessSurface, string> = {
   Admin: "Institute Manage Admin",
@@ -31,7 +29,7 @@ const titles: Record<AccessSurface, string> = {
 // surface; Admin / Manage holders edit, (in)activate and rerank their own.
 export function useInstituteCapabilities(surface: AccessSurface): Capabilities {
   const platform = isPlatformAdmin(useCurrentUser())
-  const can = capabilitiesFor(surface, { resource: INSTITUTES_RESOURCE, softDelete: true })
+  const can = capabilitiesFor(surface, { softDelete: true })
   return {
     ...can,
     create: can.create && platform,
@@ -51,7 +49,7 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
   // Admin sees the deleted filter; only the platform can act on deleted rows.
   const deletedFilter = surface === "Admin"
   const withDeleted = deletedFilter && searchParams.get("deleted") === "1"
-  const { rows: all, error } = useInstituteSurface(surface, withDeleted)
+  const { rows: all, error, denied } = useInstituteSurface(surface, withDeleted)
 
   const [query, setQuery] = React.useState("")
   const needle = query.trim().toLowerCase()
@@ -74,6 +72,8 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
   const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`
   const columnCount = 11
 
+  if (denied) return <NoAccess />
+
   return (
     <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
       <Card>
@@ -83,7 +83,6 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
             <CardDescription>Your institutes, in rank order.</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <SurfaceTabs resource={INSTITUTES_RESOURCE} baseUrl="/institutes" current={surface} />
             {can.create && (
               <Button asChild size="sm">
                 <Link href="/institutes/new">

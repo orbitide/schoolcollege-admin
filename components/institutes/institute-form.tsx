@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { isPlatformAdmin, useCurrentUser } from "@/lib/current-user"
 import { ApiError } from "@/lib/http-client"
 import { cn } from "@/lib/utils"
 import {
@@ -47,6 +48,7 @@ import {
 import {
   addInstitute,
   updateInstitute,
+  updatePlatformInstitute,
   useInstitute,
   useInstitutes,
 } from "@/lib/institutes-store"
@@ -109,6 +111,7 @@ function InstituteFormBody({
 }) {
   const router = useRouter()
   const institutes = useInstitutes()
+  const platform = isPlatformAdmin(useCurrentUser())
   const [values, setValues] = React.useState<InstituteInput>(() =>
     initial ? { ...emptyInstitute, ...initial } : emptyInstitute
   )
@@ -235,7 +238,8 @@ function InstituteFormBody({
     setPending(true)
     try {
       if (id !== undefined) {
-        await updateInstitute(id, input)
+        // The platform edits any institute, its own fields too; others edit their own.
+        await (platform ? updatePlatformInstitute : updateInstitute)(id, input)
         toast.success(`${input.name} updated`)
         router.push(`/institutes/${id}`)
       } else {

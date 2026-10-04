@@ -31,7 +31,8 @@ export const surfacesOf = (resource: string) => resourceSurfaces[resource] ?? ac
 export const surfaceHref = (baseUrl: string, surface: AccessSurface) =>
   `${baseUrl}${SURFACE_PATH[surface]}`
 
-// Stable permission codes, e.g. "teacher.manage", "settings.academic-class.view".
+// The admin's own codes ("teacher.manage") for modules not yet on the API;
+// an API page's permission is its menu key ("Institutes/ListManage").
 export const permissionCode = (resource: string, surface: AccessSurface) =>
   `${resource}.${surface.toLowerCase()}`
 

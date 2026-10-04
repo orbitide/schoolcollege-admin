@@ -2,9 +2,12 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { RotateCwIcon } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { setUserOnline } from "@/lib/global-settings"
 import { loadInstitutes } from "@/lib/institutes-store"
+import { loadNavigation } from "@/lib/navigation"
 import {
   CurrentUserContext,
   fetchCurrentUser,
@@ -20,6 +23,9 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [user, setUser] = React.useState<CurrentUser | null>(null)
   const [unreachable, setUnreachable] = React.useState(false)
+  const [checking, setChecking] = React.useState(false)
+  // Bumped by Reload to ask the API again.
+  const [attempt, setAttempt] = React.useState(0)
 
   React.useEffect(() => {
     let active = true
@@ -27,9 +33,11 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
       .then(async (found) => {
         if (!active) return
         if (found) {
-          // Every page works inside the user's institutes, so they load first.
-          await loadInstitutes()
+          // Every page works inside the user's institutes, and the sidebar
+          // needs the API's menus, so both load first.
+          await Promise.all([loadInstitutes(), loadNavigation()])
           if (!active) return
+          setUnreachable(false)
           setStampUser(found)
           // The Users page's Online dot (in-memory until the users API).
           setUserOnline(found.id, true)
@@ -42,16 +50,33 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
       .catch(() => {
         if (active) setUnreachable(true)
       })
+      .finally(() => {
+        if (active) setChecking(false)
+      })
     return () => {
       active = false
     }
-  }, [router])
+  }, [router, attempt])
 
   if (unreachable) {
     return (
-      <p role="alert" className="m-auto p-6 text-center text-sm text-muted-foreground">
-        Can&apos;t reach the server. Check that the API is running, then reload the page.
-      </p>
+      <div role="alert" className="m-auto flex flex-col items-center gap-3 p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Can&apos;t reach the server. Check that the API is running, then reload.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={checking}
+          onClick={() => {
+            setChecking(true)
+            setAttempt((n) => n + 1)
+          }}
+        >
+          <RotateCwIcon className={checking ? "animate-spin" : undefined} />
+          {checking ? "Reloading…" : "Reload"}
+        </Button>
+      </div>
     )
   }
 

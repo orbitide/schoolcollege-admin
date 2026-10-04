@@ -5,7 +5,7 @@ import Link from "next/link"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { permissionMenus, type PermissionMenu } from "@/components/app-sidebar"
+import { usePermissionMenus, type PermissionMenu } from "@/lib/permission-menus"
 import { FilterField } from "@/components/term-exams/term-exam-fields"
 import {
   AlertDialog,
@@ -47,7 +47,7 @@ export function roleContains(role: UserRoleRecord, menus: PermissionMenu[]) {
 // many users hold it; Edit, Permissions and Delete per role.
 export function RoleList() {
   const roles = useUserRoles()
-  const menus = React.useMemo(() => permissionMenus(), [])
+  const menus = usePermissionMenus()
   const [deleting, setDeleting] = React.useState<UserRoleRecord | null>(null)
 
   // Legacy orders by name.

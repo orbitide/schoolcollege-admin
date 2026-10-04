@@ -1,6 +1,7 @@
 import type { AcademicKind } from "@/components/institutes/academic/kinds"
 
-// The sidebar's Basic Settings menu, following the legacy SchoolCollege menu.
+// The Basic Settings pages still kept in the admin (the sidebar shows them
+// once their controllers declare them on the API, lib/navigation.ts).
 // Items with a `kind` open that kind's all-institutes "Manage (Admin)" page;
 // the others have their own static pages. `surfaces` marks a static page with
 // Admin / Manage / View surfaces (holidays), which is permissioned like a kind.
@@ -10,8 +11,6 @@ export const basicSettingsMenu: {
   kind?: AcademicKind
   surfaces?: boolean
 }[] = [
-  // Legacy Institute Manage Admin / Manage / View (/institutes/admin, /institutes, /institutes/view).
-  { title: "Institutes", segment: "institutes", surfaces: true },
   { title: "Branches", segment: "branches", kind: "branches" },
   { title: "Shifts", segment: "shifts", kind: "shifts" },
   { title: "Academic Years", segment: "years", kind: "years" },
@@ -31,7 +30,7 @@ export const basicSettingsMenu: {
 ]
 
 export function basicSettingsHref(segment: string) {
-  return segment === "institutes" ? "/institutes" : `/basic-settings/${segment}`
+  return `/basic-settings/${segment}`
 }
 
 // Permission resource of a kind's all-institutes page (settings.classes.view).

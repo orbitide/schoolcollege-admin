@@ -11,7 +11,7 @@ import { logChanges } from "@/lib/common-log"
 import { getCurrentUser } from "@/lib/current-user"
 import { removeInstituteUsers } from "@/lib/global-settings"
 import { removeInstituteHolidays } from "@/lib/holidays"
-import { httpClient, type PagedList } from "@/lib/http-client"
+import { ApiError, httpClient, type PagedList } from "@/lib/http-client"
 import { removeInstituteBillingProfile } from "@/lib/billing-profiles"
 import { removeInstituteInvoices } from "@/lib/saas-invoices"
 import { addSubscription, removeInstituteSubscription } from "@/lib/subscriptions"
@@ -92,7 +92,8 @@ function reloadInstitutes() {
 // every change made through this store. `rows` is undefined while loading.
 export function useInstituteSurface(surface: AccessSurface, withDeleted: boolean) {
   const changes = React.useSyncExternalStore(subscribe, () => version, () => 0)
-  const [state, setState] = React.useState<{ key: string; rows?: Institute[]; error?: string }>({ key: "" })
+  // `denied`: the API refused the page (403), so the user doesn't hold it.
+  const [state, setState] = React.useState<{ key: string; rows?: Institute[]; error?: string; denied?: boolean }>({ key: "" })
   const key = `${surface}|${withDeleted}|${changes}`
 
   React.useEffect(() => {
@@ -103,7 +104,8 @@ export function useInstituteSurface(surface: AccessSurface, withDeleted: boolean
       })
       .then(
         (page) => active && setState({ key, rows: page.items }),
-        (error: Error) => active && setState({ key, error: error.message })
+        (error: Error) =>
+          active && setState({ key, error: error.message, denied: error instanceof ApiError && error.status === 403 })
       )
     return () => {
       active = false
@@ -119,33 +121,44 @@ function replace(institute: Institute) {
   return institute
 }
 
-// Super admin. Rejects with an ApiError (fieldErrors per input) when the API refuses.
+// Platform. Rejects with an ApiError (fieldErrors per input) when the API refuses.
 export async function addInstitute(input: InstituteInput) {
-  const institute = await httpClient.post<Institute>("/institutes", input)
+  const institute = await httpClient.post<Institute>("/platforminstitutes", input)
   emit([institute, ...institutes])
   addSubscription(institute, getCurrentUser().name)
   return institute
 }
 
-// Super admin: the institute form's fields (the configuration has its own save).
+// Their own institute (Institutes Admin / Manage): the platform's fields keep
+// their values (the configuration has its own save).
 export async function updateInstitute(id: number, input: InstituteInput) {
   return replace(await httpClient.put<Institute>(`/institutes/${id}`, input))
 }
 
-// Institute Configurations (institute-configuration.manage).
+// Platform Tools › Institutes: any institute, the platform's fields too.
+export async function updatePlatformInstitute(id: number, input: InstituteInput) {
+  return replace(await httpClient.put<Institute>(`/platforminstitutes/${id}`, input))
+}
+
+// Institute Configurations: the whole configuration, the SMS gateway key included
+// (institute responses never carry it).
+export function getInstituteConfiguration(id: number) {
+  return httpClient.get<InstituteConfiguration>(`/instituteconfigurations/${id}`)
+}
+
+// Institute Configurations: saves the whole document.
 export async function updateInstituteConfiguration(id: number, configuration: InstituteConfiguration) {
-  return replace(await httpClient.put<Institute>(`/institutes/${id}/configuration`, configuration))
+  return replace(await httpClient.put<Institute>(`/instituteconfigurations/${id}`, configuration))
 }
 
-// Absent Fine Date Configuration (attendance.fine-configuration.manage):
-// only the fine period's days.
+// Absent Fine Date Configuration: only the fine period's days.
 export async function updateInstituteFinePeriod(id: number, period: { dayFrom: number; dayTo: number }) {
-  return replace(await httpClient.put<Institute>(`/institutes/${id}/fine-period`, period))
+  return replace(await httpClient.put<Institute>(`/attendancefineconfigurations/${id}`, period))
 }
 
-// Super admin: the SaaS lifecycle (Active / Trial / Suspended).
+// Platform: the SaaS lifecycle (Active / Trial / Suspended).
 export async function setInstituteStatus(id: number, status: InstituteStatus) {
-  return replace(await httpClient.put<Institute>(`/institutes/${id}/status`, { status }))
+  return replace(await httpClient.put<Institute>(`/platforminstitutes/${id}/status`, { status }))
 }
 
 // Legacy Status Update: Active <-> Inactive (Admin / Manage surface).
@@ -166,25 +179,25 @@ export async function setInstituteRank(id: number, newRank: number, currentRank:
   return institute
 }
 
-// Super admin, legacy Delete: the institute is marked Deleted and leaves the
+// Platform, legacy Delete: the institute is marked Deleted and leaves the
 // app's lists; Admin can retrieve it, so nothing else is cleared yet.
 export async function deleteInstitute(id: number) {
-  await httpClient.delete(`/institutes/${id}`)
+  await httpClient.delete(`/platforminstitutes/${id}`)
   emit(institutes.filter((i) => i.id !== id))
 }
 
-// Super admin, legacy Retrieve: back to Active.
+// Platform, legacy Retrieve: back to Active.
 export async function retrieveInstitute(id: number) {
-  const institute = await httpClient.put<Institute>(`/institutes/${id}/retrieve`)
+  const institute = await httpClient.put<Institute>(`/platforminstitutes/${id}/retrieve`)
   await reloadInstitutes()
   return institute
 }
 
-// Super admin, legacy Permanent Delete (only a deleted institute). The API
+// Platform, legacy Permanent Delete (only a deleted institute). The API
 // removes it and its User Institutes links; the modules still held in memory
 // drop their rows for it here.
 export async function deleteInstitutePermanently(id: number) {
-  await httpClient.delete(`/institutes/${id}/permanent`)
+  await httpClient.delete(`/platforminstitutes/${id}/permanent`)
   emit(institutes.filter((i) => i.id !== id))
   removeInstituteRecords(id)
   removeInstituteUsers(id)

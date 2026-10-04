@@ -6,7 +6,7 @@ import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, SearchIcon, XIcon } from "l
 import { Collapsible } from "radix-ui"
 import { toast } from "sonner"
 
-import { permissionMenus } from "@/components/app-sidebar"
+import { usePermissionMenus } from "@/lib/permission-menus"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -48,7 +48,7 @@ function Editor({ user }: { user: AdminUser }) {
   const me = useCurrentUser()
   // Loads the role list (and re-renders when it arrives) for "granted by role" below.
   useUserRoles()
-  const menus = React.useMemo(() => permissionMenus(), [])
+  const menus = usePermissionMenus()
   const [choices, setChoices] = React.useState(() => choicesOf(user))
   const [query, setQuery] = React.useState("")
   const [open, setOpen] = React.useState<ReadonlySet<string>>(() => new Set())

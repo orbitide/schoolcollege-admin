@@ -6,7 +6,7 @@ import { ArrowLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react"
 import { Collapsible } from "radix-ui"
 import { toast } from "sonner"
 
-import { permissionMenus } from "@/components/app-sidebar"
+import { usePermissionMenus } from "@/lib/permission-menus"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,7 +30,9 @@ export function RolePermissions({ roleId }: { roleId: number }) {
   const roles = useUserRoles()
   const loaded = useUserRolesLoaded()
   const role = roles.find((r) => r.id === roleId)
-  if (!loaded) return null
+  // The editor starts from the ticks the menus give, so it waits for them.
+  const menusLoaded = usePermissionMenus().length > 0
+  if (!loaded || !menusLoaded) return null
   if (!role) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -46,7 +48,7 @@ export function RolePermissions({ roleId }: { roleId: number }) {
 }
 
 function Editor({ role }: { role: UserRoleRecord }) {
-  const menus = React.useMemo(() => permissionMenus(), [])
+  const menus = usePermissionMenus()
   const allCodes = React.useMemo(() => menus.flatMap((m) => m.items.flatMap((i) => i.codes.map((c) => c.code))), [menus])
   // A seeded role's patterns ("*.view") become the codes they cover.
   const grantedNow = React.useCallback(
@@ -84,7 +86,10 @@ function Editor({ role }: { role: UserRoleRecord }) {
     if (pending) return
     setPending(true)
     try {
-      await saveRolePermissions(role.id, [...selected])
+      // Wildcards and the codes of modules not yet on the API aren't in this
+      // tree, so they stay as they are; a wildcard keeps granting what it covers.
+      const kept = role.permissions.filter((code) => !allCodes.includes(code))
+      await saveRolePermissions(role.id, [...kept, ...selected])
       toast.success(`Permissions of ${role.name} saved.`)
     } catch (error) {
       toast.error((error as Error).message)

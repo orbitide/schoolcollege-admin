@@ -5,6 +5,7 @@ import * as React from "react"
 import { logChanges } from "@/lib/common-log"
 import { reassignUsersRole } from "@/lib/global-settings"
 import { httpClient } from "@/lib/http-client"
+import { menuKeyInfo } from "@/lib/menu-keys"
 
 // User roles (legacy NccPermission, Users/ManageUserRoles): a named bundle
 // of permission codes (lib/access.ts) that users are given. Kept by the API
@@ -92,13 +93,19 @@ export function useUserRoleNames() {
   )
 }
 
-// The same rule as the API's PermissionRules.PatternsAllow.
-// Platform codes are never granted by a wildcard, only by name (PermissionRules.cs).
+// The same rule as the API's PermissionRules.PatternsAllow: "*.view" grants
+// the API's View pages (by their menu key's page) or an admin code ending in
+// ".view". Platform pages are never granted by a wildcard, only by name.
 export function roleAllows(role: Pick<UserRoleRecord, "name" | "permissions">, code: string) {
   if (role.name === SUPER_ADMIN_ROLE) return true
-  const wildcards = !code.startsWith("platform.")
+  const info = menuKeyInfo(code)
+  const wildcards = info ? !info.platform : !code.startsWith("platform.")
+  const ending = info ? `.${info.page.toLowerCase()}` : undefined
   return role.permissions.some(
-    (p) => p === code || (wildcards && p === "*") || (wildcards && p.startsWith("*.") && code.endsWith(p.slice(1)))
+    (p) =>
+      p === code ||
+      (wildcards && p === "*") ||
+      (wildcards && p.startsWith("*.") && (ending ? p.slice(1) === ending : code.endsWith(p.slice(1))))
   )
 }
 
