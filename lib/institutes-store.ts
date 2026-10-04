@@ -54,14 +54,15 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
-// API max; enough for today's institutes.
-const LIST_PAGE_SIZE = 100
+const SURFACE_LIST_PAGE_SIZE = 100
 
-// Loads the list once per page load. Rejects when the API can't be reached.
+const SURFACE_ROUTE: Record<AccessSurface, string> = { Admin: "admin", Manage: "manage", View: "view" }
+
+// Every institute the user works with, once per page load. Rejects when the API can't be reached.
 export function loadInstitutes() {
-  loading ??= httpClient.get<PagedList<Institute>>("/institutes", { params: { pageSize: LIST_PAGE_SIZE } }).then(
-    (page) => {
-      institutes = page.items
+  loading ??= httpClient.get<Institute[]>("/institutes/accessible").then(
+    (list) => {
+      institutes = list
       notify()
     },
     (error) => {
@@ -97,8 +98,8 @@ export function useInstituteSurface(surface: AccessSurface, withDeleted: boolean
   React.useEffect(() => {
     let active = true
     httpClient
-      .get<PagedList<Institute>>("/institutes", {
-        params: { withDeleted: surface === "Admin" && withDeleted, pageSize: LIST_PAGE_SIZE },
+      .get<PagedList<Institute>>(`/institutes/${SURFACE_ROUTE[surface]}`, {
+        params: { withDeleted: surface === "Admin" && withDeleted, pageSize: SURFACE_LIST_PAGE_SIZE },
       })
       .then(
         (page) => active && setState({ key, rows: page.items }),

@@ -39,3 +39,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDEs and editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.vs/
+.vscode/
+*.code-workspace
+.fleet/
+.zed/
+.cursor/
+.history/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.suo
+*.user
+*.swp
+*~

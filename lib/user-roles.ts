@@ -93,10 +93,12 @@ export function useUserRoleNames() {
 }
 
 // The same rule as the API's PermissionRules.PatternsAllow.
+// Platform codes are never granted by a wildcard, only by name (PermissionRules.cs).
 export function roleAllows(role: Pick<UserRoleRecord, "name" | "permissions">, code: string) {
   if (role.name === SUPER_ADMIN_ROLE) return true
+  const wildcards = !code.startsWith("platform.")
   return role.permissions.some(
-    (p) => p === code || p === "*" || (p.startsWith("*.") && code.endsWith(p.slice(1)))
+    (p) => p === code || (wildcards && p === "*") || (wildcards && p.startsWith("*.") && code.endsWith(p.slice(1)))
   )
 }
 
