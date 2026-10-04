@@ -3,7 +3,7 @@
 import * as React from "react"
 
 import { NavDocuments } from "@/components/nav-documents"
-import { NavMain, filterNavItems, type NavItem, type NavMainItem } from "@/components/nav-main"
+import { NavMain, filterNavItems, type NavItem, type NavMainItem, type NavTone } from "@/components/nav-main"
 import { NavSearch, matchesQuery } from "@/components/nav-search"
 import { permissionCode, surfaceHref, surfacesOf, useCan } from "@/lib/access"
 import { basicSettingsHref, basicSettingsMenu, basicSettingsResource } from "@/lib/basic-settings"
@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon, FileQuestionIcon } from "lucide-react"
+import { LayoutDashboardIcon, PackageIcon, CreditCardIcon, UsersIcon, Settings2Icon, DatabaseIcon, FileClockIcon, FileChartColumnIcon, LifeBuoyIcon, GraduationCapIcon, SlidersHorizontalIcon, ClipboardListIcon, FileSpreadsheetIcon, SearchXIcon, UserRoundIcon, CalendarCheckIcon, MessageSquareTextIcon, WrenchIcon, ArmchairIcon, SchoolIcon, HistoryIcon, NewspaperIcon, BanknoteIcon, CalendarClockIcon, MegaphoneIcon, FileQuestionIcon } from "lucide-react"
 import { BrandMark } from "@/components/brand-mark"
 
 const data = {
@@ -266,6 +266,12 @@ const data = {
             { title: "Common Log", url: "/basic-actions/common-log", permission: "common-log.manage" },
           ],
         },
+      ] satisfies NavMainItem[],
+    },
+    // The platform team's own pages (business and developer tools), never an institute's.
+    {
+      label: "Platform Tools",
+      items: [
         { title: "Pricing", url: "/plans", icon: <PackageIcon />, tone: "orange", platform: true },
         { title: "Subscriptions", url: "/subscriptions", icon: <CreditCardIcon />, tone: "rose", platform: true },
         {
@@ -279,6 +285,8 @@ const data = {
             { title: "Manage User Roles", url: "/users/roles" },
           ],
         },
+        { title: "Audit Logs", url: "/audit-logs", icon: <FileClockIcon />, tone: "slate", platform: true },
+        { title: "Database", url: "/platform-tools/database", icon: <DatabaseIcon />, tone: "emerald", platform: true },
       ] satisfies NavMainItem[],
     },
   ],
@@ -286,9 +294,8 @@ const data = {
     { title: "Settings", url: "/settings", icon: <Settings2Icon />, platform: true },
   ],
   documents: [
-    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" as const },
-    { name: "Audit Logs", url: "/audit-logs", icon: <DatabaseIcon />, tone: "slate" as const, platform: true },
-  ],
+    { name: "Support Tickets", url: "/support", icon: <LifeBuoyIcon />, tone: "sky" },
+  ] as { name: string; url: string; icon: React.ReactNode; tone?: NavTone; platform?: boolean }[],
 }
 
 export type PermissionMenu = {

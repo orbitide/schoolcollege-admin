@@ -1,6 +1,6 @@
 import { httpClient } from "@/lib/http-client"
 
-// Settings › Database: the schema plan and its execution
+// Platform Tools › Database: the schema plan and its execution
 // (Framework/Persistence/SchemaManagement on the API; no migration files).
 
 export type SchemaChangeRisk = "Safe" | "RequiresConfirmation" | "Destructive"
