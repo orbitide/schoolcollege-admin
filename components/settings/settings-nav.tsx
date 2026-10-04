@@ -12,6 +12,8 @@ const pages = [
   { title: "Maintenance Mode", href: "/settings/maintenance" },
   // Not in legacy (single site): who bills the institutes.
   { title: "Billing", href: "/settings/billing" },
+  // Schema sync (no migration files): review and execute model changes.
+  { title: "Database", href: "/settings/database" },
 ]
 
 export function SettingsNav() {
