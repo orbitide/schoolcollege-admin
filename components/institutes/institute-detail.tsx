@@ -11,7 +11,7 @@ import {
   UserIcon,
 } from "lucide-react"
 
-import { kindLabels } from "@/components/institutes/academic/kinds"
+import { customLabels, kindLabels } from "@/components/institutes/academic/kinds"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -99,7 +99,7 @@ export function InstituteDetail({ id }: { id: number }) {
 
   const config = institute.configuration
   const houseLabels = kindLabels("houses", institute)
-  const categoryLabels = kindLabels("categories", institute)
+  const categoryLabels = customLabels(institute.studentCategoryLabel, "Category", "Categories")
   const bill = billOf(institute)
 
   return (

@@ -9,6 +9,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { branchApi, type BranchRow } from "@/lib/branches-store"
+import { categoryApi } from "@/lib/categories-store"
 import type { LookupRow } from "@/lib/lookup-store"
 import { sessionApi } from "@/lib/sessions-store"
 import { shiftApi } from "@/lib/shifts-store"
@@ -55,6 +56,16 @@ const branchColumn = createDataTableColumns<BranchRow>()
 const yearColumn = createDataTableColumns<YearRow>()
 
 export const lookupPages = {
+  categories: define({
+    store: categoryApi,
+    segment: "categories",
+    singular: "Student Category",
+    plural: "Student Categories",
+    description: "Student categories such as quotas, used for admission and fees.",
+    searchPlaceholder: "Search category name",
+    form: { nameRequired: "Insert StudentCategory Name.", useFields: () => noFields },
+  }),
+
   sessions: define({
     store: sessionApi,
     segment: "sessions",

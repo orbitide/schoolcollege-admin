@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   branchStore,
   buildingStore,
-  categoryStore,
   classStore,
   classYearSubjectStore,
   dashboardMenuGroupStore,
@@ -736,19 +735,6 @@ export const academicKinds = {
     studentMatch: (r, _s, e) => e?.houseId === r.id,
     store: asEditable(houseStore),
   },
-  categories: {
-    segment: "categories",
-    singular: "Category",
-    plural: "Categories",
-    description: "Student categories such as quotas, used for admission and fees.",
-    toggle: "enableStudentCategory",
-    labelKey: "studentCategoryLabel",
-    fields: [],
-    columns: [],
-    studentMatch: (r, s, e) => !e && s.categoryId === r.id,
-    softDelete: true,
-    store: asEditable(categoryStore),
-  },
   grades: {
     segment: "grades",
     singular: "Letter grade",
@@ -1098,7 +1084,6 @@ export const academicKindOrder: AcademicKind[] = [
   "subjects",
   "classSubjects",
   "houses",
-  "categories",
   "grades",
   "remarks",
   "buildings",
@@ -1125,9 +1110,13 @@ export function visibleColumns(kind: AcademicKind, institute: Institute) {
 // Singular/plural labels, using the institute's custom label when it has one.
 export function kindLabels(kind: AcademicKind, institute: Institute) {
   const config = kindConfig(kind)
-  const custom = config.labelKey ? String(institute[config.labelKey]).trim() : ""
-  if (!custom) return { singular: config.singular, plural: config.plural }
-  return { singular: custom, plural: pluralize(custom) }
+  return customLabels(config.labelKey ? String(institute[config.labelKey]) : "", config.singular, config.plural)
+}
+
+// The institute's own name for a record kind (e.g. "Quota" for student categories), else the default words.
+export function customLabels(custom: string, singular: string, plural: string) {
+  const label = custom.trim()
+  return label ? { singular: label, plural: pluralize(label) } : { singular, plural }
 }
 
 function pluralize(word: string) {

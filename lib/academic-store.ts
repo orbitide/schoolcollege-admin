@@ -16,7 +16,6 @@ import type {
   RecordStatus,
   ResultRemark,
   Section,
-  StudentCategory,
   StudentHouse,
   Subject,
 } from "@/lib/institutes"
@@ -352,16 +351,8 @@ export const houseStore = createRecordStore<StudentHouse>(
   }
 )
 
-export const categoryStore = createRecordStore<StudentCategory>("StudentCategory", [
-  { id: 1, instituteId: 1, name: "General", rank: 1, status: "Active" },
-  {
-    id: 2,
-    instituteId: 1,
-    name: "Freedom Fighter Quota",
-    rank: 2,
-    status: "Active",
-  },
-])
+// Student categories are on the API; their picker lookup stands in for the old store.
+export { categoryStore } from "@/lib/categories-store"
 
 const seedInstituteIds = [1, 5]
 
@@ -652,7 +643,6 @@ export function removeInstituteRecords(instituteId: number) {
     sectionStore,
     subjectStore,
     houseStore,
-    categoryStore,
     letterGradeStore,
     resultRemarkStore,
   ]) {
