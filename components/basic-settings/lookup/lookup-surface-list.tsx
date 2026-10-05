@@ -5,11 +5,13 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PlusIcon, SearchIcon, XIcon } from "lucide-react"
 
+import { LookupActions } from "@/components/basic-settings/lookup/lookup-actions"
+import type { LookupPage } from "@/components/basic-settings/lookup/lookup-page"
+import { lookupPages, type LookupKey } from "@/components/basic-settings/lookups"
 import { createDataTableColumns, DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table/data-table"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { NoAccess } from "@/components/no-access"
 import { PageLoader } from "@/components/page-loader"
-import { ShiftActions } from "@/components/shifts/shift-actions"
 import { DEFAULT_PAGE_SIZE } from "@/components/table-pagination"
 import { stamp } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
@@ -20,20 +22,17 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { capabilitiesFor, type AccessSurface, type Capabilities } from "@/lib/access"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import type { Institute } from "@/lib/institutes"
-import { useShiftSurface, type ShiftRow } from "@/lib/shifts-store"
+import type { LookupRow } from "@/lib/lookup-store"
 
 const ALL = "all"
 
-const titles: Record<AccessSurface, string> = {
-  Admin: "Shift Manage Admin",
-  Manage: "Shift Manage",
-  View: "Shift View",
-}
+const suffixes: Record<AccessSurface, string> = { Admin: "Manage Admin", Manage: "Manage", View: "View" }
 
-// Legacy Shift ManageAdmin / Manage / ManageView: shifts in rank order,
-// filtered by institute. Admin also lists deleted shifts ("With deleted");
-// View only reads.
-export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
+// Legacy <Lookup> ManageAdmin / Manage / ManageView: rows in rank order,
+// filtered by institute. Admin also lists deleted rows ("With deleted"); View
+// only reads.
+export function LookupSurfaceList({ lookup, surface }: { lookup: LookupKey; surface: AccessSurface }) {
+  const page = lookupPages[lookup]
   const can = capabilitiesFor(surface, { softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
@@ -42,14 +41,14 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
   const admin = surface === "Admin"
   const withDeleted = admin && searchParams.get("deleted") === "1"
   const instituteParam = Number(searchParams.get("institute")) || undefined
-  // A user with one institute only ever sees its shifts.
+  // A user with one institute only ever sees its rows.
   const instituteId =
     institutes.length === 1
       ? institutes[0].id
       : institutes.some((institute) => institute.id === instituteParam)
         ? instituteParam
         : undefined
-  const page = Math.max(1, Number(searchParams.get("page")) || 1)
+  const pageNumber = Math.max(1, Number(searchParams.get("page")) || 1)
   const pageSize = Number(searchParams.get("size")) || DEFAULT_PAGE_SIZE
   const sortParam = searchParams.get("sort")
   const sort: DataTableSort | undefined = sortParam ? { id: sortParam, desc: searchParams.get("dir") === "desc" } : undefined
@@ -58,13 +57,13 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
   const [query, setQuery] = React.useState(searchParams.get("q") ?? "")
   const search = useDebouncedValue(query.trim(), 300)
 
-  const { rows, totalItems = 0, error, denied } = useShiftSurface(surface, {
+  const { rows, totalItems = 0, error, denied } = page.store.useSurface(surface, {
     instituteId,
     withDeleted,
     search,
     sortBy: sort?.id,
     sortDirection: sort?.desc ? "desc" : "asc",
-    page,
+    page: pageNumber,
     pageSize,
   })
   const hasFilters = query !== "" || (!!instituteId && institutes.length > 1) || withDeleted
@@ -95,15 +94,15 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
   const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`
   const showInstitute = institutes.length > 1
   const columns = React.useMemo(
-    () => shiftColumns({ offset: (page - 1) * pageSize, returnTo, can, institutes, showInstitute }),
+    () => lookupColumns({ page, offset: (pageNumber - 1) * pageSize, returnTo, can, institutes, showInstitute }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- can is derived from surface
-    [page, pageSize, returnTo, surface, institutes, showInstitute]
+    [page, pageNumber, pageSize, returnTo, surface, institutes, showInstitute]
   )
 
   if (denied) return <NoAccess />
-  if (!rows && !error) return <PageLoader label="Loading shifts" />
+  if (!rows && !error) return <PageLoader label={`Loading ${page.plural.toLowerCase()}`} />
 
-  const newHref = `/basic-settings/shifts/new?${new URLSearchParams({
+  const newHref = `/basic-settings/${page.segment}/new?${new URLSearchParams({
     ...(instituteId && { institute: String(instituteId) }),
     returnTo,
   })}`
@@ -113,14 +112,14 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
       <Card>
         <CardHeader className="flex flex-wrap items-start justify-between gap-2 border-b">
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-lg">{titles[surface]}</CardTitle>
-            <CardDescription>Daily sessions such as Morning and Day, in rank order within each institute.</CardDescription>
+            <CardTitle className="text-lg">{`${page.singular} ${suffixes[surface]}`}</CardTitle>
+            <CardDescription>{page.description}</CardDescription>
           </div>
           {can.create && (
             <Button asChild size="sm">
               <Link href={newHref}>
                 <PlusIcon data-icon="inline-start" />
-                Add shift
+                Add {page.singular.toLowerCase()}
               </Link>
             </Button>
           )}
@@ -131,8 +130,8 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search shift name"
-              aria-label="Search shifts"
+              placeholder={page.searchPlaceholder}
+              aria-label={`Search ${page.plural.toLowerCase()}`}
               className="pl-8"
             />
           </div>
@@ -151,7 +150,7 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
             )}
             {admin && (
               <FilterSelect
-                label="Deleted shifts"
+                label={`Deleted ${page.plural.toLowerCase()}`}
                 value={withDeleted ? "1" : "0"}
                 options={[
                   { value: "0", label: "Without deleted" },
@@ -174,14 +173,14 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
         columns={columns}
         rows={rows}
         totalItems={totalItems}
-        page={page}
+        page={pageNumber}
         pageSize={pageSize}
         sort={sort}
-        noun="shifts"
-        empty="No shifts match these filters."
+        noun={page.plural.toLowerCase()}
+        empty={`No ${page.plural.toLowerCase()} match these filters.`}
         error={error}
-        getRowId={(shift) => String(shift.id)}
-        rowClassName={(shift) => (shift.recordStatus === "Deleted" ? "text-muted-foreground" : undefined)}
+        getRowId={(row) => String(row.id)}
+        rowClassName={(row) => (row.recordStatus === "Deleted" ? "text-muted-foreground" : undefined)}
         onPageChange={(next) => setParams({ page: next > 1 ? String(next) : undefined })}
         onPageSizeChange={(size) => setParams({ size: size === DEFAULT_PAGE_SIZE ? undefined : String(size) })}
         onSortChange={(next) => setParams({ sort: next?.id, dir: next?.desc ? "desc" : undefined })}
@@ -190,22 +189,25 @@ export function ShiftSurfaceList({ surface }: { surface: AccessSurface }) {
   )
 }
 
-const column = createDataTableColumns<ShiftRow>()
+const column = createDataTableColumns<LookupRow>()
 
-// The legacy grid's columns; Name, Rank and Date (last modified) sort on the API.
-function shiftColumns({
+// The legacy grid's columns: Name, the lookup's own, then the shared ones;
+// Name, Rank and Date (last modified) sort on the API.
+function lookupColumns({
+  page,
   offset,
   returnTo,
   can,
   institutes,
   showInstitute,
 }: {
+  page: LookupPage
   offset: number
   returnTo: string
   can: Capabilities
   institutes: Institute[]
   showInstitute: boolean
-}): DataTableColumn<ShiftRow>[] {
+}): DataTableColumn<LookupRow>[] {
   return column.columns([
     column.display({
       id: "sl",
@@ -218,7 +220,7 @@ function shiftColumns({
       enableSorting: true,
       cell: ({ row }) => (
         <Link
-          href={`/basic-settings/shifts/${row.original.id}?returnTo=${encodeURIComponent(returnTo)}`}
+          href={`/basic-settings/${page.segment}/${row.original.id}?returnTo=${encodeURIComponent(returnTo)}`}
           className="font-medium underline-offset-4 hover:underline"
         >
           {row.original.name}
@@ -226,6 +228,7 @@ function shiftColumns({
       ),
       meta: { className: "whitespace-nowrap" },
     }),
+    ...(page.columns ?? []),
     ...(showInstitute
       ? [
           column.display({
@@ -276,7 +279,7 @@ function shiftColumns({
     column.display({
       id: "actions",
       header: "",
-      cell: ({ row }) => <ShiftActions shift={row.original} returnTo={returnTo} can={can} />,
+      cell: ({ row }) => <LookupActions page={page} row={row.original} returnTo={returnTo} can={can} />,
       meta: { headerClassName: "w-10" },
     }),
   ])

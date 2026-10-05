@@ -1,16 +1,16 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { ShiftForm } from "@/components/shifts/shift-form"
+import { LookupForm } from "@/components/basic-settings/lookup/lookup-form"
 
 export const metadata: Metadata = {
-  title: "Add shift · SMS Admin",
+  title: "Add Shift · SMS Admin",
 }
 
-export default function NewShiftPage() {
+export default function Page() {
   return (
     <Suspense>
-      <ShiftForm />
+      <LookupForm lookup="shifts" />
     </Suspense>
   )
 }

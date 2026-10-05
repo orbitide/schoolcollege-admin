@@ -4,54 +4,54 @@ import * as React from "react"
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 
+import { useLookupListHref } from "@/components/basic-settings/lookup/lookup-form"
+import { lookupPages, type LookupKey } from "@/components/basic-settings/lookups"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { NoAccess } from "@/components/no-access"
 import { PageLoader } from "@/components/page-loader"
-import { useBranchListHref } from "@/components/branches/branch-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useInstitute } from "@/lib/institutes-store"
-import { useBranchDetails } from "@/lib/branches-store"
 
-// Legacy Branch Details (deleted branches too): its institute, rank, status and
-// who created / modified it.
-export function BranchDetail({ id }: { id: number }) {
-  const { branch, denied } = useBranchDetails(id)
-  const institute = useInstitute(branch?.instituteId ?? -1)
-  const listHref = useBranchListHref()
+// Legacy <Lookup> Details (deleted rows too): its institute, own fields, rank,
+// status and who created / modified it.
+export function LookupDetail({ lookup, id }: { lookup: LookupKey; id: number }) {
+  const page = lookupPages[lookup]
+  const { row, denied } = page.store.useDetails(id)
+  const institute = useInstitute(row?.instituteId ?? -1)
+  const listHref = useLookupListHref(page.segment)
 
   if (denied) return <NoAccess />
-  if (branch === undefined) return <PageLoader label="Loading branch" />
+  if (row === undefined) return <PageLoader label={`Loading ${page.singular.toLowerCase()}`} />
 
   const back = (
     <Button asChild variant="ghost" size="sm" className="w-fit">
       <Link href={listHref}>
         <ArrowLeftIcon data-icon="inline-start" />
-        Branches
+        {page.plural}
       </Link>
     </Button>
   )
-  if (!branch)
+  if (!row)
     return (
       <div className="flex flex-col gap-4 px-4 py-4 md:py-6 lg:px-6">
         {back}
-        <p className="text-sm text-muted-foreground">No Branch found.</p>
+        <p className="text-sm text-muted-foreground">No {page.singular} found.</p>
       </div>
     )
 
-  const deleted = branch.recordStatus === "Deleted"
+  const deleted = row.recordStatus === "Deleted"
   const when = (iso: string) => new Date(iso).toLocaleString("en-GB")
   const rows: [string, React.ReactNode][] = [
-    ["Name", branch.name],
-    ["Code", branch.code],
-    ["Address", branch.address || "—"],
+    ["Name", row.name],
+    ...(page.details?.(row) ?? []),
     ["Institute", institute?.name ?? "—"],
-    ["Rank", deleted ? "—" : branch.rank],
-    ["Status", <StatusBadge key="status" status={branch.recordStatus} />],
-    ["Created by", branch.createdBy || "—"],
-    ["Creation date", when(branch.createdAt)],
-    ["Modified by", branch.modifiedBy || "—"],
-    ["Modification date", when(branch.modifiedAt)],
+    ["Rank", deleted ? "—" : row.rank],
+    ["Status", <StatusBadge key="status" status={row.recordStatus} />],
+    ["Created by", row.createdBy || "—"],
+    ["Creation date", when(row.createdAt)],
+    ["Modified by", row.modifiedBy || "—"],
+    ["Modification date", when(row.modifiedAt)],
   ]
 
   return (
@@ -59,8 +59,8 @@ export function BranchDetail({ id }: { id: number }) {
       {back}
       <Card className="max-w-3xl">
         <CardHeader className="border-b">
-          <CardTitle className="text-lg">{branch.name}</CardTitle>
-          <CardDescription>Branch details</CardDescription>
+          <CardTitle className="text-lg">{row.name}</CardTitle>
+          <CardDescription>{page.singular} details</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-y-3 text-sm">

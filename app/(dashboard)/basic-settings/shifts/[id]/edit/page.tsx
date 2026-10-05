@@ -1,18 +1,18 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { ShiftForm } from "@/components/shifts/shift-form"
+import { LookupForm } from "@/components/basic-settings/lookup/lookup-form"
 
 export const metadata: Metadata = {
-  title: "Edit shift · SMS Admin",
+  title: "Edit Shift · SMS Admin",
 }
 
-export default async function EditShiftPage({ params }: PageProps<"/basic-settings/shifts/[id]/edit">) {
+export default async function Page({ params }: PageProps<"/basic-settings/shifts/[id]/edit">) {
   const { id } = await params
 
   return (
     <Suspense>
-      <ShiftForm id={Number(id)} />
+      <LookupForm lookup="shifts" id={Number(id)} />
     </Suspense>
   )
 }

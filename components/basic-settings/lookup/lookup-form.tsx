@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 
+import type { LookupErrors, LookupPage } from "@/components/basic-settings/lookup/lookup-page"
+import { lookupPages, type LookupKey } from "@/components/basic-settings/lookups"
 import { NoAccess } from "@/components/no-access"
 import { PageLoader } from "@/components/page-loader"
 import { Button } from "@/components/ui/button"
@@ -15,73 +17,77 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { ApiError } from "@/lib/http-client"
-import { addShift, updateShift, useShiftDetails, type ShiftRow } from "@/lib/shifts-store"
+import type { LookupRow } from "@/lib/lookup-store"
 
-type Errors = { instituteId?: string; name?: string }
-
-// The list a form returns to: where it was opened from (`?returnTo=`), else Shift Manage.
-export function useShiftListHref() {
+// The list a page returns to: where it was opened from (`?returnTo=`), else the lookup's Manage page.
+export function useLookupListHref(segment: string) {
   const returnTo = useSearchParams().get("returnTo")
-  return returnTo?.startsWith("/basic-settings/shifts") ? returnTo : "/basic-settings/shifts"
+  const base = `/basic-settings/${segment}`
+  return returnTo?.startsWith(base) ? returnTo : base
 }
 
-// Legacy Shift CreateEdit: a new shift (`id` absent) or a shift's edit.
-export function ShiftForm({ id }: { id?: number }) {
-  if (id === undefined) return <ShiftFormBody />
-  return <EditShift id={id} />
+// Legacy <Lookup> CreateEdit: a new row (`id` absent) or a row's edit.
+export function LookupForm({ lookup, id }: { lookup: LookupKey; id?: number }) {
+  const page = lookupPages[lookup]
+  if (id === undefined) return <LookupFormBody page={page} />
+  return <EditLookup page={page} id={id} />
 }
 
-function EditShift({ id }: { id: number }) {
-  const { shift, denied } = useShiftDetails(id)
-  const listHref = useShiftListHref()
+function EditLookup({ page, id }: { page: LookupPage; id: number }) {
+  const { row, denied } = page.store.useDetails(id)
+  const listHref = useLookupListHref(page.segment)
 
   if (denied) return <NoAccess />
-  if (shift === undefined) return <PageLoader label="Loading shift" />
-  if (!shift || shift.recordStatus === "Deleted")
+  if (row === undefined) return <PageLoader label={`Loading ${page.singular.toLowerCase()}`} />
+  if (!row || row.recordStatus === "Deleted")
     return (
       <div className="flex flex-col items-start gap-2 p-6">
-        <p className="text-sm text-muted-foreground">Invalid Shift.</p>
+        <p className="text-sm text-muted-foreground">No {page.singular} found.</p>
         <Button asChild variant="outline" size="sm">
-          <Link href={listHref}>Back to shifts</Link>
+          <Link href={listHref}>Back to {page.plural.toLowerCase()}</Link>
         </Button>
       </div>
     )
-  return <ShiftFormBody shift={shift} />
+  return <LookupFormBody page={page} row={row} />
 }
 
-function ShiftFormBody({ shift }: { shift?: ShiftRow }) {
+function LookupFormBody({ page, row }: { page: LookupPage; row?: LookupRow }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const listHref = useShiftListHref()
+  const listHref = useLookupListHref(page.segment)
   const institutes = useAccessibleInstitutes()
   const preset = Number(searchParams.get("institute")) || undefined
   const [instituteId, setInstituteId] = React.useState(() =>
     String(
-      shift?.instituteId ??
+      row?.instituteId ??
         (institutes.length === 1 ? institutes[0].id : institutes.find((institute) => institute.id === preset)?.id ?? "")
     )
   )
-  const [name, setName] = React.useState(shift?.name ?? "")
-  const [errors, setErrors] = React.useState<Errors>({})
+  const [name, setName] = React.useState(row?.name ?? "")
+  const fields = page.form.useFields(row)
+  const [errors, setErrors] = React.useState<LookupErrors>({})
   const [pending, setPending] = React.useState(false)
   const institute = institutes.find((i) => String(i.id) === instituteId)
+  const lower = page.singular.toLowerCase()
 
   async function save(andNew: boolean) {
-    const next: Errors = {
+    const next: LookupErrors = {
       instituteId: instituteId ? undefined : "Select the institute.",
-      name: name.trim() ? undefined : "Insert Shift Name.",
+      name: name.trim() ? undefined : page.form.nameRequired,
+      ...fields.validate(),
     }
     setErrors(next)
-    if (next.instituteId || next.name) return
+    if (Object.values(next).some(Boolean)) return
 
     setPending(true)
     try {
-      const input = { instituteId: Number(instituteId), name: name.trim() }
-      if (shift) await updateShift(shift.id, input)
-      else await addShift(input)
-      toast.success(shift ? "Shift Updated Successfully" : "Shift Added Successfully")
+      const input = { instituteId: Number(instituteId), name: name.trim(), ...fields.values() }
+      if (row) await page.store.update(row.id, input)
+      else await page.store.add(input)
+      toast.success(`${page.singular} ${row ? "Updated" : "Added"} Successfully`)
       if (andNew) {
         setName("")
+        fields.reset()
         setErrors({})
       } else {
         router.push(listHref)
@@ -106,23 +112,23 @@ function ShiftFormBody({ shift }: { shift?: ShiftRow }) {
       <Button asChild variant="ghost" size="sm" className="w-fit">
         <Link href={listHref}>
           <ArrowLeftIcon data-icon="inline-start" />
-          Shifts
+          {page.plural}
         </Link>
       </Button>
 
-      <h3 className="text-xl font-semibold tracking-tight">{shift ? "Edit shift" : "Add shift"}</h3>
+      <h3 className="text-xl font-semibold tracking-tight">{row ? `Edit ${lower}` : `Add ${lower}`}</h3>
 
       <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
-          <CardDescription>Daily sessions such as Morning and Day, used by classes and routines.</CardDescription>
+          <CardTitle>{page.singular} details</CardTitle>
+          <CardDescription>{page.description}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {/* Legacy shows the institute only to users with more than one; it can't change on edit. */}
           {institutes.length > 1 && (
             <Field data-invalid={!!errors.instituteId}>
               <FieldLabel htmlFor="instituteId">Institute</FieldLabel>
-              {shift ? (
+              {row ? (
                 <Input id="instituteId" value={institute?.name ?? "—"} disabled />
               ) : (
                 <Select value={instituteId} onValueChange={setInstituteId}>
@@ -148,6 +154,7 @@ function ShiftFormBody({ shift }: { shift?: ShiftRow }) {
             <Input id="name" value={name} aria-invalid={!!errors.name} onChange={(event) => setName(event.target.value)} />
             <FieldError>{errors.name}</FieldError>
           </Field>
+          {fields.render(errors)}
         </CardContent>
       </Card>
 
@@ -155,13 +162,13 @@ function ShiftFormBody({ shift }: { shift?: ShiftRow }) {
         <Button asChild variant="outline">
           <Link href={listHref}>Cancel</Link>
         </Button>
-        {!shift && (
+        {!row && (
           <Button type="button" variant="secondary" disabled={pending} onClick={() => void save(true)}>
             Save and new
           </Button>
         )}
         <Button type="submit" disabled={pending}>
-          {shift ? "Save changes" : "Add shift"}
+          {row ? "Save changes" : `Add ${lower}`}
         </Button>
       </div>
     </form>

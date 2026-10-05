@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import type { LookupPage } from "@/components/basic-settings/lookup/lookup-page"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,31 +38,35 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { Capabilities } from "@/lib/access"
 import { ApiError } from "@/lib/http-client"
-import {
-  deleteShift,
-  deleteShiftPermanently,
-  getShiftMaxRank,
-  retrieveShift,
-  setShiftRank,
-  toggleShiftStatus,
-  type ShiftRow,
-} from "@/lib/shifts-store"
+import type { LookupRow } from "@/lib/lookup-store"
 
 type Confirm = "delete" | "retrieve" | "permanent"
 
-// Row menu of the legacy shift grids: what it offers depends on the surface
-// (`can`); a deleted shift can only be retrieved or deleted for good.
-export function ShiftActions({ shift, returnTo, can }: { shift: ShiftRow; returnTo: string; can: Capabilities }) {
+// Row menu of a legacy lookup grid: what it offers depends on the surface
+// (`can`); a deleted row can only be retrieved or deleted for good.
+export function LookupActions({
+  page,
+  row,
+  returnTo,
+  can,
+}: {
+  page: LookupPage
+  row: LookupRow
+  returnTo: string
+  can: Capabilities
+}) {
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [ranking, setRanking] = React.useState(false)
   const [pending, setPending] = React.useState(false)
-  const deleted = shift.recordStatus === "Deleted"
-  const active = shift.recordStatus === "Active"
+  const deleted = row.recordStatus === "Deleted"
+  const active = row.recordStatus === "Active"
+  const base = `/basic-settings/${page.segment}/${row.id}`
   const back = `?returnTo=${encodeURIComponent(returnTo)}`
+  const lower = page.singular.toLowerCase()
 
   async function toggleStatus() {
     try {
-      await toggleShiftStatus(shift.id)
+      await page.store.toggleStatus(row.id)
       toast.success(active ? "In-activated successfully" : "Activated successfully")
     } catch (error) {
       toast.error((error as Error).message)
@@ -73,27 +78,27 @@ export function ShiftActions({ shift, returnTo, can }: { shift: ShiftRow; return
     { title: string; description: string; action: string; destructive?: boolean; run: () => Promise<unknown>; done: string }
   > = {
     delete: {
-      title: `Delete ${shift.name}?`,
-      description: "The shift leaves every list and picker. Manage Admin can retrieve it later from “With deleted”.",
+      title: `Delete ${row.name}?`,
+      description: `The ${lower} leaves every list and picker. Manage Admin can retrieve it later from “With deleted”.`,
       action: "Delete",
       destructive: true,
-      run: () => deleteShift(shift.id),
-      done: "Shift deleted successfully",
+      run: () => page.store.remove(row.id),
+      done: `${page.singular} deleted successfully`,
     },
     retrieve: {
-      title: `Retrieve ${shift.name}?`,
-      description: "The shift comes back as active, keeping its rank unless another shift took it.",
+      title: `Retrieve ${row.name}?`,
+      description: `The ${lower} comes back as active, keeping its rank unless another ${lower} took it.`,
       action: "Retrieve",
-      run: () => retrieveShift(shift.id),
-      done: "Shift retrieve successfully",
+      run: () => page.store.retrieve(row.id),
+      done: `${page.singular} retrieve successfully`,
     },
     permanent: {
-      title: `Permanently delete ${shift.name}?`,
-      description: "The shift is removed for good. This cannot be undone.",
+      title: `Permanently delete ${row.name}?`,
+      description: `The ${lower} is removed for good. This cannot be undone.`,
       action: "Delete permanently",
       destructive: true,
-      run: () => deleteShiftPermanently(shift.id),
-      done: "Shift deleted successfully",
+      run: () => page.store.removePermanently(row.id),
+      done: `${page.singular} deleted successfully`,
     },
   }
   const dialog = confirm ? dialogs[confirm] : null
@@ -123,14 +128,14 @@ export function ShiftActions({ shift, returnTo, can }: { shift: ShiftRow; return
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem asChild>
-            <Link href={`/basic-settings/shifts/${shift.id}${back}`}>
+            <Link href={`${base}${back}`}>
               <EyeIcon />
               Details
             </Link>
           </DropdownMenuItem>
           {!deleted && can.edit && (
             <DropdownMenuItem asChild>
-              <Link href={`/basic-settings/shifts/${shift.id}/edit${back}`}>
+              <Link href={`${base}/edit${back}`}>
                 <PencilIcon />
                 Edit
               </Link>
@@ -193,7 +198,7 @@ export function ShiftActions({ shift, returnTo, can }: { shift: ShiftRow; return
 
       <Dialog open={ranking} onOpenChange={setRanking}>
         <DialogContent className="sm:max-w-sm">
-          {ranking && <RankForm shift={shift} onDone={() => setRanking(false)} />}
+          {ranking && <RankForm page={page} row={row} onDone={() => setRanking(false)} />}
         </DialogContent>
       </Dialog>
     </>
@@ -202,7 +207,7 @@ export function ShiftActions({ shift, returnTo, can }: { shift: ShiftRow; return
 
 // The legacy rank modal: the institute's maximum rank (GetMaxRank) and the
 // rank to move to. The API applies legacy UpdateRank's rules and messages.
-function RankForm({ shift, onDone }: { shift: ShiftRow; onDone: () => void }) {
+function RankForm({ page, row, onDone }: { page: LookupPage; row: LookupRow; onDone: () => void }) {
   const id = React.useId()
   const [max, setMax] = React.useState<number>()
   const [value, setValue] = React.useState("")
@@ -210,8 +215,8 @@ function RankForm({ shift, onDone }: { shift: ShiftRow; onDone: () => void }) {
   const [pending, setPending] = React.useState(false)
 
   React.useEffect(() => {
-    getShiftMaxRank(shift.id).then(setMax, (reason: Error) => setError(reason.message))
-  }, [shift.id])
+    page.store.getMaxRank(row.id).then(setMax, (reason: Error) => setError(reason.message))
+  }, [page, row.id])
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -222,7 +227,7 @@ function RankForm({ shift, onDone }: { shift: ShiftRow; onDone: () => void }) {
     }
     setPending(true)
     try {
-      await setShiftRank(shift.id, rank, shift.rank)
+      await page.store.setRank(row.id, rank, row.rank)
       toast.success("Rank updated successfully")
       onDone()
     } catch (reason) {
@@ -236,8 +241,8 @@ function RankForm({ shift, onDone }: { shift: ShiftRow; onDone: () => void }) {
       <DialogHeader>
         <DialogTitle>Change rank</DialogTitle>
         <DialogDescription>
-          {shift.name} is at rank {shift.rank}
-          {max ? ` of ${max}` : ""}. Shifts in between move by one.
+          {row.name} is at rank {row.rank}
+          {max ? ` of ${max}` : ""}. {page.plural} in between move by one.
         </DialogDescription>
       </DialogHeader>
       <Field data-invalid={!!error}>

@@ -1,16 +1,16 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { BranchForm } from "@/components/branches/branch-form"
+import { LookupForm } from "@/components/basic-settings/lookup/lookup-form"
 
 export const metadata: Metadata = {
-  title: "Add branch · SMS Admin",
+  title: "Add Branch · SMS Admin",
 }
 
-export default function NewBranchPage() {
+export default function Page() {
   return (
     <Suspense>
-      <BranchForm />
+      <LookupForm lookup="branches" />
     </Suspense>
   )
 }

@@ -1,17 +1,17 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { ShiftSurfaceList } from "@/components/shifts/shift-surface-list"
+import { LookupSurfaceList } from "@/components/basic-settings/lookup/lookup-surface-list"
 
 export const metadata: Metadata = {
   title: "Shift Manage · SMS Admin",
 }
 
 // Legacy Shift/Manage.
-export default function ShiftsManagePage() {
+export default function Page() {
   return (
     <Suspense>
-      <ShiftSurfaceList surface="Manage" />
+      <LookupSurfaceList lookup="shifts" surface="Manage" />
     </Suspense>
   )
 }

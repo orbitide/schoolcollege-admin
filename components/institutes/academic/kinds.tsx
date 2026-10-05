@@ -163,9 +163,10 @@ export type KindConfig = {
   store: RecordStore<EditableRecord>
 }
 
-// Shifts and branches are on the API: read-only lookups with the accessors pickers and names use.
+// Shifts, branches and academic years are on the API: read-only lookups with the accessors pickers and names use.
 const shiftSource = shiftStore as unknown as RecordStore<EditableRecord>
 const branchSource = branchStore as unknown as RecordStore<EditableRecord>
+const yearSource = yearStore as unknown as RecordStore<EditableRecord>
 
 function asEditable<T extends AcademicRecord>(store: RecordStore<T>) {
   return store as unknown as RecordStore<EditableRecord>
@@ -489,7 +490,7 @@ export const academicKinds = {
     softDelete: true,
     recordFilters: [
       { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
-      { key: "yearId", label: "Year", allLabel: "All years", store: asEditable(yearStore) },
+      { key: "yearId", label: "Year", allLabel: "All years", store: yearSource },
     ],
     fields: [
       mediumField,
@@ -506,7 +507,7 @@ export const academicKinds = {
         label: "Year",
         type: "record",
         required: true,
-        source: asEditable(yearStore),
+        source: yearSource,
       },
       { key: "shortName", label: "Short name", type: "text", required: true, unique: true },
       { key: "relatedSectionName", label: "Related section", type: "text" },
@@ -573,7 +574,7 @@ export const academicKinds = {
       {
         label: "Year",
         render: (r) =>
-          r.yearId == null ? "All" : <RecordName store={asEditable(yearStore)} id={r.yearId} />,
+          r.yearId == null ? "All" : <RecordName store={yearSource} id={r.yearId} />,
       },
       {
         label: "Shift",
@@ -655,13 +656,13 @@ export const academicKinds = {
     copyable: true,
     recordFilters: [
       { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
-      { key: "yearId", label: "Year", allLabel: "All years", store: asEditable(yearStore) },
+      { key: "yearId", label: "Year", allLabel: "All years", store: yearSource },
     ],
     detailSection: (r) => <ClassYearSubjectDetails record={r as unknown as ClassYearSubject} />,
     fields: [
       { key: "medium", label: "Academic medium", type: "select", options: academicMediums, allLabel: "All medium", showWhen: mediumEnabled },
       { key: "classId", label: "Academic class", type: "record", source: asEditable(classStore) },
-      { key: "yearId", label: "Academic year", type: "record", source: asEditable(yearStore) },
+      { key: "yearId", label: "Academic year", type: "record", source: yearSource },
       { key: "perStudentSubjectCount", label: "Per student subject count", type: "integer" },
     ],
     columns: [
@@ -676,7 +677,7 @@ export const academicKinds = {
       },
       {
         label: "Year",
-        render: (r) => <RecordName store={asEditable(yearStore)} id={r.yearId} />,
+        render: (r) => <RecordName store={yearSource} id={r.yearId} />,
       },
       {
         label: "Per student",
@@ -690,33 +691,6 @@ export const academicKinds = {
       },
     ],
     store: asEditable(classYearSubjectStore),
-  },
-  years: {
-    segment: "years",
-    singular: "Academic year",
-    plural: "Academic years",
-    description: "Years that classes, sections and results are recorded against.",
-    fields: [
-      { key: "code", label: "Code", type: "text", required: true, unique: true },
-      {
-        key: "isCurrent",
-        label: "Current academic year",
-        type: "checkbox",
-        current: true,
-        wide: true,
-      },
-    ],
-    columns: [{ label: "Code", render: (r) => String(r.code || "—") }],
-    inUse: (record) =>
-      usedBy(
-        asEditable(classYearSubjectStore),
-        "yearId",
-        record,
-        "class subject set",
-        "class subject sets"
-      ),
-    studentMatch: (r, _s, e) => e?.yearId === r.id,
-    store: asEditable(yearStore),
   },
   sessions: {
     segment: "sessions",
@@ -1130,7 +1104,6 @@ export const academicKinds = {
 export type AcademicKind = keyof typeof academicKinds
 
 export const academicKindOrder: AcademicKind[] = [
-  "years",
   "sessions",
   "groups",
   "classes",

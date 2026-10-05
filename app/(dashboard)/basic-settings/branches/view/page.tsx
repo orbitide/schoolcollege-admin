@@ -1,17 +1,17 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { BranchSurfaceList } from "@/components/branches/branch-surface-list"
+import { LookupSurfaceList } from "@/components/basic-settings/lookup/lookup-surface-list"
 
 export const metadata: Metadata = {
   title: "Branch View · SMS Admin",
 }
 
 // Legacy Branch/ManageView.
-export default function BranchesViewPage() {
+export default function Page() {
   return (
     <Suspense>
-      <BranchSurfaceList surface="View" />
+      <LookupSurfaceList lookup="branches" surface="View" />
     </Suspense>
   )
 }
