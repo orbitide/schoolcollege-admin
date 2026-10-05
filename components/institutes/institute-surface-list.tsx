@@ -141,7 +141,7 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
 
   const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`
   const columns = React.useMemo(
-    () => instituteColumns({ offset: (page - 1) * pageSize, returnTo, can }),
+    () => instituteColumns({ offset: (page - 1) * pageSize, returnTo, can, admin }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- can is derived from surface
     [page, pageSize, returnTo, surface]
   )
@@ -285,15 +285,17 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
 
 const column = createDataTableColumns<Institute>()
 
-// The legacy list's columns; Name, Short name, EIIN, Rank and Date (last modified) sort on the API.
+// The legacy list's columns, plus the SaaS status on Manage Admin; Name, Short name, EIIN, Rank, Date (last modified) and Subscription sort on the API.
 function instituteColumns({
   offset,
   returnTo,
   can,
+  admin,
 }: {
   offset: number
   returnTo: string
   can: ReturnType<typeof useInstituteCapabilities>
+  admin: boolean
 }): DataTableColumn<Institute>[] {
   return column.columns([
     column.display({
@@ -366,8 +368,18 @@ function instituteColumns({
         ),
       meta: { className: "whitespace-nowrap text-xs tabular-nums" },
     }),
+    // Manage Admin's SaaS lifecycle (Active / Trial / Suspended), the one its Status filter and cards use.
+    ...(admin
+      ? [
+          column.accessor("status", {
+            header: "Subscription",
+            enableSorting: true,
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
+          }),
+        ]
+      : []),
     column.display({
-      id: "status",
+      id: "recordStatus",
       header: "Status",
       cell: ({ row }) => <StatusBadge status={row.original.recordStatus} />,
     }),
