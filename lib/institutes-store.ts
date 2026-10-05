@@ -173,9 +173,10 @@ export async function updateInstituteConfiguration(id: number, configuration: In
   return replace(await httpClient.post<Institute>(`/instituteconfiguration/general-configuration/${id}`, configuration))
 }
 
-// Absent Fine Date Configuration: only the fine period's days.
+// Absent Fine Date Configuration: the fine period's days, saved with the rest of the configuration.
 export async function updateInstituteFinePeriod(id: number, period: { dayFrom: number; dayTo: number }) {
-  return replace(await httpClient.post<Institute>(`/configuration/attendance-absent-fine-date-configuration/${id}`, period))
+  const configuration = await getInstituteConfiguration(id)
+  return updateInstituteConfiguration(id, { ...configuration, ...period })
 }
 
 // Institute Manage Admin: the SaaS lifecycle (Active / Trial / Suspended).
