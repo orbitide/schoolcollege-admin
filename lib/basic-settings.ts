@@ -41,3 +41,17 @@ export function basicSettingsResource(segment: string) {
 export function basicSettingsItem(segment: string) {
   return basicSettingsMenu.find((item) => item.segment === segment && item.kind)
 }
+
+// One institute's records on a section's own page (buildings live under Seat Plan).
+export function instituteSettingsHref(segment: string, instituteId: number) {
+  const base = segment === "buildings" ? "/seat-plans/buildings/admin" : basicSettingsHref(segment)
+  return `${base}?institute=${instituteId}`
+}
+
+// Where an institute's record list lives: the section's own page when it has
+// one, otherwise the institute's list page.
+export function instituteListHref(segment: string, instituteId: number) {
+  return segment === "buildings" || segment === "holidays" || basicSettingsItem(segment)
+    ? instituteSettingsHref(segment, instituteId)
+    : `/institutes/${instituteId}/${segment}`
+}

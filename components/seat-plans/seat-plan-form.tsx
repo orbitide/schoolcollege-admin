@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { buildingStore, classStore, groupStore, subjectStore } from "@/lib/academic-store"
+import { instituteSettingsHref } from "@/lib/basic-settings"
 import { useCurrentUser } from "@/lib/current-user"
 import {
   assignRolls,
@@ -535,7 +536,7 @@ function SeatPlanEditor({
             <p className="text-sm text-muted-foreground">
               No rooms yet.{" "}
               <Link
-                href={`/institutes/${institute.id}/buildings`}
+                href={instituteSettingsHref("buildings", institute.id)}
                 className="font-medium text-foreground underline underline-offset-4"
               >
                 Add buildings and rooms

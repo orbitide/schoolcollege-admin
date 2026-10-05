@@ -19,6 +19,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { classStore } from "@/lib/academic-store"
+import { instituteListHref } from "@/lib/basic-settings"
 import { useAccessibleInstitutes, useCurrentUser } from "@/lib/current-user"
 import {
   addHoliday,
@@ -71,7 +72,7 @@ export function HolidayForm({
   const listHref = returnTo?.startsWith("/")
     ? returnTo
     : instituteId != null
-      ? `/institutes/${instituteId}/holidays`
+      ? instituteListHref("holidays", instituteId)
       : "/basic-settings/holidays"
 
   const preset =

@@ -1,23 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { ArrowLeftIcon, PencilIcon } from "lucide-react"
 
-import {
-  academicKindOrder,
-  isKindEnabled,
-  kindConfig,
-  kindLabels,
-} from "@/components/institutes/academic/kinds"
 import { InstituteActions } from "@/components/institutes/institute-actions"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { Button } from "@/components/ui/button"
-import type { Institute } from "@/lib/institutes"
 import { useInstitute } from "@/lib/institutes-store"
-import { cn } from "@/lib/utils"
 
-// Shared header and tab bar for every /institutes/[id]/* page.
+// Shared header for every /institutes/[id]/* page.
 // Unknown ids render nothing so the page's own not-found state shows alone.
 export function InstituteHeader({ id }: { id: number }) {
   const router = useRouter()
@@ -71,60 +63,6 @@ export function InstituteHeader({ id }: { id: number }) {
           />
         </div>
       </div>
-
-      <InstituteNav institute={institute} />
     </div>
-  )
-}
-
-function InstituteNav({ institute }: { institute: Institute }) {
-  const pathname = usePathname()
-  const base = `/institutes/${institute.id}`
-  const tabs = [
-    { href: base, label: "Overview", exact: true },
-    ...academicKindOrder
-      .filter((kind) => isKindEnabled(kind, institute))
-      .map((kind) => ({
-        href: `${base}/${kindConfig(kind).segment}`,
-        label: kindLabels(kind, institute).plural,
-        exact: false,
-      })),
-    { href: `${base}/configuration`, label: "Configuration", exact: false },
-  ]
-  // Holidays have their own module (legacy HolidayAndEventSettings) but keep
-  // their tab where the generic list had it, before Buildings.
-  const buildings = tabs.findIndex((tab) => tab.href === `${base}/buildings`)
-  tabs.splice(buildings < 0 ? tabs.length - 1 : buildings, 0, {
-    href: `${base}/holidays`,
-    label: "Holidays & events",
-    exact: false,
-  })
-
-  return (
-    <nav
-      aria-label="Institute sections"
-      className="-mx-1 flex gap-1 overflow-x-auto border-b px-1"
-    >
-      {tabs.map((tab) => {
-        const active = tab.exact
-          ? pathname === tab.href
-          : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-              active
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </Link>
-        )
-      })}
-    </nav>
   )
 }

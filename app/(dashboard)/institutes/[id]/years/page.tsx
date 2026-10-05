@@ -1,15 +1,8 @@
-import type { Metadata } from "next"
+import { redirect } from "next/navigation"
 
-import { RecordList } from "@/components/institutes/academic/record-list"
+import { instituteSettingsHref } from "@/lib/basic-settings"
 
-export const metadata: Metadata = {
-  title: "Academic years · SMS Admin",
-}
-
-export default async function YearsPage({
-  params,
-}: PageProps<"/institutes/[id]/years">) {
+export default async function Page({ params }: PageProps<"/institutes/[id]/years">) {
   const { id } = await params
-
-  return <RecordList instituteId={Number(id)} kind="years" />
+  redirect(instituteSettingsHref("years", Number(id)))
 }

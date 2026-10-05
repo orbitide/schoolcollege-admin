@@ -57,6 +57,7 @@ import {
   editableStatus,
   type RecordStatus,
 } from "@/lib/institutes"
+import { instituteListHref } from "@/lib/basic-settings"
 import { useCurrentUser } from "@/lib/current-user"
 import { useInstitute } from "@/lib/institutes-store"
 import { cn } from "@/lib/utils"
@@ -68,9 +69,9 @@ const ALL = "__all"
 // all-institutes admin list the form was opened from (`?returnTo=`).
 function useListHref(instituteId: number, segment: string) {
   const returnTo = useSearchParams().get("returnTo")
-  return returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/")
+  return returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/") || returnTo?.startsWith("/seat-plans/")
     ? returnTo
-    : `/institutes/${instituteId}/${segment}`
+    : instituteListHref(segment, instituteId)
 }
 
 export function RecordForm({

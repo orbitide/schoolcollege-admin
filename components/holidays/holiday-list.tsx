@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { classStore } from "@/lib/academic-store"
-import { capabilitiesFor, useSurfaces, type AccessSurface } from "@/lib/access"
+import { capabilitiesFor, type AccessSurface } from "@/lib/access"
 import { useAccessibleInstitutes } from "@/lib/current-user"
 import { formatDateRange, useAllHolidays } from "@/lib/holidays"
 import { academicMediums } from "@/lib/institutes"
@@ -48,24 +48,16 @@ const titles: Record<AccessSurface, string> = {
 // rank. The surface decides the actions: Manage adds, edits, (in)activates,
 // reranks and (unlike most resources, as legacy Manage does) deletes; Admin
 // also sees deleted ones, retrieves them and deletes them for good; View only
-// reads. With `instituteId` it is that institute's tab.
-export function HolidayList({
-  surface,
-  instituteId,
-}: {
-  surface: AccessSurface
-  instituteId?: number
-}) {
+// reads.
+export function HolidayList({ surface }: { surface: AccessSurface }) {
   const can = capabilitiesFor(surface, { resource: HOLIDAYS_RESOURCE, softDelete: true })
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const accessible = useAccessibleInstitutes()
+  const institutes = useAccessibleInstitutes()
   const holidays = useAllHolidays()
   const classes = classStore.useAll()
-  const embedded = instituteId != null
-  const institutes = embedded ? accessible.filter((i) => i.id === instituteId) : accessible
-  const canPick = !embedded && institutes.length > 1
+  const canPick = institutes.length > 1
 
   const param = (key: string) => searchParams.get(key) ?? ""
   const institute = canPick
@@ -111,12 +103,10 @@ export function HolidayList({
   }
 
   const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`
-  const newHref = embedded
-    ? `/institutes/${instituteId}/holidays/new`
-    : `${HOLIDAYS_HREF}/new?${new URLSearchParams({
-        ...(institute && { institute: String(institute.id) }),
-        returnTo,
-      })}`
+  const newHref = `${HOLIDAYS_HREF}/new?${new URLSearchParams({
+    ...(institute && { institute: String(institute.id) }),
+    returnTo,
+  })}`
   const showInstitute = !institute
   const showMedium = institutes.some(
     (i) => i.enableMedium && (!institute || i.id === institute.id)
@@ -125,22 +115,20 @@ export function HolidayList({
 
   return (
     <div
-      className={cn("flex flex-col gap-4 md:gap-6", !embedded && "px-4 py-4 md:py-6 lg:px-6")}
+      className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6"
     >
       <Card>
         <CardHeader className="flex flex-wrap items-start justify-between gap-2 border-b">
           <div className="flex flex-col gap-1">
             <CardTitle className="text-lg">
-              {embedded ? "Holidays & Events" : titles[surface]}
+              {titles[surface]}
             </CardTitle>
             <CardDescription>
               Holidays and events for the whole institute, or for one medium or class.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!embedded && (
-              <SurfaceTabs resource={HOLIDAYS_RESOURCE} baseUrl={HOLIDAYS_HREF} current={surface} />
-            )}
+            <SurfaceTabs resource={HOLIDAYS_RESOURCE} baseUrl={HOLIDAYS_HREF} current={surface} />
             {can.create && institutes.length > 0 && (
               <Button asChild size="sm">
                 <Link href={newHref}>
@@ -285,11 +273,7 @@ export function HolidayList({
                       <HolidayActions
                         holiday={holiday}
                         returnTo={returnTo}
-                        editHref={
-                          embedded
-                            ? `/institutes/${instituteId}/holidays/${holiday.id}/edit`
-                            : `${HOLIDAYS_HREF}/${holiday.id}/edit?returnTo=${encodeURIComponent(returnTo)}`
-                        }
+                        editHref={`${HOLIDAYS_HREF}/${holiday.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
                         can={can}
                       />
                     </TableCell>
@@ -310,8 +294,3 @@ export function HolidayList({
   )
 }
 
-// An institute's Holidays tab: its list on the best surface the user holds.
-export function InstituteHolidays({ instituteId }: { instituteId: number }) {
-  const surfaces = useSurfaces(HOLIDAYS_RESOURCE)
-  return <HolidayList surface={surfaces[0] ?? "View"} instituteId={instituteId} />
-}

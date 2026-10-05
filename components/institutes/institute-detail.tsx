@@ -43,6 +43,7 @@ import {
   subjectStore,
   yearStore,
 } from "@/lib/academic-store"
+import { instituteSettingsHref } from "@/lib/basic-settings"
 import { formatTaka, monthName, useBillingSettings } from "@/lib/billing"
 import { formatDateRange, holidayStore } from "@/lib/holidays"
 import { latestInvoices, useBillOf, useOutstanding } from "@/lib/institute-billing"
@@ -231,7 +232,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Current academic year">
               <Link
-                href={`/institutes/${institute.id}/years`}
+                href={instituteSettingsHref("years", institute.id)}
                 className="underline-offset-4 hover:underline"
               >
                 {currentYear ? currentYear.name : "Not set"}
@@ -239,7 +240,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Classes">
               <ManageLink
-                href={`/institutes/${institute.id}/classes`}
+                href={instituteSettingsHref("classes", institute.id)}
                 count={classes.length}
                 noun="class"
                 plural="classes"
@@ -247,7 +248,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Sections">
               <ManageLink
-                href={`/institutes/${institute.id}/sections`}
+                href={instituteSettingsHref("sections", institute.id)}
                 count={sections.length}
                 noun="section"
                 plural="sections"
@@ -255,7 +256,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Subjects">
               <ManageLink
-                href={`/institutes/${institute.id}/subjects`}
+                href={instituteSettingsHref("subjects", institute.id)}
                 count={subjects.length}
                 noun="subject"
                 plural="subjects"
@@ -263,7 +264,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Letter grades">
               <ManageLink
-                href={`/institutes/${institute.id}/grades`}
+                href={instituteSettingsHref("grades", institute.id)}
                 count={grades.length}
                 noun="grade"
                 plural="grades"
@@ -271,7 +272,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Result remarks">
               <ManageLink
-                href={`/institutes/${institute.id}/remarks`}
+                href={instituteSettingsHref("remarks", institute.id)}
                 count={remarks.length}
                 noun="remark"
                 plural="remarks"
@@ -279,7 +280,7 @@ export function InstituteDetail({ id }: { id: number }) {
             </Row>
             <Row label="Next holiday">
               <Link
-                href={`/institutes/${institute.id}/holidays`}
+                href={instituteSettingsHref("holidays", institute.id)}
                 className="underline-offset-4 hover:underline"
               >
                 {nextHoliday
@@ -294,7 +295,7 @@ export function InstituteDetail({ id }: { id: number }) {
             <Row label="Branch">
               {institute.enableBranch ? (
                 <ManageLink
-                  href={`/institutes/${institute.id}/branches`}
+                  href={instituteSettingsHref("branches", institute.id)}
                   count={branches.length}
                   noun="branch"
                   plural="branches"
@@ -306,7 +307,7 @@ export function InstituteDetail({ id }: { id: number }) {
             <Row label="Shift">
               {institute.enableShift ? (
                 <ManageLink
-                  href={`/institutes/${institute.id}/shifts`}
+                  href={instituteSettingsHref("shifts", institute.id)}
                   count={shifts.length}
                   noun="shift"
                   plural="shifts"
@@ -318,7 +319,7 @@ export function InstituteDetail({ id }: { id: number }) {
             <Row label="Group">
               {institute.enableGroup ? (
                 <ManageLink
-                  href={`/institutes/${institute.id}/groups`}
+                  href={instituteSettingsHref("groups", institute.id)}
                   count={groups.length}
                   noun="group"
                   plural="groups"
@@ -339,7 +340,7 @@ export function InstituteDetail({ id }: { id: number }) {
             <Row label="Student house">
               {institute.enableStudentHouse ? (
                 <ManageLink
-                  href={`/institutes/${institute.id}/houses`}
+                  href={instituteSettingsHref("houses", institute.id)}
                   count={houses.length}
                   noun={houseLabels.singular.toLowerCase()}
                   plural={houseLabels.plural.toLowerCase()}
@@ -351,7 +352,7 @@ export function InstituteDetail({ id }: { id: number }) {
             <Row label="Student category">
               {institute.enableStudentCategory ? (
                 <ManageLink
-                  href={`/institutes/${institute.id}/categories`}
+                  href={instituteSettingsHref("categories", institute.id)}
                   count={categories.length}
                   noun={categoryLabels.singular.toLowerCase()}
                   plural={categoryLabels.plural.toLowerCase()}

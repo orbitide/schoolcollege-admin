@@ -16,6 +16,7 @@ import {
 import { NotFound } from "@/components/institutes/academic/record-list"
 import { StatusBadge } from "@/components/institutes/status-badge"
 import { Button } from "@/components/ui/button"
+import { instituteListHref } from "@/lib/basic-settings"
 import {
   Card,
   CardContent,
@@ -44,9 +45,9 @@ export function RecordDetail({
   const returnTo = useSearchParams().get("returnTo")
   const base = `/institutes/${instituteId}/${config.segment}`
   const listHref =
-    returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/")
+    returnTo?.startsWith("/basic-settings/") || returnTo?.startsWith("/configurations/") || returnTo?.startsWith("/fees/") || returnTo?.startsWith("/routine/") || returnTo?.startsWith("/seat-plans/")
       ? returnTo
-      : base
+      : instituteListHref(config.segment, instituteId)
 
   if (!institute) return <NotFound />
   const { singular, plural } = kindLabels(kind, institute)
