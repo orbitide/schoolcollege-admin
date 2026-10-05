@@ -4,8 +4,6 @@ import * as React from "react"
 
 import { logChanges } from "@/lib/common-log"
 import type {
-  AcademicClass,
-  AcademicGroup,
   AcademicRecord,
   Building,
   ClassYearSubject,
@@ -340,56 +338,11 @@ export { letterGradeStore } from "@/lib/grades-store"
 // Result remarks are on the API; their lookup stands in for the old store.
 export { resultRemarkStore } from "@/lib/remarks-store"
 
-export const groupStore = createRecordStore<AcademicGroup>(
-  "AcademicClassGroup",
-  [
-    ["Science", "SCI", "বিজ্ঞান"],
-    ["Business Studies", "BUS", "ব্যবসায় শিক্ষা"],
-    ["Humanities", "HUM", "মানবিক"],
-  ].map(([name, code, nameBn], index) => ({
-    id: index + 1,
-    instituteId: 1,
-    name,
-    code,
-    nameBn,
-    rank: index + 1,
-    status: "Active" as const,
-  }))
-)
+// Academic groups are on the API; their picker lookup (ids are the legacy group values) stands in for the old store.
+export { groupStore } from "@/lib/groups-store"
 
-// Each class promotes from the one before it; Nine and Ten split into groups.
-export const classStore = createRecordStore<AcademicClass>(
-  "AcademicClass",
-  [
-    ["Class Six", "ষষ্ঠ শ্রেণি", "601"],
-    ["Class Seven", "সপ্তম শ্রেণি", "701"],
-    ["Class Eight", "অষ্টম শ্রেণি", "801"],
-    ["Class Nine", "নবম শ্রেণি", "901"],
-    ["Class Ten", "দশম শ্রেণি", "1001"],
-  ].map(([name, nameBn, rollStartFrom], index) => {
-    const grouped = index >= 3
-    const ssc = index === 4
-    // Class Eight sits JSC and issues testimonials for it, as Ten does for SSC.
-    const jsc = index === 2
-    return {
-      id: index + 1,
-      instituteId: 1,
-      name,
-      nameBn,
-      medium: "",
-      rollStartFrom,
-      previousClassId: index ? index : null,
-      hasSession: false,
-      hasSubjectGroup: grouped,
-      groupIds: grouped ? [1, 2, 3] : [],
-      publicExams: ssc ? ["SSC"] : jsc ? ["JSC"] : [],
-      testimonialExams: ssc ? ["SSC"] : jsc ? ["JSC"] : [],
-      enableBoardAdmission: ssc,
-      rank: index + 1,
-      status: "Active" as const,
-    }
-  })
-)
+// Academic classes are on the API; their picker lookup stands in for the old store.
+export { classStore } from "@/lib/classes-store"
 
 // Sections A and B of every seeded class, in the morning and day shifts.
 export const sectionStore = createRecordStore<Section>(
@@ -564,8 +517,6 @@ export function removeInstituteRecords(instituteId: number) {
     dashboardMenuGroupStore,
     classYearSubjectStore,
     buildingStore,
-    groupStore,
-    classStore,
     sectionStore,
     subjectStore,
   ]) {

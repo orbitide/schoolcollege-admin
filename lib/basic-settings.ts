@@ -11,8 +11,6 @@ export const basicSettingsMenu: {
   kind?: AcademicKind
   surfaces?: boolean
 }[] = [
-  { title: "Groups", segment: "groups", kind: "groups" },
-  { title: "Academic Classes", segment: "classes", kind: "classes" },
   { title: "Sections", segment: "sections", kind: "sections" },
   { title: "Subjects", segment: "subjects", kind: "subjects" },
   { title: "Class Year Subjects", segment: "class-subjects", kind: "classSubjects" },

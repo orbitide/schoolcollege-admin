@@ -20,7 +20,6 @@ import {
 import {
   academicMediums,
   academicVersions,
-  publicExams,
   roomCapacity,
   sectionGenders,
   type AcademicRecord,
@@ -162,6 +161,8 @@ export type KindConfig = {
 const shiftSource = shiftStore as unknown as RecordStore<EditableRecord>
 const branchSource = branchStore as unknown as RecordStore<EditableRecord>
 const yearSource = yearStore as unknown as RecordStore<EditableRecord>
+const classSource = classStore as unknown as RecordStore<EditableRecord>
+const groupSource = groupStore as unknown as RecordStore<EditableRecord>
 
 function asEditable<T extends AcademicRecord>(store: RecordStore<T>) {
   return store as unknown as RecordStore<EditableRecord>
@@ -200,29 +201,6 @@ function RecordName({
   return record ? record.name : fallback
 }
 
-// Comma-separated names of referenced records, e.g. a class's groups.
-function RecordNames({
-  store,
-  instituteId,
-  ids,
-}: {
-  store: RecordStore<EditableRecord>
-  instituteId: number
-  ids: unknown
-}) {
-  const wanted = list(ids).map(Number)
-  const names = store
-    .useList(instituteId)
-    .filter((record) => wanted.includes(record.id))
-    .map((record) => record.name)
-  return names.length ? names.join(", ") : "—"
-}
-
-// Array field values; anything else reads as empty.
-function list(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String) : []
-}
-
 // "Used by 2 sections." when other records still point at this one, either
 // through `key` directly or as one of the ids in an array field.
 function usedBy(
@@ -244,215 +222,9 @@ function usedBy(
   return `Used by ${count} ${count === 1 ? noun : plural}${suffix ? ` ${suffix}` : ""}.`
 }
 
-// True when `classId`'s promotion chain leads back to `record`, so picking it
-// as the previous class would make a loop.
-function promotesFrom(classId: number, record: EditableRecord) {
-  const classes = classStore.getList(record.instituteId)
-  const seen = new Set<number>()
-  let current: number | null = classId
-  while (current != null && !seen.has(current)) {
-    if (current === record.id) return true
-    seen.add(current)
-    const next = classes.find((c) => c.id === current)
-    current = next?.previousClassId ?? null
-  }
-  return false
-}
-
 const groupEnabled = (institute: Institute) => institute.enableGroup
 
 export const academicKinds = {
-  groups: {
-    segment: "groups",
-    singular: "Group",
-    plural: "Groups",
-    description: "Streams such as Science or Humanities that a class can be split into.",
-    toggle: "enableGroup",
-    fields: [
-      { key: "code", label: "Code", type: "text", required: true, unique: true },
-      { key: "nameBn", label: "Name (Bangla)", type: "text" },
-    ],
-    columns: [
-      { label: "Code", render: (r) => String(r.code || "—") },
-      { label: "Name (Bangla)", render: (r) => String(r.nameBn || "—") },
-    ],
-    inUse: (record) =>
-      usedBy(asEditable(classStore), "groupIds", record, "class", "classes") ??
-      usedBy(asEditable(sectionStore), "groupId", record, "section", "sections"),
-    studentMatch: (r, _s, e) => e?.groupId === r.id,
-    store: asEditable(groupStore),
-  },
-  classes: {
-    segment: "classes",
-    singular: "Class",
-    plural: "Classes",
-    description: "Levels the institute teaches, such as Class Six, in teaching order.",
-    uniqueScope: ["medium"],
-    fields: [
-      { key: "nameBn", label: "Name (Bangla)", type: "text", required: true },
-      {
-        key: "medium",
-        label: "Medium",
-        type: "select",
-        options: academicMediums,
-        required: true,
-        showWhen: mediumEnabled,
-      },
-      {
-        key: "rollStartFrom",
-        label: "Roll (start from)",
-        type: "text",
-        placeholder: "e.g. 601",
-        description: "First class roll given to students of this class.",
-      },
-      {
-        key: "previousClassId",
-        label: "Previous class",
-        type: "record",
-        source: asEditable(classStore),
-        allLabel: "None",
-        description: "The class students are promoted from.",
-      },
-      {
-        key: "hasSession",
-        label: "Has session",
-        type: "checkbox",
-        description: "Admits by session (e.g. 2025-26) instead of by academic year.",
-      },
-      {
-        key: "enableBoardAdmission",
-        label: "Enable board admission",
-        type: "checkbox",
-        description: "Students of this class are registered with the education board.",
-      },
-      {
-        key: "hasSubjectGroup",
-        label: "Has subject group",
-        type: "checkbox",
-        description: "Students choose a group such as Science or Humanities.",
-        showWhen: groupEnabled,
-      },
-      {
-        key: "groupIds",
-        label: "Subject groups",
-        type: "multiselect",
-        source: asEditable(groupStore),
-        wide: true,
-        showWhen: groupEnabled,
-        showWhenValues: (values) => values.hasSubjectGroup === true,
-      },
-      {
-        key: "publicExams",
-        label: "Public exams",
-        type: "multiselect",
-        options: publicExams,
-        wide: true,
-        description: "Board exams students of this class sit.",
-      },
-      {
-        key: "testimonialExams",
-        label: "Enable testimonial for",
-        type: "multiselect",
-        options: publicExams,
-        wide: true,
-        showWhenValues: (values) =>
-          Array.isArray(values.publicExams) && values.publicExams.length > 0,
-      },
-    ],
-    columns: [
-      { label: "Name (Bangla)", render: (r) => String(r.nameBn || "—") },
-      {
-        label: "Medium",
-        showWhen: mediumEnabled,
-        render: (r) => String(r.medium || "—"),
-      },
-      {
-        label: "Previous class",
-        render: (r) => (
-          <RecordName store={asEditable(classStore)} id={r.previousClassId} />
-        ),
-      },
-      { label: "Roll from", render: (r) => String(r.rollStartFrom || "—") },
-      { label: "Session", render: (r) => (r.hasSession ? "Yes" : "—") },
-      {
-        label: "Groups",
-        showWhen: groupEnabled,
-        render: (r) =>
-          r.hasSubjectGroup ? (
-            <RecordNames
-              store={asEditable(groupStore)}
-              instituteId={r.instituteId}
-              ids={r.groupIds}
-            />
-          ) : (
-            "—"
-          ),
-      },
-      {
-        label: "Public exams",
-        render: (r) => {
-          const exams = list(r.publicExams)
-          if (!exams.length) return "—"
-          const testimonial = list(r.testimonialExams)
-          return (
-            <span className="flex flex-wrap gap-1">
-              {exams.map((exam) => (
-                <Badge
-                  key={exam}
-                  variant="outline"
-                  title={testimonial.includes(exam) ? "Testimonial enabled" : undefined}
-                >
-                  {exam}
-                  {testimonial.includes(exam) && " · T"}
-                </Badge>
-              ))}
-            </span>
-          )
-        },
-      },
-      {
-        label: "Board admission",
-        render: (r) => (r.enableBoardAdmission ? "Yes" : "—"),
-      },
-    ],
-    validate: (values, { record }) => {
-      const errors: Errors = {}
-      const exams = list(values.publicExams)
-      const stray = list(values.testimonialExams).filter(
-        (exam) => !exams.includes(exam)
-      )
-      if (stray.length) {
-        errors.testimonialExams = `Tick ${stray.join(", ")} as a public exam first.`
-      }
-      if (values.hasSubjectGroup && !list(values.groupIds).length) {
-        errors.groupIds = "Pick at least one subject group."
-      }
-      const previous = values.previousClassId
-      if (record && previous != null && promotesFrom(Number(previous), record)) {
-        errors.previousClassId = `This would make ${record.name} its own previous class.`
-      }
-      return errors
-    },
-    inUse: (record) =>
-      usedBy(asEditable(sectionStore), "classId", record, "section", "sections") ??
-      usedBy(
-        asEditable(classStore),
-        "previousClassId",
-        record,
-        "class",
-        "classes",
-        "as its previous class"
-      ) ??
-      usedBy(
-        asEditable(classYearSubjectStore),
-        "classId",
-        record,
-        "class subject set",
-        "class subject sets"
-      ),
-    studentMatch: (r, _s, e) => e?.classId === r.id,
-    store: asEditable(classStore),
-  },
   sections: {
     segment: "sections",
     singular: "Section",
@@ -463,7 +235,7 @@ export const academicKinds = {
     uniqueScope: ["classId", "shiftId", "branchId", "version", "medium", "yearId", "gender", "groupId"],
     softDelete: true,
     recordFilters: [
-      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "classId", label: "Class", allLabel: "All classes", store: classSource },
       { key: "yearId", label: "Year", allLabel: "All years", store: yearSource },
     ],
     fields: [
@@ -473,7 +245,7 @@ export const academicKinds = {
         label: "Class",
         type: "record",
         required: true,
-        source: asEditable(classStore),
+        source: classSource,
         sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
       },
       {
@@ -513,7 +285,7 @@ export const academicKinds = {
         key: "groupId",
         label: "Group",
         type: "record",
-        source: asEditable(groupStore),
+        source: groupSource,
         allLabel: "No group",
         showWhen: groupEnabled,
       },
@@ -543,7 +315,7 @@ export const academicKinds = {
       mediumColumn,
       {
         label: "Class",
-        render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} />,
+        render: (r) => <RecordName store={classSource} id={r.classId} />,
       },
       {
         label: "Year",
@@ -563,7 +335,7 @@ export const academicKinds = {
       {
         label: "Group",
         showWhen: groupEnabled,
-        render: (r) => <RecordName store={asEditable(groupStore)} id={r.groupId} />,
+        render: (r) => <RecordName store={groupSource} id={r.groupId} />,
       },
       {
         label: "Gender",
@@ -629,13 +401,13 @@ export const academicKinds = {
     softDelete: true,
     copyable: true,
     recordFilters: [
-      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "classId", label: "Class", allLabel: "All classes", store: classSource },
       { key: "yearId", label: "Year", allLabel: "All years", store: yearSource },
     ],
     detailSection: (r) => <ClassYearSubjectDetails record={r as unknown as ClassYearSubject} />,
     fields: [
       { key: "medium", label: "Academic medium", type: "select", options: academicMediums, allLabel: "All medium", showWhen: mediumEnabled },
-      { key: "classId", label: "Academic class", type: "record", source: asEditable(classStore) },
+      { key: "classId", label: "Academic class", type: "record", source: classSource },
       { key: "yearId", label: "Academic year", type: "record", source: yearSource },
       { key: "perStudentSubjectCount", label: "Per student subject count", type: "integer" },
     ],
@@ -647,7 +419,7 @@ export const academicKinds = {
       },
       {
         label: "Class",
-        render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} />,
+        render: (r) => <RecordName store={classSource} id={r.classId} />,
       },
       {
         label: "Year",
@@ -834,13 +606,13 @@ export const academicKinds = {
     plural: "Chapters & Topics",
     description: "The chapters of each class subject, and optional topics inside them, that questions are filed under.",
     recordFilters: [
-      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
+      { key: "classId", label: "Class", allLabel: "All classes", store: classSource },
       { key: "subjectId", label: "Subject", allLabel: "All subjects", store: asEditable(subjectStore) },
     ],
     uniqueScope: ["classId", "subjectId", "parentId"],
     fields: [
       { key: "nameBn", label: "Name (Bangla)", type: "text" },
-      { key: "classId", label: "Class", type: "record", required: true, source: asEditable(classStore) },
+      { key: "classId", label: "Class", type: "record", required: true, source: classSource },
       { key: "subjectId", label: "Subject", type: "record", required: true, source: asEditable(subjectStore) },
       {
         key: "parentId",
@@ -855,7 +627,7 @@ export const academicKinds = {
     ],
     columns: [
       { label: "Bangla name", render: (r) => String(r.nameBn || "—") },
-      { label: "Class", render: (r) => <RecordName store={asEditable(classStore)} id={r.classId} /> },
+      { label: "Class", render: (r) => <RecordName store={classSource} id={r.classId} /> },
       { label: "Subject", render: (r) => <RecordName store={asEditable(subjectStore)} id={r.subjectId} /> },
       {
         label: "Chapter",
@@ -879,8 +651,6 @@ export const academicKinds = {
 export type AcademicKind = keyof typeof academicKinds
 
 export const academicKindOrder: AcademicKind[] = [
-  "groups",
-  "classes",
   "sections",
   "subjects",
   "classSubjects",

@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { classStore } from "@/lib/academic-store"
 import { branchApi, type BranchRow } from "@/lib/branches-store"
 import { categoryApi } from "@/lib/categories-store"
+import { classApi, publicExamFlags, type ClassRow } from "@/lib/classes-store"
+import { groupApi, groupOf, groupStore, legacyGroups, type GroupRow, type LegacyGroup } from "@/lib/groups-store"
 import { gradeApi, type GradeRow } from "@/lib/grades-store"
 import { houseApi, mediumLabels, type AcademicMedium, type HouseRow } from "@/lib/houses-store"
 import type { LookupRow } from "@/lib/lookup-store"
@@ -176,7 +178,313 @@ function NumberField({
 
 const isNumber = (text: string) => /^\d+(\.\d+)?$/.test(text.trim())
 
+const groupColumn = createDataTableColumns<GroupRow>()
+const classColumn = createDataTableColumns<ClassRow>()
+
+const legacyGroupLabel = (group: LegacyGroup) => legacyGroups.find((g) => g.group === group)?.label ?? group
+
+// The institute's names for the groups a class offers (the legacy names where it has none).
+function ClassGroupNames({ instituteId, groups }: { instituteId: number; groups: LegacyGroup[] }) {
+  const named = groupStore.useList(instituteId)
+  if (!groups.length) return "—"
+  return groups.map((group) => named.find((g) => groupOf(g.id) === group)?.name ?? legacyGroupLabel(group)).join(", ")
+}
+
+function ClassNameOf({ id }: { id: number | null }) {
+  const academicClass = classStore.useOne(id ?? -1)
+  return id == null ? "None" : (academicClass?.name ?? "—")
+}
+
+// The institute's other classes, for the class students are promoted from.
+function PreviousClassSelect({
+  instituteId,
+  exceptId,
+  value,
+  onChange,
+}: {
+  instituteId: number
+  exceptId?: number
+  value: string
+  onChange: (value: string) => void
+}) {
+  const classes = classStore.useList(instituteId).filter((c) => c.id !== exceptId && (c.status === "Active" || String(c.id) === value))
+  return (
+    <OptionSelect
+      id="previousAcademicClassId"
+      value={value}
+      allLabel="None"
+      options={classes.map((c) => ({ value: String(c.id), label: c.name }))}
+      onChange={onChange}
+    />
+  )
+}
+
+// The groups the institute has named (Academic Group), to tick the ones a class offers.
+function GroupChecks({
+  instituteId,
+  value,
+  onChange,
+}: {
+  instituteId: number
+  value: LegacyGroup[]
+  onChange: (value: LegacyGroup[]) => void
+}) {
+  const named = groupStore.useList(instituteId).filter((g) => g.status === "Active")
+  if (!named.length) return <p className="text-sm text-muted-foreground">Name the institute&apos;s groups in Academic Group first.</p>
+  return (
+    <div className="flex flex-wrap gap-4">
+      {named.map((g) => {
+        const group = groupOf(g.id)
+        if (!group) return null
+        return (
+          <Field key={g.id} orientation="horizontal" className="w-fit">
+            <Checkbox
+              id={`group-${group}`}
+              checked={value.includes(group)}
+              onCheckedChange={(checked) => onChange(checked === true ? [...value, group] : value.filter((v) => v !== group))}
+            />
+            <FieldLabel htmlFor={`group-${group}`}>{g.name}</FieldLabel>
+          </Field>
+        )
+      })}
+    </div>
+  )
+}
+
+type ClassFlag = "hasSession" | "hasSubjectGroup" | "enableBoardAdmission" | (typeof publicExamFlags)[number]["is"]
+
 export const lookupPages = {
+  groups: define<GroupRow>({
+    store: groupApi,
+    segment: "groups",
+    singular: "Academic Group",
+    plural: "Academic Groups",
+    description: "The institute's names for the board's subject groups (Science, Business Studies, Humanities) its classes offer.",
+    searchPlaceholder: "Search name, code or Bangla name",
+    columns: [
+      groupColumn.accessor("group", {
+        header: "Group",
+        enableSorting: true,
+        cell: ({ row }) => legacyGroupLabel(row.original.group),
+      }),
+      groupColumn.accessor("code", { header: "Code", enableSorting: true }),
+      groupColumn.accessor("nameBn", { header: "Name (Bangla)", enableSorting: false, cell: ({ row }) => row.original.nameBn || "—" }),
+    ],
+    details: (row) => [
+      ["Group", legacyGroupLabel(row.group)],
+      ["Code", row.code],
+      ["Name (Bangla)", row.nameBn || "—"],
+    ],
+    form: {
+      nameRequired: "Insert Academic Group Name.",
+      useFields: function useGroupFields(row) {
+        const [group, setGroup] = React.useState<string>(row?.group ?? "")
+        const code = useText(row?.code ?? "")
+        const nameBn = useText(row?.nameBn ?? "")
+        return {
+          validate: () => ({
+            group: group ? undefined : "Select the group.",
+            code: code.value.trim() ? undefined : "Insert Academic Group Code.",
+          }),
+          values: () => ({ group, code: code.value.trim(), nameBn: nameBn.value.trim() }),
+          reset: () => {
+            setGroup("")
+            code.setValue("")
+            nameBn.setValue("")
+          },
+          render: (errors: LookupErrors) => (
+            <>
+              <Field data-invalid={!!errors.group}>
+                <FieldLabel htmlFor="group">Group</FieldLabel>
+                {/* Classes store the legacy group, so it can't change once named. */}
+                {row ? (
+                  <Input id="group" value={legacyGroupLabel(row.group)} disabled />
+                ) : (
+                  <OptionSelect
+                    id="group"
+                    value={group}
+                    allLabel="Select group"
+                    options={legacyGroups.map((g) => ({ value: g.group, label: g.label }))}
+                    onChange={setGroup}
+                  />
+                )}
+                <FieldError>{errors.group}</FieldError>
+              </Field>
+              <TextField id="code" label="Code" value={code.value} error={errors.code} onChange={code.setValue} />
+              <TextField id="nameBn" label="Name (Bangla)" value={nameBn.value} error={errors.nameBn} onChange={nameBn.setValue} />
+            </>
+          ),
+        }
+      },
+    },
+  }),
+
+  classes: define<ClassRow>({
+    store: classApi,
+    segment: "classes",
+    singular: "Academic Class",
+    plural: "Academic Classes",
+    description: "Levels the institute teaches, such as Class Six, in teaching order within each medium.",
+    searchPlaceholder: "Search name or Bangla name",
+    // Legacy Academic Class Manage has no rank.
+    capabilities: { Manage: { reorder: false } },
+    columns: [
+      classColumn.accessor("nameBn", { header: "Name (Bangla)", enableSorting: true, cell: ({ row }) => row.original.nameBn || "—" }),
+      classColumn.accessor("academicMedium", {
+        header: "Medium",
+        enableSorting: true,
+        cell: ({ row }) => (row.original.academicMedium ? mediumLabels[row.original.academicMedium] : "—"),
+      }),
+      classColumn.display({
+        id: "previous",
+        header: "Previous class",
+        cell: ({ row }) => <ClassNameOf id={row.original.previousAcademicClassId} />,
+      }),
+      classColumn.display({
+        id: "groups",
+        header: "Groups",
+        cell: ({ row }) =>
+          row.original.hasSubjectGroup ? (
+            <ClassGroupNames instituteId={row.original.instituteId} groups={row.original.academicGroups} />
+          ) : (
+            "—"
+          ),
+      }),
+      classColumn.display({
+        id: "exams",
+        header: "Public exams",
+        cell: ({ row }) => publicExamFlags.filter((flag) => row.original[flag.is]).map((flag) => flag.exam).join(", ") || "—",
+      }),
+    ],
+    details: (row) => [
+      ["Name (Bangla)", row.nameBn || "—"],
+      ["Medium", row.academicMedium ? mediumLabels[row.academicMedium] : "—"],
+      ["Roll starts from", row.rollStartFrom || "—"],
+      ["Previous class", <ClassNameOf key="previous" id={row.previousAcademicClassId} />],
+      ["Has session", row.hasSession ? "Yes" : "No"],
+      [
+        "Subject groups",
+        row.hasSubjectGroup ? <ClassGroupNames key="groups" instituteId={row.instituteId} groups={row.academicGroups} /> : "No",
+      ],
+      ["Public exams", publicExamFlags.filter((flag) => row[flag.is]).map((flag) => flag.exam).join(", ") || "—"],
+      ["Testimonial for", publicExamFlags.find((flag) => row[flag.testimonial])?.exam ?? "—"],
+      ["Board admission", row.enableBoardAdmission ? "Yes" : "No"],
+    ],
+    form: {
+      nameRequired: "Insert Academic Class Name.",
+      useFields: function useClassFields(row) {
+        const nameBn = useText(row?.nameBn ?? "")
+        const rollStartFrom = useText(row?.rollStartFrom ?? "")
+        const [medium, setMedium] = React.useState<string>(row?.academicMedium ?? "")
+        const [previousId, setPreviousId] = React.useState(row?.previousAcademicClassId ? String(row.previousAcademicClassId) : "")
+        const [groups, setGroups] = React.useState<LegacyGroup[]>(row?.academicGroups ?? [])
+        const [testimonial, setTestimonial] = React.useState<string>(
+          publicExamFlags.find((flag) => row?.[flag.testimonial])?.exam ?? ""
+        )
+        const [flags, setFlags] = React.useState<Record<ClassFlag, boolean>>(() => ({
+          hasSession: row?.hasSession ?? false,
+          hasSubjectGroup: row?.hasSubjectGroup ?? false,
+          enableBoardAdmission: row?.enableBoardAdmission ?? false,
+          isJSC: row?.isJSC ?? false,
+          isSSC: row?.isSSC ?? false,
+          isHSC: row?.isHSC ?? false,
+          isOLevel: row?.isOLevel ?? false,
+          isALevel: row?.isALevel ?? false,
+        }))
+        const check = (flag: ClassFlag, label: string) => (
+          <Field key={flag} orientation="horizontal" className="w-fit">
+            <Checkbox
+              id={flag}
+              checked={flags[flag]}
+              onCheckedChange={(checked) => setFlags((current) => ({ ...current, [flag]: checked === true }))}
+            />
+            <FieldLabel htmlFor={flag}>{label}</FieldLabel>
+          </Field>
+        )
+
+        return {
+          validate: (institute) => ({
+            academicMedium: institute?.enableMedium && !medium ? "No Academic Medium Found." : undefined,
+            academicGroups: flags.hasSubjectGroup && !groups.length ? "No Academic Group Selected." : undefined,
+          }),
+          values: () => ({
+            nameBn: nameBn.value.trim(),
+            rollStartFrom: rollStartFrom.value.trim(),
+            academicMedium: medium || null,
+            previousAcademicClassId: previousId ? Number(previousId) : null,
+            ...flags,
+            academicGroups: flags.hasSubjectGroup ? groups : [],
+            ...Object.fromEntries(publicExamFlags.map((flag) => [flag.testimonial, flag.exam === testimonial])),
+          }),
+          reset: () => {
+            nameBn.setValue("")
+            rollStartFrom.setValue("")
+            setPreviousId("")
+          },
+          render: (errors: LookupErrors, institute) => (
+            <>
+              <TextField id="nameBn" label="Name (Bangla)" value={nameBn.value} error={errors.nameBn} onChange={nameBn.setValue} />
+              {institute?.enableMedium && (
+                <Field data-invalid={!!errors.academicMedium}>
+                  <FieldLabel htmlFor="academicMedium">Medium</FieldLabel>
+                  <OptionSelect
+                    id="academicMedium"
+                    value={medium}
+                    allLabel="Select medium"
+                    options={Object.entries(mediumLabels).map(([value, label]) => ({ value, label }))}
+                    onChange={setMedium}
+                  />
+                  <FieldError>{errors.academicMedium}</FieldError>
+                </Field>
+              )}
+              <TextField
+                id="rollStartFrom"
+                label="Roll starts from"
+                value={rollStartFrom.value}
+                error={errors.rollStartFrom}
+                onChange={rollStartFrom.setValue}
+              />
+              {institute && (
+                <Field data-invalid={!!errors.previousAcademicClassId}>
+                  <FieldLabel htmlFor="previousAcademicClassId">Previous class</FieldLabel>
+                  <PreviousClassSelect instituteId={institute.id} exceptId={row?.id} value={previousId} onChange={setPreviousId} />
+                  <FieldError>{errors.previousAcademicClassId}</FieldError>
+                </Field>
+              )}
+              <div className="flex flex-wrap gap-x-6 gap-y-3 sm:col-span-2">
+                {check("hasSession", "Has session")}
+                {check("enableBoardAdmission", "Board admission")}
+                {check("hasSubjectGroup", "Has subject group")}
+              </div>
+              {flags.hasSubjectGroup && institute && (
+                <Field data-invalid={!!errors.academicGroups} className="sm:col-span-2">
+                  <FieldLabel>Subject groups</FieldLabel>
+                  <GroupChecks instituteId={institute.id} value={groups} onChange={setGroups} />
+                  <FieldError>{errors.academicGroups}</FieldError>
+                </Field>
+              )}
+              <Field className="sm:col-span-2">
+                <FieldLabel>Public exams</FieldLabel>
+                <div className="flex flex-wrap gap-x-6 gap-y-3">{publicExamFlags.map((flag) => check(flag.is, flag.exam))}</div>
+              </Field>
+              <Field data-invalid={!!errors.enableTestimonial}>
+                <FieldLabel htmlFor="testimonial">Testimonial for</FieldLabel>
+                <OptionSelect
+                  id="testimonial"
+                  value={testimonial}
+                  allLabel="None"
+                  options={publicExamFlags.map((flag) => ({ value: flag.exam, label: flag.exam }))}
+                  onChange={setTestimonial}
+                />
+                <FieldError>{errors.enableTestimonial}</FieldError>
+              </Field>
+            </>
+          ),
+        }
+      },
+    },
+  }),
+
   grades: define<GradeRow>({
     store: gradeApi,
     segment: "grades",
