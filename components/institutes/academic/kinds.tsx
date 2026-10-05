@@ -163,6 +163,9 @@ export type KindConfig = {
   store: RecordStore<EditableRecord>
 }
 
+// Shifts are on the API: a read-only lookup with the accessors pickers and names use.
+const shiftSource = shiftStore as unknown as RecordStore<EditableRecord>
+
 function asEditable<T extends AcademicRecord>(store: RecordStore<T>) {
   return store as unknown as RecordStore<EditableRecord>
 }
@@ -309,20 +312,6 @@ export const academicKinds = {
       usedBy(asEditable(buildingStore), "branchId", record, "building", "buildings"),
     studentMatch: (r, _s, e) => e?.branchId === r.id,
     store: asEditable(branchStore),
-  },
-  shifts: {
-    segment: "shifts",
-    singular: "Shift",
-    plural: "Shifts",
-    description: "Daily sessions such as Morning and Day, used by classes and routines.",
-    toggle: "enableShift",
-    softDelete: true,
-    fields: [],
-    columns: [],
-    inUse: (record) =>
-      usedBy(asEditable(sectionStore), "shiftId", record, "section", "sections"),
-    studentMatch: (r, _s, e) => e?.shiftId === r.id,
-    store: asEditable(shiftStore),
   },
   groups: {
     segment: "groups",
@@ -560,7 +549,7 @@ export const academicKinds = {
         label: "Shift",
         type: "record",
         required: true,
-        source: asEditable(shiftStore),
+        source: shiftSource,
         showWhen: (institute) => institute.enableShift,
       },
       {
@@ -615,7 +604,7 @@ export const academicKinds = {
       {
         label: "Shift",
         showWhen: (institute) => institute.enableShift,
-        render: (r) => <RecordName store={asEditable(shiftStore)} id={r.shiftId} />,
+        render: (r) => <RecordName store={shiftSource} id={r.shiftId} />,
       },
       {
         label: "Version",
@@ -1076,7 +1065,7 @@ export const academicKinds = {
         key: "shiftId",
         label: "Shift",
         type: "record",
-        source: asEditable(shiftStore),
+        source: shiftSource,
         allLabel: "All shifts",
         showWhen: (institute) => institute.enableShift,
       },
@@ -1090,7 +1079,7 @@ export const academicKinds = {
       {
         label: "Shift",
         showWhen: (institute) => institute.enableShift,
-        render: (r) => <RecordName store={asEditable(shiftStore)} id={r.shiftId} fallback="All shifts" />,
+        render: (r) => <RecordName store={shiftSource} id={r.shiftId} fallback="All shifts" />,
       },
       { label: "Break", render: (r) => (r.isBreak ? <Badge variant="secondary">Break</Badge> : "—") },
     ],
@@ -1168,7 +1157,6 @@ export type AcademicKind = keyof typeof academicKinds
 
 export const academicKindOrder: AcademicKind[] = [
   "branches",
-  "shifts",
   "years",
   "sessions",
   "groups",

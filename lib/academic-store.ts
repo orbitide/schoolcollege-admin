@@ -19,7 +19,6 @@ import type {
   RecordStatus,
   ResultRemark,
   Section,
-  Shift,
   StudentCategory,
   StudentHouse,
   Subject,
@@ -343,11 +342,8 @@ export const buildingStore = createRecordStore<Building>("Building", [
   },
 ])
 
-export const shiftStore = createRecordStore<Shift>("Shift", [
-  { id: 1, instituteId: 1, name: "Morning", rank: 1, status: "Active" },
-  { id: 2, instituteId: 1, name: "Day", rank: 2, status: "Active" },
-  { id: 3, instituteId: 2, name: "Morning", rank: 1, status: "Active" },
-])
+// Shifts are on the API; their picker lookup stands in for the old store.
+export { shiftStore } from "@/lib/shifts-store"
 
 export const yearStore = createRecordStore<AcademicYear>("AcademicYear", [
   {
@@ -708,7 +704,6 @@ export function removeInstituteRecords(instituteId: number) {
     classYearSubjectStore,
     buildingStore,
     branchStore,
-    shiftStore,
     groupStore,
     classStore,
     sectionStore,

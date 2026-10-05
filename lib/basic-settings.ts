@@ -12,7 +12,6 @@ export const basicSettingsMenu: {
   surfaces?: boolean
 }[] = [
   { title: "Branches", segment: "branches", kind: "branches" },
-  { title: "Shifts", segment: "shifts", kind: "shifts" },
   { title: "Academic Years", segment: "years", kind: "years" },
   { title: "Academic Sessions", segment: "sessions", kind: "sessions" },
   { title: "Groups", segment: "groups", kind: "groups" },
