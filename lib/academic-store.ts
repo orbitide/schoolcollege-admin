@@ -9,7 +9,6 @@ import type {
   AcademicRecord,
   AcademicSession,
   AcademicYear,
-  Branch,
   Building,
   ClassYearSubject,
   ClassYearSubjectDetail,
@@ -282,26 +281,8 @@ export function createRecordStore<T extends AcademicRecord>(
   }
 }
 
-export const branchStore = createRecordStore<Branch>("Branch", [
-  {
-    id: 1,
-    instituteId: 1,
-    name: "Main Campus",
-    code: "MC",
-    address: "10 Road 1, Dhaka",
-    rank: 1,
-    status: "Active",
-  },
-  {
-    id: 2,
-    instituteId: 1,
-    name: "Uttara Branch",
-    code: "UB",
-    address: "Sector 7, Uttara, Dhaka",
-    rank: 2,
-    status: "Active",
-  },
-])
+// Branches are on the API; their picker lookup stands in for the old store.
+export { branchStore } from "@/lib/branches-store"
 
 const room = (id: number, name: string, totalColumns: number, benchesPerColumn: number, studentsPerBench: number) => ({
   id,
@@ -703,7 +684,6 @@ export function removeInstituteRecords(instituteId: number) {
     dashboardMenuGroupStore,
     classYearSubjectStore,
     buildingStore,
-    branchStore,
     groupStore,
     classStore,
     sectionStore,

@@ -163,8 +163,9 @@ export type KindConfig = {
   store: RecordStore<EditableRecord>
 }
 
-// Shifts are on the API: a read-only lookup with the accessors pickers and names use.
+// Shifts and branches are on the API: read-only lookups with the accessors pickers and names use.
 const shiftSource = shiftStore as unknown as RecordStore<EditableRecord>
+const branchSource = branchStore as unknown as RecordStore<EditableRecord>
 
 function asEditable<T extends AcademicRecord>(store: RecordStore<T>) {
   return store as unknown as RecordStore<EditableRecord>
@@ -286,33 +287,6 @@ function checkRange(
 }
 
 export const academicKinds = {
-  branches: {
-    segment: "branches",
-    singular: "Branch",
-    plural: "Branches",
-    description: "Campuses of this institute. Students and classes belong to a branch.",
-    toggle: "enableBranch",
-    fields: [
-      { key: "code", label: "Code", type: "text", required: true, unique: true },
-      { key: "address", label: "Address", type: "textarea", wide: true },
-    ],
-    columns: [
-      { label: "Code", render: (r) => String(r.code || "—") },
-      {
-        label: "Address",
-        render: (r) => (
-          <span className="block max-w-64 truncate text-muted-foreground">
-            {String(r.address || "—")}
-          </span>
-        ),
-      },
-    ],
-    inUse: (record) =>
-      usedBy(asEditable(sectionStore), "branchId", record, "section", "sections") ??
-      usedBy(asEditable(buildingStore), "branchId", record, "building", "buildings"),
-    studentMatch: (r, _s, e) => e?.branchId === r.id,
-    store: asEditable(branchStore),
-  },
   groups: {
     segment: "groups",
     singular: "Group",
@@ -541,7 +515,7 @@ export const academicKinds = {
         label: "Branch",
         type: "record",
         required: true,
-        source: asEditable(branchStore),
+        source: branchSource,
         showWhen: (institute) => institute.enableBranch,
       },
       {
@@ -589,7 +563,7 @@ export const academicKinds = {
       {
         label: "Branch",
         showWhen: (institute) => institute.enableBranch,
-        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+        render: (r) => <RecordName store={branchSource} id={r.branchId} />,
       },
       mediumColumn,
       {
@@ -956,7 +930,7 @@ export const academicKinds = {
       {
         label: "Branch",
         showWhen: (institute) => institute.enableBranch,
-        render: (r) => <RecordName store={asEditable(branchStore)} id={r.branchId} />,
+        render: (r) => <RecordName store={branchSource} id={r.branchId} />,
       },
       {
         label: "Rooms",
@@ -1156,7 +1130,6 @@ export const academicKinds = {
 export type AcademicKind = keyof typeof academicKinds
 
 export const academicKindOrder: AcademicKind[] = [
-  "branches",
   "years",
   "sessions",
   "groups",
