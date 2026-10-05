@@ -154,7 +154,7 @@ function LookupFormBody({ page, row }: { page: LookupPage; row?: LookupRow }) {
             <Input id="name" value={name} aria-invalid={!!errors.name} onChange={(event) => setName(event.target.value)} />
             <FieldError>{errors.name}</FieldError>
           </Field>
-          {fields.render(errors)}
+          {fields.render(errors, institute)}
         </CardContent>
       </Card>
 

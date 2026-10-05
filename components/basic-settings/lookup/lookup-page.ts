@@ -1,6 +1,7 @@
 import type * as React from "react"
 
 import type { DataTableColumn } from "@/components/data-table/data-table"
+import type { Institute } from "@/lib/institutes"
 import type { LookupRow, LookupStore } from "@/lib/lookup-store"
 
 export type LookupErrors = Record<string, string | undefined>
@@ -38,5 +39,6 @@ export type LookupFields = {
   // The fields' part of the input.
   values: () => Record<string, unknown>
   reset: () => void
-  render: (errors: LookupErrors) => React.ReactNode
+  // `institute` is the one picked on the form (undefined until it is).
+  render: (errors: LookupErrors, institute?: Institute) => React.ReactNode
 }

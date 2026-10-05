@@ -16,7 +16,6 @@ import type {
   RecordStatus,
   ResultRemark,
   Section,
-  StudentHouse,
   Subject,
 } from "@/lib/institutes"
 
@@ -331,25 +330,8 @@ export { sessionStore } from "@/lib/sessions-store"
 
 // Legacy StudentHouse: for the whole institute, or one medium and/or class,
 // ranked within that scope.
-export const houseStore = createRecordStore<StudentHouse>(
-  "StudentHouse",
-  ["Red", "Blue", "Green", "Yellow"].map((color, index) => ({
-    id: index + 1,
-    instituteId: 1,
-    name: `${color} House`,
-    medium: "",
-    classId: null,
-    capacity: 0,
-    rank: index + 1,
-    status: "Active" as const,
-  })),
-  {
-    rankWithin: ["medium", "classId"],
-    // Legacy lists them by medium, then class, then rank.
-    compare: (a, b) =>
-      a.medium.localeCompare(b.medium) || (a.classId ?? 0) - (b.classId ?? 0) || a.rank - b.rank,
-  }
-)
+// Student houses are on the API; their picker lookup stands in for the old store.
+export { houseStore } from "@/lib/houses-store"
 
 // Student categories are on the API; their picker lookup stands in for the old store.
 export { categoryStore } from "@/lib/categories-store"
@@ -642,7 +624,6 @@ export function removeInstituteRecords(instituteId: number) {
     classStore,
     sectionStore,
     subjectStore,
-    houseStore,
     letterGradeStore,
     resultRemarkStore,
   ]) {

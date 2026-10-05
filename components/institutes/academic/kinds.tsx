@@ -11,7 +11,6 @@ import {
   dashboardMenuGroupStore,
   dashboardMenuStore,
   groupStore,
-  houseStore,
   letterGradeStore,
   resultRemarkStore,
   sectionStore,
@@ -690,51 +689,6 @@ export const academicKinds = {
     ],
     store: asEditable(classYearSubjectStore),
   },
-  houses: {
-    segment: "houses",
-    singular: "House",
-    plural: "Houses",
-    description: "Student houses used for co-curricular groups and competitions.",
-    toggle: "enableStudentHouse",
-    labelKey: "studentHouseLabel",
-    // Legacy StudentHouse: for all of the institute, or one medium and/or
-    // class; names are unique, and ranked, within that scope.
-    uniqueScope: ["medium", "classId"],
-    softDelete: true,
-    fields: [
-      mediumField,
-      {
-        key: "classId",
-        label: "Academic class",
-        type: "record",
-        source: asEditable(classStore),
-        allLabel: "All classes",
-        sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
-      },
-      {
-        key: "capacity",
-        label: "Capacity",
-        type: "integer",
-        min: 0,
-        description: "Use 0 for no limit.",
-      },
-    ],
-    columns: [
-      mediumColumn,
-      {
-        label: "Class",
-        render: (r) =>
-          r.classId == null ? "All" : <RecordName store={asEditable(classStore)} id={r.classId} />,
-      },
-      {
-        label: "Capacity",
-        align: "right",
-        render: (r) => (num(r.capacity) ? num(r.capacity).toLocaleString() : "Unlimited"),
-      },
-    ],
-    studentMatch: (r, _s, e) => e?.houseId === r.id,
-    store: asEditable(houseStore),
-  },
   grades: {
     segment: "grades",
     singular: "Letter grade",
@@ -1083,7 +1037,6 @@ export const academicKindOrder: AcademicKind[] = [
   "sections",
   "subjects",
   "classSubjects",
-  "houses",
   "grades",
   "remarks",
   "buildings",
