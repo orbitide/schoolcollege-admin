@@ -54,6 +54,18 @@ function toApiError(error: AxiosError<ProblemDetails>): ApiError {
   if (!response) return new ApiError("Can't reach the server. Check your connection and try again.", 0)
 
   const problem = typeof response.data === "object" && response.data ? response.data : {}
+  // 503: the API is up but the database isn't (ApiExceptionHandler). Other 5xx
+  // details can hold exception text in Development, so they're never shown.
+  if (response.status === 503)
+    return new ApiError(
+      problem.detail ?? "The database isn't reachable right now. Please try again in a moment.",
+      503,
+      {},
+      problem.traceId
+    )
+  if (response.status >= 500)
+    return new ApiError("Something went wrong on the server. Please try again.", response.status, {}, problem.traceId)
+
   const fieldErrors: Record<string, string> = {}
   for (const [key, messages] of Object.entries(problem.errors ?? {})) {
     if (messages.length) fieldErrors[fieldKey(key)] = messages[0]

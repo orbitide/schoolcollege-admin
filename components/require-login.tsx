@@ -15,6 +15,7 @@ import {
   setStampUser,
   type CurrentUser,
 } from "@/lib/current-user"
+import { ApiError } from "@/lib/http-client"
 
 // Shows the panel only when the backend says someone is signed in: on load it
 // asks GET /auth/me (the API checks its own session cookie). A user coming
@@ -23,10 +24,9 @@ import {
 export function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [user, setUser] = React.useState<CurrentUser | null>(null)
-  const [unreachable, setUnreachable] = React.useState(false)
-  const [checking, setChecking] = React.useState(false)
-  // Bumped by Reload to ask the API again.
-  const [attempt, setAttempt] = React.useState(0)
+  // Why the API couldn't answer (no server, no database), shown with Reload.
+  const [unreachable, setUnreachable] = React.useState<string | null>(null)
+  const [reloading, setReloading] = React.useState(false)
 
   React.useEffect(() => {
     let active = true
@@ -38,7 +38,7 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
           // needs the API's menus, so both load first.
           await Promise.all([loadInstitutes(), loadNavigation()])
           if (!active) return
-          setUnreachable(false)
+          setUnreachable(null)
           setStampUser(found)
           // The Users page's Online dot (in-memory until the users API).
           setUserOnline(found.id, true)
@@ -48,34 +48,37 @@ export function RequireLogin({ children }: { children: React.ReactNode }) {
         const back = `${window.location.pathname}${window.location.search}`
         router.replace(back === "/dashboard" ? "/login" : `/login?returnUrl=${encodeURIComponent(back)}`)
       })
-      .catch(() => {
-        if (active) setUnreachable(true)
-      })
-      .finally(() => {
-        if (active) setChecking(false)
+      .catch((error) => {
+        if (!active) return
+        setUnreachable(
+          error instanceof ApiError && error.status !== 0
+            ? error.message
+            : "Can't reach the server. Check that the API is running, then reload."
+        )
       })
     return () => {
       active = false
     }
-  }, [router, attempt])
+  }, [router])
 
   if (unreachable) {
     return (
       <div role="alert" className="m-auto flex flex-col items-center gap-3 p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Can&apos;t reach the server. Check that the API is running, then reload.
+          {unreachable}
         </p>
         <Button
           variant="outline"
           size="sm"
-          disabled={checking}
+          disabled={reloading}
           onClick={() => {
-            setChecking(true)
-            setAttempt((n) => n + 1)
+            // A full page load, so nothing from the failed attempt survives.
+            setReloading(true)
+            window.location.reload()
           }}
         >
-          <RotateCwIcon className={checking ? "animate-spin" : undefined} />
-          {checking ? "Reloading…" : "Reload"}
+          <RotateCwIcon className={reloading ? "animate-spin" : undefined} />
+          {reloading ? "Reloading…" : "Reload"}
         </Button>
       </div>
     )
