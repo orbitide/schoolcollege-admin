@@ -96,7 +96,7 @@ import {
 import { formatTaka } from "@/lib/billing"
 import { useBillOf } from "@/lib/institute-billing"
 import { managers, type Institute } from "@/lib/institutes"
-import { updatePlatformInstitute, useInstitutes } from "@/lib/institutes-store"
+import { updateAdminInstitute, useInstitutes } from "@/lib/institutes-store"
 import { GripVerticalIcon, CircleCheckIcon, BanIcon, LoaderIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
 
 // New in v9: declare the features this table uses — anything you don't
@@ -234,7 +234,7 @@ const columns = columnHelper.columns([
           </Label>
           <Select
             onValueChange={(value) => {
-              updatePlatformInstitute(row.original.id, { ...row.original, manager: value }).then(
+              updateAdminInstitute(row.original.id, { ...row.original, manager: value }).then(
                 () => toast.success(`${value} assigned to ${row.original.name}`),
                 (error: Error) => toast.error(error.message)
               )

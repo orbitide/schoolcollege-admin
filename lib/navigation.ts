@@ -11,6 +11,8 @@ export type NavigationItem = {
   key: string
   // What a role's "*.admin" / "*.manage" / "*.view" wildcard sees it as.
   page: MenuPage
+  // A platform page, from its menu or on its own.
+  platform: boolean
 }
 
 export type NavigationMenu = {
@@ -27,7 +29,7 @@ export type NavigationMenu = {
 
 export function registerMenus(menus: readonly NavigationMenu[]) {
   for (const menu of menus) {
-    for (const item of menu.items) registerMenuKey(item.key, { page: item.page, platform: menu.platform })
+    for (const item of menu.items) registerMenuKey(item.key, { page: item.page, platform: menu.platform || item.platform })
   }
 }
 

@@ -9,7 +9,9 @@ import {
   CircleMinusIcon,
   EllipsisVerticalIcon,
   EyeIcon,
+  PauseIcon,
   PencilIcon,
+  PlayIcon,
   Trash2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -51,6 +53,7 @@ import {
   getInstituteMaxRank,
   retrieveInstitute,
   setInstituteRank,
+  setInstituteStatus,
   toggleInstituteRecordStatus,
 } from "@/lib/institutes-store"
 
@@ -66,13 +69,23 @@ export function InstituteSurfaceActions({
 }: {
   institute: Institute
   returnTo: string
-  can: Capabilities
+  can: Capabilities & { saasStatus?: boolean }
 }) {
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [ranking, setRanking] = React.useState(false)
   const [pending, setPending] = React.useState(false)
   const deleted = institute.recordStatus === "Deleted"
   const active = institute.recordStatus === "Active"
+  const suspended = institute.status === "Suspended"
+
+  async function toggleSaasStatus() {
+    try {
+      await setInstituteStatus(institute.id, suspended ? "Active" : "Suspended")
+      toast.success(`${institute.name} ${suspended ? "reactivated" : "suspended"}`)
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
+  }
 
   async function toggleStatus() {
     try {
@@ -160,6 +173,12 @@ export function InstituteSurfaceActions({
                 <DropdownMenuItem onSelect={toggleStatus}>
                   {active ? <CircleMinusIcon /> : <CircleCheckIcon />}
                   {active ? "Inactivate" : "Activate"}
+                </DropdownMenuItem>
+              )}
+              {can.saasStatus && (
+                <DropdownMenuItem onSelect={toggleSaasStatus}>
+                  {suspended ? <PlayIcon /> : <PauseIcon />}
+                  {suspended ? "Reactivate" : "Suspend"}
                 </DropdownMenuItem>
               )}
               {can.reorder && (
