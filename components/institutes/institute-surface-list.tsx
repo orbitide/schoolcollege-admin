@@ -19,13 +19,13 @@ import { InstituteSurfaceActions } from "@/components/institutes/institute-surfa
 import { NoAccess } from "@/components/no-access"
 import { PageLoader } from "@/components/page-loader"
 import { StatusBadge } from "@/components/institutes/status-badge"
-import { DEFAULT_PAGE_SIZE, TablePagination } from "@/components/table-pagination"
+import { createDataTableColumns, DataTable, type DataTableColumn, type DataTableSort } from "@/components/data-table/data-table"
+import { DEFAULT_PAGE_SIZE } from "@/components/table-pagination"
 import { stamp } from "@/components/term-exams/term-exam-fields"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { capabilitiesFor, type AccessSurface, type Capabilities } from "@/lib/access"
 import { formatTaka } from "@/lib/billing"
 import { useBillOf, type InstituteBill } from "@/lib/institute-billing"
@@ -74,6 +74,8 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
   const type = admin ? instituteTypes.find((value) => value === typeParam) : undefined
   const page = Math.max(1, Number(searchParams.get("page")) || 1)
   const pageSize = Number(searchParams.get("size")) || DEFAULT_PAGE_SIZE
+  const sortParam = searchParams.get("sort")
+  const sort: DataTableSort | undefined = sortParam ? { id: sortParam, desc: searchParams.get("dir") === "desc" } : undefined
 
   // The search box answers at once; the API is asked once typing pauses.
   const [query, setQuery] = React.useState(searchParams.get("q") ?? "")
@@ -84,6 +86,8 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
     search,
     status: saasStatus,
     type,
+    sortBy: sort?.id,
+    sortDirection: sort?.desc ? "desc" : "asc",
     page,
     pageSize,
   })
@@ -136,7 +140,11 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
   }
 
   const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`
-  const columnCount = 11
+  const columns = React.useMemo(
+    () => instituteColumns({ offset: (page - 1) * pageSize, returnTo, can }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- can is derived from surface
+    [page, pageSize, returnTo, surface]
+  )
 
   if (denied) return <NoAccess />
   if (!rows && !error) return <PageLoader label="Loading institutes" />
@@ -255,105 +263,121 @@ export function InstituteSurfaceList({ surface }: { surface: AccessSurface }) {
       </Card>
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader className="bg-muted">
-            <TableRow>
-              <TableHead className="w-12">Sl</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Short name</TableHead>
-              <TableHead>Logo</TableHead>
-              <TableHead>EIIN</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-center">Rank</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows?.length ? (
-              rows.map((institute, index) => {
-                const edited = institute.createdAt !== institute.modifiedAt
-                const deleted = institute.recordStatus === "Deleted"
-                return (
-                  <TableRow key={institute.id} className={cn(deleted && "text-muted-foreground")}>
-                    <TableCell className="tabular-nums text-muted-foreground">{(page - 1) * pageSize + index + 1}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {deleted ? (
-                        institute.name
-                      ) : (
-                        <Link
-                          href={`/institutes/${institute.id}`}
-                          className="font-medium underline-offset-4 hover:underline"
-                        >
-                          {institute.name}
-                        </Link>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{institute.shortName}</TableCell>
-                    <TableCell>
-                      {institute.logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- a data URL from the form
-                        <img src={institute.logoUrl} alt="" className="size-10 rounded object-contain" />
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="tabular-nums">{institute.eiin}</TableCell>
-                    <TableCell>{institute.email}</TableCell>
-                    <TableCell className="text-center tabular-nums">{institute.rank}</TableCell>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {edited ? (
-                        <>
-                          <div>Cr: {institute.createdBy}</div>
-                          <div>Mo: {institute.modifiedBy}</div>
-                        </>
-                      ) : (
-                        institute.createdBy
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs tabular-nums">
-                      {edited ? (
-                        <>
-                          <div>Cr: {stamp(institute.createdAt ?? "")}</div>
-                          <div>Mo: {stamp(institute.modifiedAt ?? "")}</div>
-                        </>
-                      ) : (
-                        stamp(institute.createdAt ?? "")
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={institute.recordStatus} />
-                    </TableCell>
-                    <TableCell>
-                      <InstituteSurfaceActions institute={institute} returnTo={returnTo} can={can} />
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columnCount} className="h-24 text-center text-muted-foreground">
-                  {error ?? (rows ? "No institutes match these filters." : "Loading…")}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <TablePagination
+      <DataTable
+        columns={columns}
+        rows={rows}
+        totalItems={totalItems}
         page={page}
         pageSize={pageSize}
-        totalItems={totalItems}
+        sort={sort}
         noun="institutes"
+        empty="No institutes match these filters."
+        error={error}
+        getRowId={(institute) => String(institute.id)}
+        rowClassName={(institute) => (institute.recordStatus === "Deleted" ? "text-muted-foreground" : undefined)}
         onPageChange={(next) => setParams({ page: next > 1 ? String(next) : undefined })}
         onPageSizeChange={(size) => setParams({ size: size === DEFAULT_PAGE_SIZE ? undefined : String(size) })}
+        onSortChange={(next) => setParams({ sort: next?.id, dir: next?.desc ? "desc" : undefined })}
       />
     </div>
   )
+}
+
+const column = createDataTableColumns<Institute>()
+
+// The legacy list's columns; Name, Short name, EIIN, Rank and Date (last modified) sort on the API.
+function instituteColumns({
+  offset,
+  returnTo,
+  can,
+}: {
+  offset: number
+  returnTo: string
+  can: ReturnType<typeof useInstituteCapabilities>
+}): DataTableColumn<Institute>[] {
+  return column.columns([
+    column.display({
+      id: "sl",
+      header: "Sl",
+      cell: ({ row }) => offset + row.index + 1,
+      meta: { className: "tabular-nums text-muted-foreground", headerClassName: "w-12" },
+    }),
+    column.accessor("name", {
+      header: "Name",
+      enableSorting: true,
+      cell: ({ row }) =>
+        row.original.recordStatus === "Deleted" ? (
+          row.original.name
+        ) : (
+          <Link href={`/institutes/${row.original.id}`} className="font-medium underline-offset-4 hover:underline">
+            {row.original.name}
+          </Link>
+        ),
+      meta: { className: "whitespace-nowrap" },
+    }),
+    column.accessor("shortName", {
+      header: "Short name",
+      enableSorting: true,
+      meta: { className: "whitespace-nowrap" },
+    }),
+    column.display({
+      id: "logo",
+      header: "Logo",
+      cell: ({ row }) =>
+        row.original.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a data URL from the form
+          <img src={row.original.logoUrl} alt="" className="size-10 rounded object-contain" />
+        ) : (
+          "—"
+        ),
+    }),
+    column.accessor("eiin", { header: "EIIN", enableSorting: true, meta: { className: "tabular-nums" } }),
+    column.accessor("email", { header: "Email", enableSorting: false }),
+    column.accessor("rank", {
+      header: "Rank",
+      enableSorting: true,
+      meta: { className: "text-center tabular-nums", headerClassName: "text-center" },
+    }),
+    column.display({
+      id: "user",
+      header: "User",
+      cell: ({ row }) =>
+        row.original.createdAt !== row.original.modifiedAt ? (
+          <>
+            <div>Cr: {row.original.createdBy}</div>
+            <div>Mo: {row.original.modifiedBy}</div>
+          </>
+        ) : (
+          row.original.createdBy
+        ),
+      meta: { className: "whitespace-nowrap text-xs" },
+    }),
+    column.accessor("modifiedAt", {
+      header: "Date",
+      enableSorting: true,
+      cell: ({ row }) =>
+        row.original.createdAt !== row.original.modifiedAt ? (
+          <>
+            <div>Cr: {stamp(row.original.createdAt ?? "")}</div>
+            <div>Mo: {stamp(row.original.modifiedAt ?? "")}</div>
+          </>
+        ) : (
+          stamp(row.original.createdAt ?? "")
+        ),
+      meta: { className: "whitespace-nowrap text-xs tabular-nums" },
+    }),
+    column.display({
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.recordStatus} />,
+    }),
+    column.display({
+      id: "actions",
+      header: "",
+      cell: ({ row }) => <InstituteSurfaceActions institute={row.original} returnTo={returnTo} can={can} />,
+      meta: { headerClassName: "w-10" },
+    }),
+  ])
 }
 
 // Manage Admin's SaaS summary (the former platform page's cards) over the

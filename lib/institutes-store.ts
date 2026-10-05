@@ -90,6 +90,8 @@ export type InstituteSurfaceQuery = {
   search?: string
   status?: InstituteStatus
   type?: string
+  sortBy?: string
+  sortDirection?: "asc" | "desc"
   page: number
   pageSize: number
 }
@@ -108,8 +110,8 @@ export function useInstituteSurface(surface: AccessSurface, query: InstituteSurf
     error?: string
     denied?: boolean
   }>({ key: "" })
-  const { withDeleted = false, search = "", status, type, page, pageSize } = query
-  const key = [surface, withDeleted, search, status, type, page, pageSize, changes].join("|")
+  const { withDeleted = false, search = "", status, type, sortBy, sortDirection, page, pageSize } = query
+  const key = [surface, withDeleted, search, status, type, sortBy, sortDirection, page, pageSize, changes].join("|")
 
   React.useEffect(() => {
     let active = true
@@ -120,6 +122,8 @@ export function useInstituteSurface(surface: AccessSurface, query: InstituteSurf
           search: search || undefined,
           status,
           type,
+          sortBy,
+          sortDirection: sortBy ? sortDirection : undefined,
           pageNumber: page,
           pageSize,
         },
@@ -132,7 +136,7 @@ export function useInstituteSurface(surface: AccessSurface, query: InstituteSurf
     return () => {
       active = false
     }
-  }, [key, surface, withDeleted, search, status, type, page, pageSize])
+  }, [key, surface, withDeleted, search, status, type, sortBy, sortDirection, page, pageSize])
 
   // Keeps showing the previous rows while a refetch is on its way.
   return state
