@@ -112,7 +112,7 @@ function InstituteFormBody({
   const router = useRouter()
   const institutes = useInstitutes()
   // Manage Admin saves the platform's fields too; Manage keeps their values.
-  const admin = useCan()("Institutes/ListAdmin")
+  const admin = useCan()("Institutes/ManageAdmin")
   const [values, setValues] = React.useState<InstituteInput>(() =>
     initial ? { ...emptyInstitute, ...initial } : emptyInstitute
   )

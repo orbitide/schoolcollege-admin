@@ -16,7 +16,7 @@ const listeners = new Set<() => void>()
 
 // Every menu item the API declares, grouped by menu (legacy module › admin
 // menu › menu item): what Manage User Roles and Extra Permission tick. Each
-// item's code is its key ("Institutes/ListManage").
+// item's code is its key ("Institutes/Manage").
 function load() {
   loading ??= httpClient.get<NavigationMenu[]>("/roles/permission-menus").then(
     (list) => {

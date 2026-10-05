@@ -32,7 +32,7 @@ export const surfaceHref = (baseUrl: string, surface: AccessSurface) =>
   `${baseUrl}${SURFACE_PATH[surface]}`
 
 // The admin's own codes ("teacher.manage") for modules not yet on the API;
-// an API page's permission is its menu key ("Institutes/ListManage").
+// an API page's permission is its menu key ("Institutes/Manage").
 export const permissionCode = (resource: string, surface: AccessSurface) =>
   `${resource}.${surface.toLowerCase()}`
 
