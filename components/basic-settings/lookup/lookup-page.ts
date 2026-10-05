@@ -1,6 +1,7 @@
 import type * as React from "react"
 
 import type { DataTableColumn } from "@/components/data-table/data-table"
+import type { AccessSurface, Capabilities } from "@/lib/access"
 import type { Institute } from "@/lib/institutes"
 import type { LookupRow, LookupStore } from "@/lib/lookup-store"
 
@@ -21,6 +22,8 @@ export type LookupPage<R extends LookupRow = LookupRow> = {
   plural: string
   description: string
   searchPlaceholder: string
+  // Where a page offers less than the surface rules (legacy SubActions), e.g. no rank on Manage.
+  capabilities?: Partial<Record<AccessSurface, Partial<Capabilities>>>
   // The legacy grid's own columns, shown after Name.
   columns?: DataTableColumn<R>[]
   // Details rows after Name.

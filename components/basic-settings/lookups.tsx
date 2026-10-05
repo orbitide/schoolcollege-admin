@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { classStore } from "@/lib/academic-store"
 import { branchApi, type BranchRow } from "@/lib/branches-store"
 import { categoryApi } from "@/lib/categories-store"
+import { gradeApi, type GradeRow } from "@/lib/grades-store"
 import { houseApi, mediumLabels, type AcademicMedium, type HouseRow } from "@/lib/houses-store"
 import type { LookupRow } from "@/lib/lookup-store"
 import { remarkApi, type RemarkRow } from "@/lib/remarks-store"
@@ -61,6 +62,7 @@ const branchColumn = createDataTableColumns<BranchRow>()
 const yearColumn = createDataTableColumns<YearRow>()
 const houseColumn = createDataTableColumns<HouseRow>()
 const remarkColumn = createDataTableColumns<RemarkRow>()
+const gradeColumn = createDataTableColumns<GradeRow>()
 
 const ALL = "all"
 
@@ -175,6 +177,104 @@ function NumberField({
 const isNumber = (text: string) => /^\d+(\.\d+)?$/.test(text.trim())
 
 export const lookupPages = {
+  grades: define<GradeRow>({
+    store: gradeApi,
+    segment: "grades",
+    singular: "Letter Grade",
+    plural: "Letter Grades",
+    description: "Marks ranges and the grade point each earns, per medium; results are graded by them.",
+    searchPlaceholder: "Search grade name",
+    // Legacy Letter Grade Manage has no rank.
+    capabilities: { Manage: { reorder: false } },
+    columns: [
+      gradeColumn.accessor("minimumMarks", {
+        header: "Marks",
+        enableSorting: true,
+        cell: ({ row }) => range(row.original.minimumMarks, row.original.maximumMarks),
+        meta: { className: "whitespace-nowrap" },
+      }),
+      gradeColumn.accessor("gradePoint", {
+        header: "Grade point",
+        enableSorting: true,
+        cell: ({ row }) => `${row.original.gradePoint.toFixed(2)} / ${row.original.maxGradePoint.toFixed(2)}`,
+        meta: { className: "whitespace-nowrap tabular-nums" },
+      }),
+      gradeColumn.accessor("academicMedium", {
+        header: "Medium",
+        enableSorting: true,
+        cell: ({ row }) => (row.original.academicMedium ? mediumLabels[row.original.academicMedium] : "All"),
+      }),
+    ],
+    details: (row) => [
+      ["Medium", row.academicMedium ? mediumLabels[row.academicMedium] : "All"],
+      ["Marks", range(row.minimumMarks, row.maximumMarks)],
+      ["Grade point", row.gradePoint.toFixed(2)],
+      ["Max grade point", row.maxGradePoint.toFixed(2)],
+    ],
+    form: {
+      nameRequired: "Insert Letter Grade Name.",
+      useFields: function useGradeFields(row) {
+        const [medium, setMedium] = React.useState<string>(row?.academicMedium ?? "")
+        const minMarks = useText(String(row?.minimumMarks ?? 0))
+        const maxMarks = useText(String(row?.maximumMarks ?? 0))
+        const gradePoint = useText(String(row?.gradePoint ?? 0))
+        const maxGradePoint = useText(String(row?.maxGradePoint ?? 5))
+        return {
+          validate: (institute) => {
+            const errors: LookupErrors = {}
+            const maxGpa = institute?.configuration.maximumGpa ?? 5
+            if (!isNumber(minMarks.value) || !isNumber(maxMarks.value)) errors.minimumMarks = "Enter the minimum and maximum marks."
+            else if (Number(maxMarks.value) > 100) errors.minimumMarks = "Marks must be within 0 and 100."
+            else if (Number(minMarks.value) > Number(maxMarks.value)) errors.minimumMarks = "Minimum marks won't exceed Maximum marks."
+            if (!isNumber(gradePoint.value)) errors.gradePoint = "Enter the grade point."
+            else if (Number(gradePoint.value) > Number(maxGradePoint.value))
+              errors.gradePoint = "Grade point can not exceed the max grade point."
+            if (!isNumber(maxGradePoint.value)) errors.maxGradePoint = "Enter the max grade point."
+            else if (Number(maxGradePoint.value) > maxGpa)
+              errors.maxGradePoint = `Can not exceed the institute's maximum GPA (${maxGpa}).`
+            return errors
+          },
+          values: () => ({
+            academicMedium: medium || null,
+            minimumMarks: Number(minMarks.value),
+            maximumMarks: Number(maxMarks.value),
+            gradePoint: Number(gradePoint.value),
+            maxGradePoint: Number(maxGradePoint.value),
+          }),
+          reset: () => {
+            for (const field of [minMarks, maxMarks, gradePoint]) field.setValue("0")
+          },
+          render: (errors: LookupErrors, institute) => (
+            <>
+              {institute?.enableMedium && (
+                <Field>
+                  <FieldLabel htmlFor="academicMedium">Medium</FieldLabel>
+                  <OptionSelect
+                    id="academicMedium"
+                    value={medium}
+                    allLabel="All mediums"
+                    options={Object.entries(mediumLabels).map(([value, label]) => ({ value, label }))}
+                    onChange={setMedium}
+                  />
+                </Field>
+              )}
+              <NumberField id="minimumMarks" label="Minimum marks" value={minMarks.value} error={errors.minimumMarks} onChange={minMarks.setValue} />
+              <NumberField id="maximumMarks" label="Maximum marks" value={maxMarks.value} onChange={maxMarks.setValue} />
+              <NumberField id="gradePoint" label="Grade point" value={gradePoint.value} error={errors.gradePoint} onChange={gradePoint.setValue} />
+              <NumberField
+                id="maxGradePoint"
+                label="Max grade point"
+                value={maxGradePoint.value}
+                error={errors.maxGradePoint}
+                onChange={maxGradePoint.setValue}
+              />
+            </>
+          ),
+        }
+      },
+    },
+  }),
+
   remarks: define<RemarkRow>({
     store: remarkApi,
     segment: "remarks",

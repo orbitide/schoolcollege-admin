@@ -12,7 +12,6 @@ import type {
   ClassYearSubjectDetail,
   DashboardMenu,
   DashboardMenuGroup,
-  LetterGrade,
   RecordStatus,
   Section,
   Subject,
@@ -335,36 +334,8 @@ export { houseStore } from "@/lib/houses-store"
 // Student categories are on the API; their picker lookup stands in for the old store.
 export { categoryStore } from "@/lib/categories-store"
 
-const seedInstituteIds = [1, 5]
-
-// Standard Bangladesh grading scale out of 5.
-const gradeScale: [string, number, number, number][] = [
-  ["A+", 80, 100, 5],
-  ["A", 70, 79, 4],
-  ["A-", 60, 69, 3.5],
-  ["B", 50, 59, 3],
-  ["C", 40, 49, 2],
-  ["D", 33, 39, 1],
-  ["F", 0, 32, 0],
-]
-
-export const letterGradeStore = createRecordStore<LetterGrade>(
-  "LetterGrade",
-  seedInstituteIds.flatMap((instituteId, i) =>
-    gradeScale.map(([name, minMarks, maxMarks, gradePoint], index) => ({
-      id: i * gradeScale.length + index + 1,
-      instituteId,
-      name,
-      medium: "",
-      minMarks,
-      maxMarks,
-      gradePoint,
-      maxGradePoint: 5,
-      rank: index + 1,
-      status: "Active" as const,
-    }))
-  )
-)
+// Letter grades are on the API; their lookup stands in for the old store.
+export { letterGradeStore } from "@/lib/grades-store"
 
 // Result remarks are on the API; their lookup stands in for the old store.
 export { resultRemarkStore } from "@/lib/remarks-store"
@@ -597,7 +568,6 @@ export function removeInstituteRecords(instituteId: number) {
     classStore,
     sectionStore,
     subjectStore,
-    letterGradeStore,
   ]) {
     store.removeForInstitute(instituteId)
   }

@@ -33,7 +33,7 @@ const suffixes: Record<AccessSurface, string> = { Admin: "Manage Admin", Manage:
 // only reads.
 export function LookupSurfaceList({ lookup, surface }: { lookup: LookupKey; surface: AccessSurface }) {
   const page = lookupPages[lookup]
-  const can = capabilitiesFor(surface, { softDelete: true })
+  const can = { ...capabilitiesFor(surface, { softDelete: true }), ...page.capabilities?.[surface] }
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

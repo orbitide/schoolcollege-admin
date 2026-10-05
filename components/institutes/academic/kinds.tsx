@@ -11,7 +11,6 @@ import {
   dashboardMenuGroupStore,
   dashboardMenuStore,
   groupStore,
-  letterGradeStore,
   sectionStore,
   shiftStore,
   subjectStore,
@@ -170,14 +169,6 @@ function asEditable<T extends AcademicRecord>(store: RecordStore<T>) {
 
 const num = (value: unknown) => Number(value ?? 0)
 
-function formatNumber(value: unknown, digits = 2) {
-  return num(value).toFixed(digits).replace(/\.?0+$/, "")
-}
-
-function range(min: unknown, max: unknown, digits = 2) {
-  return `${formatNumber(min, digits)}–${formatNumber(max, digits)}`
-}
-
 const mediumEnabled = (institute: Institute) => institute.enableMedium
 
 const mediumField: FieldDef = {
@@ -269,19 +260,6 @@ function promotesFrom(classId: number, record: EditableRecord) {
 }
 
 const groupEnabled = (institute: Institute) => institute.enableGroup
-
-function checkRange(
-  errors: Errors,
-  values: FieldValues,
-  minKey: string,
-  maxKey: string,
-  label: string
-) {
-  if (num(values[minKey]) < 0) errors[minKey] = `${label} can not be negative.`
-  else if (num(values[minKey]) > num(values[maxKey])) {
-    errors[minKey] = `Minimum ${label.toLowerCase()} won't exceed the maximum.`
-  }
-}
 
 export const academicKinds = {
   groups: {
@@ -688,58 +666,6 @@ export const academicKinds = {
     ],
     store: asEditable(classYearSubjectStore),
   },
-  grades: {
-    segment: "grades",
-    singular: "Letter grade",
-    plural: "Letter grades",
-    description: "Marks ranges and the grade point each range earns.",
-    uniqueScope: ["medium"],
-    fields: [
-      mediumField,
-      { key: "minMarks", label: "Minimum marks", type: "decimal", required: true, min: 0, max: 100 },
-      { key: "maxMarks", label: "Maximum marks", type: "decimal", required: true, min: 0, max: 100 },
-      { key: "gradePoint", label: "Grade point", type: "decimal", required: true, min: 0 },
-      {
-        key: "maxGradePoint",
-        label: "Max grade point",
-        type: "decimal",
-        required: true,
-        min: 0,
-        description: "Usually the institute's maximum GPA.",
-      },
-    ],
-    columns: [
-      { label: "Marks", render: (r) => range(r.minMarks, r.maxMarks) },
-      {
-        label: "Grade point",
-        render: (r) => `${num(r.gradePoint).toFixed(2)} / ${num(r.maxGradePoint).toFixed(2)}`,
-      },
-      mediumColumn,
-    ],
-    validate: (values, { institute, siblings }) => {
-      const errors: Errors = {}
-      const maxGpa = institute.configuration.maximumGpa
-      checkRange(errors, values, "minMarks", "maxMarks", "Marks")
-      if (num(values.maxMarks) > 100) errors.maxMarks = "Marks can not exceed 100."
-      if (num(values.gradePoint) > num(values.maxGradePoint)) {
-        errors.gradePoint = "Grade point can not exceed the max grade point."
-      }
-      if (num(values.maxGradePoint) > maxGpa) {
-        errors.maxGradePoint = `Can not exceed the institute's maximum GPA (${maxGpa}).`
-      }
-      const overlap = siblings.find(
-        (grade) =>
-          grade.medium === values.medium &&
-          num(grade.minMarks) <= num(values.maxMarks) &&
-          num(values.minMarks) <= num(grade.maxMarks)
-      )
-      if (overlap && !errors.minMarks) {
-        errors.minMarks = `Overlaps ${overlap.name} (${range(overlap.minMarks, overlap.maxMarks)}).`
-      }
-      return errors
-    },
-    store: asEditable(letterGradeStore),
-  },
   // Legacy Buildings, listed under the Seat Plan menu rather than Basic
   // Settings (/seat-plans/buildings/admin), but kept as an institute tab.
   buildings: {
@@ -958,7 +884,6 @@ export const academicKindOrder: AcademicKind[] = [
   "sections",
   "subjects",
   "classSubjects",
-  "grades",
   "buildings",
 ]
 
