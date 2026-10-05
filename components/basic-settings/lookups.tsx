@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { branchApi, type BranchRow } from "@/lib/branches-store"
 import type { LookupRow } from "@/lib/lookup-store"
+import { sessionApi } from "@/lib/sessions-store"
 import { shiftApi } from "@/lib/shifts-store"
 import { yearApi, type YearRow } from "@/lib/years-store"
 
@@ -54,6 +55,16 @@ const branchColumn = createDataTableColumns<BranchRow>()
 const yearColumn = createDataTableColumns<YearRow>()
 
 export const lookupPages = {
+  sessions: define({
+    store: sessionApi,
+    segment: "sessions",
+    singular: "Academic Session",
+    plural: "Academic Sessions",
+    description: "Admission sessions for classes that run across years, such as 2025-26.",
+    searchPlaceholder: "Search session name",
+    form: { nameRequired: "Enter Academic Session Name", useFields: () => noFields },
+  }),
+
   shifts: define({
     store: shiftApi,
     segment: "shifts",

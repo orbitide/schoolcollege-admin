@@ -16,7 +16,6 @@ import {
   letterGradeStore,
   resultRemarkStore,
   sectionStore,
-  sessionStore,
   shiftStore,
   subjectStore,
   yearStore,
@@ -692,17 +691,6 @@ export const academicKinds = {
     ],
     store: asEditable(classYearSubjectStore),
   },
-  sessions: {
-    segment: "sessions",
-    singular: "Session",
-    plural: "Sessions",
-    description: "Admission sessions for classes that run across years, such as 2025-26.",
-    softDelete: true,
-    fields: [],
-    columns: [],
-    studentMatch: (r, _s, e) => e?.sessionId === r.id,
-    store: asEditable(sessionStore),
-  },
   houses: {
     segment: "houses",
     singular: "House",
@@ -1104,7 +1092,6 @@ export const academicKinds = {
 export type AcademicKind = keyof typeof academicKinds
 
 export const academicKindOrder: AcademicKind[] = [
-  "sessions",
   "groups",
   "classes",
   "sections",

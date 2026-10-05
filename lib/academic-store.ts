@@ -7,7 +7,6 @@ import type {
   AcademicClass,
   AcademicGroup,
   AcademicRecord,
-  AcademicSession,
   Building,
   ClassYearSubject,
   ClassYearSubjectDetail,
@@ -328,16 +327,8 @@ export { shiftStore } from "@/lib/shifts-store"
 // Academic years are on the API; their picker lookup stands in for the old store.
 export { yearStore } from "@/lib/years-store"
 
-export const sessionStore = createRecordStore<AcademicSession>("AcademicSession", [
-  { id: 1, instituteId: 1, name: "2025-26", rank: 1, status: "Active" },
-  ...["2023-24", "2024-25", "2025-26", "2026-27"].map((name, index) => ({
-    id: 2 + index,
-    instituteId: 5,
-    name,
-    rank: index + 1,
-    status: (name === "2023-24" ? "Inactive" : "Active") as RecordStatus,
-  })),
-])
+// Academic sessions are on the API; their picker lookup stands in for the old store.
+export { sessionStore } from "@/lib/sessions-store"
 
 // Legacy StudentHouse: for the whole institute, or one medium and/or class,
 // ranked within that scope.
@@ -660,7 +651,6 @@ export function removeInstituteRecords(instituteId: number) {
     classStore,
     sectionStore,
     subjectStore,
-    sessionStore,
     houseStore,
     categoryStore,
     letterGradeStore,
