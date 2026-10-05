@@ -14,7 +14,6 @@ import type {
   DashboardMenuGroup,
   LetterGrade,
   RecordStatus,
-  ResultRemark,
   Section,
   Subject,
 } from "@/lib/institutes"
@@ -367,34 +366,8 @@ export const letterGradeStore = createRecordStore<LetterGrade>(
   )
 )
 
-const remarkScale: Omit<ResultRemark, "id" | "instituteId" | "classId" | "rank" | "status">[] = [
-  { name: "Golden A+", minGpa: 5, maxGpa: 5, minMarks: 80, maxMarks: 100, basedOnGrading: true, isGolden: true, minFailCount: 0, maxFailCount: 0, medium: "" },
-  { name: "Excellent", minGpa: 4.5, maxGpa: 4.99, minMarks: 70, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
-  { name: "Very good", minGpa: 4, maxGpa: 4.49, minMarks: 60, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
-  { name: "Good", minGpa: 3, maxGpa: 3.99, minMarks: 50, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
-  { name: "Satisfactory", minGpa: 1, maxGpa: 2.99, minMarks: 33, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 0, maxFailCount: 0, medium: "" },
-  { name: "Fail", minGpa: 0, maxGpa: 0, minMarks: 0, maxMarks: 100, basedOnGrading: true, isGolden: false, minFailCount: 1, maxFailCount: 99, medium: "" },
-]
-
-export const resultRemarkStore = createRecordStore<ResultRemark>(
-  "ResultRemarks",
-  seedInstituteIds.flatMap((instituteId, i) =>
-    remarkScale.map((remark, index) => ({
-      ...remark,
-      id: i * remarkScale.length + index + 1,
-      instituteId,
-      classId: null,
-      rank: index + 1,
-      status: "Active" as const,
-    }))
-  ),
-  {
-    // Legacy ranks remarks within their medium and class, listed in that order.
-    rankWithin: ["medium", "classId"],
-    compare: (a, b) =>
-      a.medium.localeCompare(b.medium) || (a.classId ?? 0) - (b.classId ?? 0) || a.rank - b.rank,
-  }
-)
+// Result remarks are on the API; their lookup stands in for the old store.
+export { resultRemarkStore } from "@/lib/remarks-store"
 
 export const groupStore = createRecordStore<AcademicGroup>(
   "AcademicClassGroup",
@@ -625,7 +598,6 @@ export function removeInstituteRecords(instituteId: number) {
     sectionStore,
     subjectStore,
     letterGradeStore,
-    resultRemarkStore,
   ]) {
     store.removeForInstitute(instituteId)
   }

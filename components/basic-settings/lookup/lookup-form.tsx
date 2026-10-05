@@ -74,7 +74,7 @@ function LookupFormBody({ page, row }: { page: LookupPage; row?: LookupRow }) {
     const next: LookupErrors = {
       instituteId: instituteId ? undefined : "Select the institute.",
       name: name.trim() ? undefined : page.form.nameRequired,
-      ...fields.validate(),
+      ...fields.validate(institute),
     }
     setErrors(next)
     if (Object.values(next).some(Boolean)) return

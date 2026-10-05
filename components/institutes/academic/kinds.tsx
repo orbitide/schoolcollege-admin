@@ -12,7 +12,6 @@ import {
   dashboardMenuStore,
   groupStore,
   letterGradeStore,
-  resultRemarkStore,
   sectionStore,
   shiftStore,
   subjectStore,
@@ -741,84 +740,6 @@ export const academicKinds = {
     },
     store: asEditable(letterGradeStore),
   },
-  remarks: {
-    segment: "remarks",
-    singular: "Result remark",
-    plural: "Result remarks",
-    description: "Remarks printed on results for a GPA, marks or fail-count range.",
-    // Legacy ResultRemarks: per class and optionally medium; names are unique,
-    // and ranked, within that scope.
-    uniqueScope: ["medium", "classId"],
-    softDelete: true,
-    nameLabel: "Remarks",
-    nameMultiline: true,
-    recordFilters: [
-      { key: "classId", label: "Class", allLabel: "All classes", store: asEditable(classStore) },
-    ],
-    fields: [
-      mediumField,
-      {
-        key: "classId",
-        label: "Academic class",
-        type: "record",
-        required: true,
-        source: asEditable(classStore),
-        sourceFilter: (c, values) => !values.medium || !c.medium || c.medium === values.medium,
-      },
-      { key: "minGpa", label: "Minimum GPA", type: "decimal", required: true, min: 0 },
-      { key: "maxGpa", label: "Maximum GPA", type: "decimal", required: true, min: 0 },
-      { key: "minMarks", label: "Minimum marks", type: "decimal", required: true, min: 0, max: 100 },
-      { key: "maxMarks", label: "Maximum marks", type: "decimal", required: true, min: 0, max: 100 },
-      { key: "minFailCount", label: "Minimum fail count", type: "integer", required: true, min: 0 },
-      { key: "maxFailCount", label: "Maximum fail count", type: "integer", required: true, min: 0 },
-      {
-        key: "basedOnGrading",
-        label: "Based on grading",
-        type: "checkbox",
-        description: "Use the GPA range instead of the marks range.",
-      },
-      {
-        key: "isGolden",
-        label: "Golden",
-        type: "checkbox",
-        description: "Golden GPA: the top grade in every subject.",
-      },
-    ],
-    columns: [
-      {
-        label: "GPA",
-        render: (r) => (
-          <span className="flex items-center gap-2">
-            {range(r.minGpa, r.maxGpa)}
-            {Boolean(r.isGolden) && (
-              <Badge className="bg-amber-500 text-white">Golden</Badge>
-            )}
-          </span>
-        ),
-      },
-      { label: "Marks", render: (r) => range(r.minMarks, r.maxMarks) },
-      { label: "Fail count", render: (r) => range(r.minFailCount, r.maxFailCount, 0) },
-      mediumColumn,
-      {
-        label: "Class",
-        render: (r) =>
-          r.classId == null ? "All" : <RecordName store={asEditable(classStore)} id={r.classId} />,
-      },
-    ],
-    validate: (values, { institute }) => {
-      const errors: Errors = {}
-      const maxGpa = institute.configuration.maximumGpa
-      checkRange(errors, values, "minGpa", "maxGpa", "GPA")
-      if (num(values.maxGpa) > maxGpa) {
-        errors.maxGpa = `Can not exceed the institute's maximum GPA (${maxGpa}).`
-      }
-      checkRange(errors, values, "minMarks", "maxMarks", "Marks")
-      if (num(values.maxMarks) > 100) errors.maxMarks = "Marks can not exceed 100."
-      checkRange(errors, values, "minFailCount", "maxFailCount", "Fail count")
-      return errors
-    },
-    store: asEditable(resultRemarkStore),
-  },
   // Legacy Buildings, listed under the Seat Plan menu rather than Basic
   // Settings (/seat-plans/buildings/admin), but kept as an institute tab.
   buildings: {
@@ -1038,7 +959,6 @@ export const academicKindOrder: AcademicKind[] = [
   "subjects",
   "classSubjects",
   "grades",
-  "remarks",
   "buildings",
 ]
 

@@ -35,7 +35,7 @@ export type LookupPage<R extends LookupRow = LookupRow> = {
 
 export type LookupFields = {
   // Client checks with legacy messages; the API repeats them.
-  validate: () => LookupErrors
+  validate: (institute?: Institute) => LookupErrors
   // The fields' part of the input.
   values: () => Record<string, unknown>
   reset: () => void

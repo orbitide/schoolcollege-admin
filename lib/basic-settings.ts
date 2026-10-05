@@ -17,7 +17,6 @@ export const basicSettingsMenu: {
   { title: "Subjects", segment: "subjects", kind: "subjects" },
   { title: "Class Year Subjects", segment: "class-subjects", kind: "classSubjects" },
   { title: "Letter Grades", segment: "grades", kind: "grades" },
-  { title: "Result Remarks", segment: "remarks", kind: "remarks" },
   { title: "Holidays & Events", segment: "holidays", surfaces: true },
   { title: "Districts", segment: "districts" },
   { title: "User Institutes", segment: "user-institutes" },
