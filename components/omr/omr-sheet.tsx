@@ -256,14 +256,14 @@ export function OmrSheet({ layout, info }: { layout: OmrLayout; info: OmrSheetIn
           </text>
         </>
       )}
-      {answers.columns.map((column, c) => (
-        <g key={c}>
+      {answers.columns.map((column, colIdx) => (
+        <g key={colIdx}>
           {column.bubbles.map((bx, k) => (
             <text key={k} x={bx} y={answers.headerY + 0.9} textAnchor="middle" fontSize={2.5 * f} fontWeight={700} fill={c.ink}>
               {optionLabels[info.lang][k]}
             </text>
           ))}
-          {c > 0 && (
+          {colIdx > 0 && (
             <line
               x1={column.left - 1.5}
               y1={answers.headerY - 2}
